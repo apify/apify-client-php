@@ -1,0 +1,81 @@
+name: PHP integration tests
+
+# Language-specific workflow: only runs for the PHP client. Triggers on PRs to master that touch
+# PHP client, test, example, or documentation code, and can be dispatched manually from any branch.
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '**/*.php'
+      - 'composer.json'
+      - 'composer.lock'
+      - '.php-cs-fixer.dist.php'
+      - 'phpstan.neon.dist'
+      - 'phpunit.xml.dist'
+      # The "Test examples" step validates the in-documentation snippets, so doc changes must
+      # re-run the workflow even though Markdown is not PHP code.
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/php-integration-tests.yml'
+  workflow_dispatch:
+
+# Avoid concurrent runs of the same ref racing on the shared test account.
+concurrency:
+  group: php-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, json, curl
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # The formatter/lint gate mandated by the coding rules (PSR-12 via php-cs-fixer).
+      - name: Check formatting (php-cs-fixer)
+        run: composer lint
+
+      # Static-analysis gate mandated by the coding rules.
+      - name: Static analysis (PHPStan)
+        run: composer stan
+
+      # Offline unit tests (mock transport): prove the retry/error/signature logic without the API.
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite unit
+
+      # Fail fast if the integration-test secret is missing or empty. Without this guard the
+      # integration tests silently "pass" (they self-skip when APIFY_TOKEN is unset), so a green run
+      # would not prove the API logic actually executed.
+      - name: Require APIFY_TOKEN secret
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          if [ -z "${APIFY_TOKEN}" ]; then
+            echo "::error::APIFY_TOKEN secret is empty or missing; integration tests would not run against the API."
+            exit 1
+          fi
+
+      - name: Integration tests
+        env:
+          # The integration-test token is stored as a repository secret.
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: vendor/bin/phpunit --testsuite integration
+
+      # Standalone CI step that verifies the documentation examples work end-to-end against the live
+      # API (ExamplesTest runs each example) and that every in-documentation PHP snippet is valid,
+      # runnable code (DocSnippetsTest lints each fenced block).
+      - name: Test examples
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: vendor/bin/phpunit --testsuite examples
