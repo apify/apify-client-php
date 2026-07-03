@@ -175,7 +175,7 @@ final class ApifyClient
     /** A client for a specific Actor run. */
     public function run(string $id): RunClient
     {
-        return new RunClient($this, $this->http, $this->baseUrl, 'actor-runs', $id);
+        return new RunClient($this->http, $this->baseUrl, 'actor-runs', $id);
     }
 
     // ----- Dataset accessors ---------------------------------------------------

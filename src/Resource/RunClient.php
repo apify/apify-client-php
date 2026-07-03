@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Apify\Client\Resource;
 
-use Apify\Client\ApifyClient;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
@@ -33,7 +32,6 @@ final class RunClient
 
     /** @internal */
     public function __construct(
-        private ApifyClient $root,
         private HttpClientCore $http,
         string $baseUrl,
         string $resourcePath,

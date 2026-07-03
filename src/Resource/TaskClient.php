@@ -113,7 +113,7 @@ final class TaskClient
     /** Returns a client for the last run of this task, optionally filtered by status and/or origin. */
     public function lastRun(?LastRunOptions $options = null): RunClient
     {
-        $client = new RunClient($this->root, $this->http, $this->ctx->subUrl(''), 'runs', 'last');
+        $client = new RunClient($this->http, $this->ctx->subUrl(''), 'runs', 'last');
         $client->setLastRunParams($options ?? new LastRunOptions());
         return $client;
     }
