@@ -179,28 +179,40 @@ final class RunClient
         return new ActorRun($data);
     }
 
-    /** A client for this run's default dataset. */
+    /**
+     * A client for this run's default dataset. Any {@code status}/{@code origin} filters pinned by a
+     * last-run accessor are inherited so the correct run's dataset is resolved.
+     */
     public function dataset(): DatasetClient
     {
-        return DatasetClient::nested($this->http, $this->ctx->subUrl(''), 'dataset');
+        return DatasetClient::nested($this->http, $this->ctx->subUrl(''), 'dataset', $this->ctx->baseParams);
     }
 
-    /** A client for this run's default key-value store. */
+    /**
+     * A client for this run's default key-value store. Any {@code status}/{@code origin} filters
+     * pinned by a last-run accessor are inherited so the correct run's store is resolved.
+     */
     public function keyValueStore(): KeyValueStoreClient
     {
-        return KeyValueStoreClient::nested($this->http, $this->ctx->subUrl(''), 'key-value-store');
+        return KeyValueStoreClient::nested($this->http, $this->ctx->subUrl(''), 'key-value-store', $this->ctx->baseParams);
     }
 
-    /** A client for this run's default request queue. */
+    /**
+     * A client for this run's default request queue. Any {@code status}/{@code origin} filters pinned
+     * by a last-run accessor are inherited so the correct run's queue is resolved.
+     */
     public function requestQueue(): RequestQueueClient
     {
-        return RequestQueueClient::nested($this->http, $this->ctx->subUrl(''), 'request-queue');
+        return RequestQueueClient::nested($this->http, $this->ctx->subUrl(''), 'request-queue', $this->ctx->baseParams);
     }
 
-    /** A client for accessing this run's log. */
+    /**
+     * A client for accessing this run's log. Any {@code status}/{@code origin} filters pinned by a
+     * last-run accessor are inherited so the correct run's log is resolved.
+     */
     public function log(): LogClient
     {
-        return LogClient::nested($this->http, $this->ctx->subUrl(''));
+        return LogClient::nested($this->http, $this->ctx->subUrl(''), $this->ctx->baseParams);
     }
 
     /**

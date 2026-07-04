@@ -57,10 +57,18 @@ final class RequestQueueClient
         return new self($http, $ctx, $options?->clientKey, $timeoutSecs);
     }
 
-    /** Creates a client for a run's default request queue (nested path only, no ID). @internal */
-    public static function nested(HttpClientCore $http, string $base, string $subPath): self
+    /**
+     * Creates a client for a run's default request queue (nested path only, no ID). Any
+     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
+     * accessor) become base params so every request resolves the correct run's queue. @internal
+     */
+    public static function nested(HttpClientCore $http, string $base, string $subPath, ?QueryParams $inheritedParams = null): self
     {
-        return new self($http, ResourceContext::collection($http, $base, $subPath), null);
+        $ctx = ResourceContext::collection($http, $base, $subPath);
+        if ($inheritedParams !== null) {
+            $ctx->baseParams = $inheritedParams->copy();
+        }
+        return new self($http, $ctx, null);
     }
 
     /**

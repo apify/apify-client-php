@@ -29,10 +29,18 @@ final class KeyValueStoreClient
         return new self(ResourceContext::single($http, $baseUrl, 'key-value-stores', $id));
     }
 
-    /** Creates a client for a run's default key-value store (nested path only, no ID). @internal */
-    public static function nested(HttpClientCore $http, string $base, string $subPath): self
+    /**
+     * Creates a client for a run's default key-value store (nested path only, no ID). Any
+     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
+     * accessor) become base params so every request resolves the correct run's store. @internal
+     */
+    public static function nested(HttpClientCore $http, string $base, string $subPath, ?QueryParams $inheritedParams = null): self
     {
-        return new self(ResourceContext::collection($http, $base, $subPath));
+        $ctx = ResourceContext::collection($http, $base, $subPath);
+        if ($inheritedParams !== null) {
+            $ctx->baseParams = $inheritedParams->copy();
+        }
+        return new self($ctx);
     }
 
     /** @internal */

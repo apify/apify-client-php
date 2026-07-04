@@ -29,10 +29,18 @@ final class DatasetClient
         return new self($http, ResourceContext::single($http, $baseUrl, 'datasets', $id));
     }
 
-    /** Creates a dataset client for a run's default dataset (nested path only, no ID). @internal */
-    public static function nested(HttpClientCore $http, string $base, string $subPath): self
+    /**
+     * Creates a dataset client for a run's default dataset (nested path only, no ID). Any
+     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
+     * accessor) become base params so every request resolves the correct run's dataset. @internal
+     */
+    public static function nested(HttpClientCore $http, string $base, string $subPath, ?QueryParams $inheritedParams = null): self
     {
-        return new self($http, ResourceContext::collection($http, $base, $subPath));
+        $ctx = ResourceContext::collection($http, $base, $subPath);
+        if ($inheritedParams !== null) {
+            $ctx->baseParams = $inheritedParams->copy();
+        }
+        return new self($http, $ctx);
     }
 
     /** @internal */
@@ -78,7 +86,7 @@ final class DatasetClient
         $options ??= new DatasetListItemsOptions();
         $params = new QueryParams();
         $options->appendTo($params);
-        $url = $params->applyToUrl($this->ctx->subUrl('items'));
+        $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
         $response = $this->http->call('GET', $url);
 
         $items = Json::decode((string) $response->getBody());
@@ -105,7 +113,7 @@ final class DatasetClient
         $params = new QueryParams();
         $params->addString('format', $format->value);
         ($options ?? new DatasetDownloadOptions())->appendTo($params);
-        $url = $params->applyToUrl($this->ctx->subUrl('items'));
+        $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
         $response = $this->http->call('GET', $url);
         return (string) $response->getBody();
     }
@@ -117,9 +125,10 @@ final class DatasetClient
      */
     public function pushItems(mixed $items): void
     {
+        $url = $this->ctx->mergedParams(new QueryParams())->applyToUrl($this->ctx->subUrl('items'));
         $this->http->call(
             'POST',
-            $this->ctx->subUrl('items'),
+            $url,
             Json::encode($items),
             ResourceContext::CONTENT_TYPE_JSON_CHARSET
         );

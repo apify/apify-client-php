@@ -26,10 +26,18 @@ final class LogClient
         return new self($http, ResourceContext::single($http, $baseUrl, 'logs', $id));
     }
 
-    /** Creates a log client for a run's or build's nested log endpoint (e.g. {@code .../log}). @internal */
-    public static function nested(HttpClientCore $http, string $base): self
+    /**
+     * Creates a log client for a run's or build's nested log endpoint (e.g. {@code .../log}). Any
+     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
+     * accessor) become base params so the log of the correct run is resolved. @internal
+     */
+    public static function nested(HttpClientCore $http, string $base, ?QueryParams $inheritedParams = null): self
     {
-        return new self($http, ResourceContext::collection($http, $base, 'log'));
+        $ctx = ResourceContext::collection($http, $base, 'log');
+        if ($inheritedParams !== null) {
+            $ctx->baseParams = $inheritedParams->copy();
+        }
+        return new self($http, $ctx);
     }
 
     /** Fetches the log as text, or {@code null} if the log does not exist. */
