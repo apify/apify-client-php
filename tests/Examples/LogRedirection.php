@@ -11,9 +11,13 @@ final class LogRedirection
 {
     public static function run(ApifyClient $client): void
     {
+        // Start the run without waiting for it to finish.
         $run = $client->actor('apify/hello-world')->start();
-        // Wait for the run to finish so the full log is available, then stream it to stdout.
-        $client->run((string) $run->getId())->waitForFinish(120);
+
+        // Open a live streaming connection to the run's log (the `stream=1` endpoint) and redirect it
+        // to stdout as the run produces it. The server keeps the connection open and emits log lines
+        // in real time; the stream ends once the run finishes, so reading it to EOF also waits for
+        // the run to complete.
         $stream = $client->run((string) $run->getId())->getStreamedLog();
         while (!$stream->eof()) {
             echo $stream->read(8192);

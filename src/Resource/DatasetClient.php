@@ -159,14 +159,19 @@ final class DatasetClient
      */
     public function createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null): string
     {
+        $options ??= new DatasetListItemsOptions();
         $params = new QueryParams();
-        ($options ?? new DatasetListItemsOptions())->appendTo($params);
-        $dataset = $this->get();
-        if ($dataset !== null) {
-            $secret = $dataset->get('urlSigningSecretKey');
-            if (is_string($secret)) {
-                $signature = Signatures::signStorageContent($secret, (string) $dataset->getId(), $expiresInSecs);
-                $params->addString('signature', $signature);
+        $options->appendTo($params);
+        // Only compute a signature when the caller did not already supply one, otherwise the URL
+        // would carry two conflicting `signature` query params (mirrors KeyValueStoreClient::createKeysPublicUrl).
+        if ($options->signature === null) {
+            $dataset = $this->get();
+            if ($dataset !== null) {
+                $secret = $dataset->get('urlSigningSecretKey');
+                if (is_string($secret)) {
+                    $signature = Signatures::signStorageContent($secret, (string) $dataset->getId(), $expiresInSecs);
+                    $params->addString('signature', $signature);
+                }
             }
         }
         return $params->applyToUrl($this->ctx->publicUrl('items'));

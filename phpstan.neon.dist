@@ -1,3 +1,9 @@
+# Rationale for level 6: the public surface is fully, explicitly typed (native param/return types
+# plus array-shape PHPDoc), which level 6 enforces. Levels 7-9 mainly tighten handling of `mixed`,
+# but this client deliberately exposes `mixed` at the API boundary (arbitrary JSON-serializable Actor
+# input, raw record values, unmodelled response fields via `toArray()`), so those levels would force
+# defensive casts on values that are `mixed` by design rather than surface real bugs. Level 6 is the
+# strongest level that fits this JSON-centric API without such noise.
 parameters:
     level: 6
     paths:

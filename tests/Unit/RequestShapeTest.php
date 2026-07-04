@@ -6,6 +6,7 @@ namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\Json;
+use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\MetamorphOptions;
 use Apify\Client\Options\RequestQueueClientOptions;
 use Apify\Client\Options\RunChargeOptions;
@@ -128,6 +129,32 @@ final class RequestShapeTest extends TestCase
 
         // The per-queue timeout must be threaded down to the transport (first attempt uses it directly).
         self::assertSame(2.0, $transport->timeouts[0]);
+    }
+
+    public function testCreateItemsPublicUrlDoesNotDuplicateCallerSignature(): void
+    {
+        // When the caller already supplies a signature, the client must not fetch the dataset to
+        // compute a second one — the URL would otherwise carry two conflicting `signature` params.
+        $transport = new MockTransport(); // no responses queued: get() must not be called
+        $url = $this->client($transport)
+            ->dataset('ds1')
+            ->createItemsPublicUrl(new DatasetListItemsOptions(signature: 'caller-sig'));
+
+        self::assertSame(0, $transport->callCount());
+        self::assertSame(1, substr_count($url, 'signature='));
+        self::assertStringContainsString('signature=caller-sig', $url);
+    }
+
+    public function testCreateItemsPublicUrlSignsPrivateDatasetWhenNoSignatureGiven(): void
+    {
+        // Private datasets (those exposing urlSigningSecretKey) get a single computed signature.
+        $transport = (new MockTransport())->queueResponse(
+            200,
+            Json::encode(['data' => ['id' => 'ds1', 'urlSigningSecretKey' => 'secret']])
+        );
+        $url = $this->client($transport)->dataset('ds1')->createItemsPublicUrl();
+
+        self::assertSame(1, substr_count($url, 'signature='));
     }
 
     public function testUpdateLimitsPutsToMeLimits(): void

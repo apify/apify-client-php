@@ -40,10 +40,11 @@ throwing. API failures are thrown as `ApifyApiException` (see [error handling](.
 
 ## Models and unmodeled data (`toArray`)
 
-Response models expose the commonly-used fields as typed getters (e.g. `$actor->getId()`). The API
-returns more fields than are modelled; every model also exposes `toArray()`, which returns the full
-raw object, so nothing the API returns is lost. For example a `Schedule`'s `actions`/`isExclusive`,
-or the private account details of `me()`, are available via `toArray()`:
+Response models expose the commonly-used fields as typed getters (e.g. `$actor->getId()`). The
+[models reference](models.md) lists every model and its getters. The API returns more fields than are
+modelled; every model also exposes `toArray()`, which returns the full raw object, so nothing the API
+returns is lost. For example a `Schedule`'s `actions`/`isExclusive`, or the private account details
+of `me()`, are available via `toArray()`:
 
 ```php
 $schedule = $client->schedule('SCHEDULE_ID')->get();
@@ -71,6 +72,8 @@ the arguments you need:
 $options = new ActorListOptions(my: true, limit: 10);
 $page = $client->actors()->list($options);
 ```
+
+The [options reference](options.md) lists every option class and all of its fields.
 
 ## Common list options — `ListOptions`
 
@@ -110,4 +113,6 @@ inside a run and throws otherwise. Returns the updated run.
 - [Schedules](schedules.md)
 - [Webhooks & dispatches](webhooks.md)
 - [Store, users & logs](misc.md)
+- [Models reference](models.md)
+- [Options reference](options.md)
 - [Runnable examples](examples.md)

@@ -1,8 +1,11 @@
 # Runnable examples
 
-Each example below is a self-contained snippet assuming a configured `$client`. The same programs
-live under [`tests/Examples/`](../tests/Examples) and are executed end-to-end against the live API by
-the `Test examples` CI step (see `ExamplesTest`), so they are guaranteed to stay runnable.
+Each snippet below assumes a configured `$client` and that the types it uses are imported with the
+appropriate `use` statements (see [Namespaces](README.md#namespaces)); the first
+[complete program](#a-complete-standalone-program) shows the full scaffolding the shorter snippets
+omit for brevity. The same programs live under [`tests/Examples/`](../tests/Examples) and are executed
+end-to-end against the live API by the `Test examples` CI step (see `ExamplesTest`), so they are
+guaranteed to stay runnable.
 
 ## A complete, standalone program
 
@@ -100,11 +103,16 @@ try {
 ## Start a run, wait, then fetch the Actor's last run and its storages
 
 ```php
-$client->actor('apify/hello-world')->call(null, null, 120);
-$last = $client->actor('apify/hello-world')->lastRun(new LastRunOptions(status: 'SUCCEEDED'))->get();
+$started = $client->actor('apify/hello-world')->start();
+$client->run($started->getId())->waitForFinish(120);
+
+// Fetch the last run and read its storages via the run-nested convenience accessors.
+$lastRun = $client->actor('apify/hello-world')->lastRun(new LastRunOptions(status: 'SUCCEEDED'));
+$last = $lastRun->get();
 if ($last !== null) {
-    $client->dataset($last->getDefaultDatasetId())->listItems();
-    $client->keyValueStore($last->getDefaultKeyValueStoreId())->getRecord('OUTPUT');
+    $lastRun->dataset()->listItems();
+    $lastRun->keyValueStore()->getRecord('OUTPUT');
+    $lastRun->requestQueue()->listHead(10);
 }
 ```
 
@@ -123,8 +131,9 @@ foreach ($client->store()->iterate(new StoreListOptions(limit: 10)) as $item) {
 ## Run an Actor with log redirection
 
 ```php
+// Start the run without waiting, then redirect its log to stdout live. The streaming endpoint keeps
+// the connection open and emits log lines in real time; reading to EOF also waits for the run to end.
 $run = $client->actor('apify/hello-world')->start();
-$client->run($run->getId())->waitForFinish(120);
 $stream = $client->run($run->getId())->getStreamedLog();
 while (!$stream->eof()) {
     echo $stream->read(8192);
