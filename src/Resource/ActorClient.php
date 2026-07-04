@@ -125,7 +125,8 @@ final class ActorClient
     public function defaultBuild(?int $waitForFinish = null): BuildClient
     {
         $params = new QueryParams();
-        $params->addInt('waitForFinish', $waitForFinish);
+        // Clamp the server-side wait below the per-request timeout, consistent with run/build get().
+        $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinish));
         $data = $this->ctx->getResourceRequired('builds/default', $params);
         $build = new Build(is_array($data) ? $data : []);
         return new BuildClient($this->http, $this->baseUrl, (string) $build->getId());

@@ -93,7 +93,9 @@ final class KeyValueStoreClient
      */
     public function getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord
     {
-        $options ??= new GetRecordOptions(attachment: true);
+        // GetRecordOptions defaults attachment=true (matching the reference client), so a caller-
+        // supplied options object requests the record as an attachment unless it opts out explicitly.
+        $options ??= new GetRecordOptions();
         $params = new QueryParams();
         $options->appendTo($params);
         $response = $this->ctx->getRaw('records/' . ResourceContext::encodePathSegment($key), $params);
@@ -148,8 +150,8 @@ final class KeyValueStoreClient
         $params = new QueryParams();
         $store = $this->get();
         if ($store !== null) {
-            $secret = DatasetClient::extractString($store->toArray(), 'urlSigningSecretKey');
-            if ($secret !== null) {
+            $secret = $store->get('urlSigningSecretKey');
+            if (is_string($secret)) {
                 $params->addString('signature', Signatures::createHmacSignature($secret, $key));
             }
         }
@@ -169,8 +171,8 @@ final class KeyValueStoreClient
         if ($options->signature === null) {
             $store = $this->get();
             if ($store !== null) {
-                $secret = DatasetClient::extractString($store->toArray(), 'urlSigningSecretKey');
-                if ($secret !== null) {
+                $secret = $store->get('urlSigningSecretKey');
+                if (is_string($secret)) {
                     $params->addString(
                         'signature',
                         Signatures::signStorageContent($secret, (string) $store->getId(), $expiresInSecs)

@@ -86,14 +86,27 @@ final class RequestShapeTest extends TestCase
 
     public function testDefaultBuildFetchesBuildsDefault(): void
     {
+        // Ample per-request timeout so the server-side wait clamp leaves waitForFinish=10 intact.
         $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'build1']]));
-        $this->client($transport)->actor('me~a')->defaultBuild(10);
+        $client = new ApifyClient(token: 't', minDelayBetweenRetriesMillis: 1, timeoutSecs: 60, httpClient: $transport);
+        $client->actor('me~a')->defaultBuild(10);
 
         $request = $transport->lastRequest();
         self::assertSame('GET', $request->getMethod());
         $uri = (string) $request->getUri();
         self::assertStringContainsString('/actors/me~a/builds/default', $uri);
         self::assertStringContainsString('waitForFinish=10', $uri);
+    }
+
+    public function testDefaultBuildClampsWaitToPerRequestTimeout(): void
+    {
+        // With a small per-request timeout, the server-side wait is clamped down so the server never
+        // holds the connection past the client's socket timeout (consistent with run/build get()).
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'build1']]));
+        $client = new ApifyClient(token: 't', minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
+        $client->actor('me~a')->defaultBuild(120);
+
+        self::assertStringContainsString('waitForFinish=0', (string) $transport->lastRequest()->getUri());
     }
 
     public function testRequestQueueOptionsApplyClientKey(): void

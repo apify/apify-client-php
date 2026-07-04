@@ -76,11 +76,6 @@ final class QueryParams
         return $this;
     }
 
-    public function isEmpty(): bool
-    {
-        return $this->pairs === [];
-    }
-
     /** Returns a shallow copy of this instance. */
     public function copy(): self
     {

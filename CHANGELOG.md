@@ -10,7 +10,8 @@
   `validateInput()`, `defaultBuild()`, `lastRun()`, run `abort`/`metamorph`/`reboot`/`resurrect`/
   `charge`/`waitForFinish`, dataset `listItems`/`downloadItems`/`pushItems`/public URLs, key-value
   store records and public URLs, request queue batch add with retries, lazy request/store iteration,
-  and log streaming.
+  and log streaming. `lastRun(status, origin)` filters propagate to the run's nested dataset,
+  key-value store, request queue, and log accessors, so they resolve the same run.
 - `batchAddRequests` requires a non-empty `uniqueKey` per request, splits batches by both the 25-request
   count limit and the ~9 MiB payload-size limit, and retries only the requests the API reports
   unprocessed in a successful response (previously it hard-coded an empty unprocessed list and could

@@ -2,8 +2,10 @@
 
 Snippets assume `$client = new ApifyClient('my-api-token');` and imported types (see
 [Namespaces](README.md#namespaces)). The storage collections all support
-`list(?StorageListOptions $options = null)` and `getOrCreate(?string $name = null, ?array $schema = null)`,
-and the same storage can be reached from a run (`$client->run($id)->dataset()`, etc.).
+`list(?StorageListOptions $options = null)` and `getOrCreate(?string $name = null)`; the dataset and
+key-value-store collections additionally accept an optional `?array $schema` on `getOrCreate`
+(request queues take only a name). The same storage can be reached from a run
+(`$client->run($id)->dataset()`, etc.).
 
 ## Datasets
 
@@ -52,7 +54,7 @@ echo $record?->getValue() ?? '';
 ## Request queues
 
 Collection — `$client->requestQueues()`: `list(?StorageListOptions $options = null): PaginationList`,
-`getOrCreate(?string $name = null, ?array $schema = null): RequestQueue`.
+`getOrCreate(?string $name = null): RequestQueue`.
 
 A specific queue client is obtained with `$client->requestQueue($id, ?RequestQueueClientOptions $options = null)`.
 The optional `RequestQueueClientOptions` sets a stable `clientKey` (required to operate on locks the

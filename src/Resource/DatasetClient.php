@@ -163,8 +163,8 @@ final class DatasetClient
         ($options ?? new DatasetListItemsOptions())->appendTo($params);
         $dataset = $this->get();
         if ($dataset !== null) {
-            $secret = self::extractString($dataset->toArray(), 'urlSigningSecretKey');
-            if ($secret !== null) {
+            $secret = $dataset->get('urlSigningSecretKey');
+            if (is_string($secret)) {
                 $signature = Signatures::signStorageContent($secret, (string) $dataset->getId(), $expiresInSecs);
                 $params->addString('signature', $signature);
             }
@@ -176,17 +176,5 @@ final class DatasetClient
     {
         $value = $response->getHeaderLine($name);
         return $value === '' ? $fallback : (int) $value;
-    }
-
-    /**
-     * Reads a string field from a raw resource array, returning {@code null} if absent or not a string.
-     *
-     * @param array<string,mixed> $data
-     * @internal
-     */
-    public static function extractString(array $data, string $key): ?string
-    {
-        $value = $data[$key] ?? null;
-        return is_string($value) ? $value : null;
     }
 }
