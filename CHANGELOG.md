@@ -2,7 +2,7 @@
 
 ## 0.1.0
 
-- Initial PHP client for the Apify API (spec `v2-2026-07-02T131926Z`).
+- Initial PHP client for the Apify API (spec `v2-2026-07-01T115402Z`).
 - Resource clients for Actors, Actor versions and environment variables, builds, runs, datasets,
   key-value stores, request queues, tasks, schedules, webhooks, webhook dispatches, the Apify Store,
   users, and logs.

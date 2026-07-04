@@ -23,7 +23,7 @@ final class Version
      * The version of the Apify OpenAPI specification this client was generated and verified
      * against. Corresponds to the {@code info.version} field of the Apify OpenAPI document.
      */
-    public const API_SPEC_VERSION = 'v2-2026-07-02T131926Z';
+    public const API_SPEC_VERSION = 'v2-2026-07-01T115402Z';
 
     private function __construct()
     {
