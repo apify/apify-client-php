@@ -1,0 +1,114 @@
+name: Publish PHP client
+
+# Language-specific publish workflow for the PHP client. Triggered manually only (workflow_dispatch)
+# so a maintainer deliberately decides when a release is cut. The release version is the single
+# source of truth in src/Version.php (CLIENT_VERSION). The package is distributed via Packagist,
+# which builds the release from the pushed Git tag; this workflow tags the release, creates the
+# GitHub release, and notifies Packagist to update.
+#
+# Packagist does not offer OIDC "Trusted Publishing"; its update API requires a username + API token,
+# which are read from repository secrets (nothing is stored in the repo).
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run all checks but do not tag, release, or notify Packagist.'
+        type: boolean
+        default: false
+
+# Never allow two publish runs to race; publishing two releases concurrently is hard to undo.
+concurrency:
+  group: php-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the tagged GitHub release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A release must only ever be cut from master.
+      - name: Require master branch
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/master" ]; then
+            echo "::error::Publishing is only allowed from master, but this run is on '${GITHUB_REF}'."
+            exit 1
+          fi
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, json, curl
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Gate the release on the same quality bar as CI so a broken build can never be published.
+      - name: Check formatting (php-cs-fixer)
+        run: composer lint
+
+      - name: Static analysis (PHPStan)
+        run: composer stan
+
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite unit
+
+      - name: Resolve version from src/Version.php
+        id: version
+        run: |
+          version=$(php -r "require 'src/Version.php'; echo Apify\Client\Version::CLIENT_VERSION;")
+          if ! echo "${version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version::CLIENT_VERSION '${version}' is not a bare semver (X.Y.Z)."
+            exit 1
+          fi
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: v${version}"
+
+      - name: Ensure tag does not already exist
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists on origin; bump Version::CLIENT_VERSION first."
+            exit 1
+          fi
+
+      - name: Create and push release tag
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub release
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes "Apify PHP client ${TAG}. See CHANGELOG.md for details."
+
+      # Notify Packagist to pull the new tag. Credentials come from repository secrets.
+      - name: Notify Packagist
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          curl -sS -XPOST -H'content-type:application/json' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
+            -d'{"repository":{"url":"https://packagist.org/packages/apify/apify-client"}}'
