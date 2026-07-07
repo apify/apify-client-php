@@ -8,9 +8,9 @@ namespace Apify\Client\Options;
  * Filters which "last" run the last-run accessors resolve to. Leave a field {@code null} to leave
  * that filter unset.
  *
- * {@code origin} is an Apify-platform convenience exposed by the reference client but not documented
- * as a query parameter in the OpenAPI spec; it is included for parity, threaded to the same
- * {@code runs/last} endpoint.
+ * {@code origin} is a query parameter declared on the {@code runs/last} endpoints in the OpenAPI
+ * spec (alongside {@code status}); it is threaded to that endpoint, matching the reference client's
+ * {@code lastRun({ status, origin })}.
  */
 final class LastRunOptions
 {
