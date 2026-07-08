@@ -64,7 +64,7 @@ $configured = new ApifyClient(
 | `publicBaseUrl` | `baseUrl` | Base URL used when building public, shareable resource URLs. |
 | `maxRetries` | `8` | Maximum retries for failed requests. |
 | `minDelayBetweenRetriesMillis` | `500` | Minimum delay between retries (exponential backoff). |
-| `maxDelayBetweenRetriesMillis` | request timeout | Upper bound on the growing inter-retry delay. |
+| `maxDelayBetweenRetriesMillis` | `timeoutSecs × 1000` (360000) | Upper bound (milliseconds) on the growing inter-retry delay; defaults to the request timeout expressed in milliseconds. |
 | `timeoutSecs` | `360` | Overall per-request timeout. |
 | `userAgentSuffix` | `null` | Custom suffix appended to the `User-Agent` header. |
 | `httpClient` | Guzzle | The replaceable transport (`Apify\Client\Http\HttpClientInterface`). |
@@ -79,14 +79,19 @@ can wrap any [PSR-18](https://www.php-fig.org/psr/psr-18/) client with `Psr18Htt
 your own implementation:
 
 ```php
+// Use the default Guzzle transport explicitly.
 $client = new ApifyClient(token: 'my-api-token', httpClient: new GuzzleHttpClient());
+
+// Or wrap any PSR-18 client (configure its proxy/TLS/timeout on the wrapped client, since
+// PSR-18 has no per-request timeout and Psr18HttpClient ignores the client's timeoutSecs).
+$psr18 = new \GuzzleHttp\Client(['timeout' => 120]); // any Psr\Http\Message ClientInterface
+$client = new ApifyClient(token: 'my-api-token', httpClient: new Psr18HttpClient($psr18));
 ```
 
 ## Error handling
 
 Methods that fetch a single resource return `null` when the resource does not exist (rather than
-throwing). Other API failures are thrown as `Apify\Client\Exception\ApifyApiException`, which exposes
-the HTTP status, API error `type`, message, attempt count, and request method/path:
+throwing). Other API failures are thrown as `Apify\Client\Exception\ApifyApiException`:
 
 ```php
 try {
@@ -95,6 +100,22 @@ try {
     echo $e->getStatusCode() . ' ' . $e->getType() . ': ' . $e->getApiMessage() . PHP_EOL;
 }
 ```
+
+`ApifyApiException` extends `RuntimeException` and exposes:
+
+| Accessor | Returns |
+|---|---|
+| `getStatusCode(): int` | HTTP status code of the error response. |
+| `getType(): ?string` | Machine-readable API error type (e.g. `"record-not-found"`). |
+| `getApiMessage(): string` | Raw API error message, without the status/type prefix. |
+| `getMessage(): string` | Formatted message (`apify API error (status …, type …): …`), from `Throwable`. |
+| `getAttempt(): int` | 1-based number of the request attempt that produced the error. |
+| `getHttpMethod(): string` | HTTP method of the failed call (e.g. `"GET"`). |
+| `getPath(): string` | Path of the API endpoint (URL excluding origin). |
+| `getData(): ?array` | Additional structured error data provided by the API, if any. |
+
+Transport-level failures (network errors, timeouts) are retried internally; only if every retry is
+exhausted does the underlying error surface. Requests are retried on network errors, HTTP 429 and 5xx.
 
 ## Versioning
 

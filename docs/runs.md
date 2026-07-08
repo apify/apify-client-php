@@ -4,7 +4,7 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Run collection — `$client->runs()`
 
-- `list(?ListOptions $options, ?RunListOptions $filter): PaginationList` — list runs.
+- `list(?ListOptions $options = null, ?RunListOptions $filter = null): PaginationList` — list runs.
 
 ```php
 $page = $client->runs()->list(new ListOptions(limit: 10), new RunListOptions(status: ['SUCCEEDED']));
@@ -31,3 +31,15 @@ $run = $client->run('RUN_ID')->waitForFinish(120);
 $client->run('RUN_ID')->charge(new RunChargeOptions(eventName: 'result', count: 3));
 $items = $client->run('RUN_ID')->dataset()->listItems();
 ```
+
+### `waitForFinish` — two distinct meanings
+
+`waitForFinish` appears in two different roles; do not confuse them:
+
+- **`waitForFinish(?int $waitSecs = null)`** — the client-side helper method (on runs and builds). It
+  polls until the run/build reaches a terminal state, transparently issuing repeated server-side
+  waits. `$waitSecs` is the total budget in seconds and is **not** capped; `null` waits indefinitely.
+  For instance, `waitForFinish(300)` waits up to five minutes.
+- **The server-side `waitForFinish` parameter** — `get(?int $waitForFinishSecs = null)` (and
+  `defaultBuild()`) and the `waitForFinish` field on `*Options` (e.g. `ActorStartOptions`). This is a
+  single API-side wait and the server caps it at 60 seconds, so the client clamps larger values.

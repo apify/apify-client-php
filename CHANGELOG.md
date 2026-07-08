@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Synced to Apify OpenAPI spec `v2-2026-07-07T132551Z`. No public interface changes.
+- `origin` is now a spec-declared query parameter on the last-run endpoints; corrected the
+  `LastRunOptions` doc comment accordingly (behavior unchanged). Kept parity with the reference
+  client, which does not expose `waitForFinish` on `lastRun`.
+
 ## 0.1.0
 
 - Initial PHP client for the Apify API (spec `v2-2026-07-02T131926Z`).

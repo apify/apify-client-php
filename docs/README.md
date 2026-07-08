@@ -35,6 +35,10 @@ use Apify\Client\Model\RequestQueueRequest;
 use Apify\Client\Options\BatchAddRequestsOptions;
 ```
 
+The streaming-log accessors (`LogClient::stream()` and `RunClient::getStreamedLog()`) return the
+PSR-7 `Psr\Http\Message\StreamInterface` (from the `psr/http-message` package), not an
+`Apify\Client\` type — import it as `use Psr\Http\Message\StreamInterface;`.
+
 Methods that fetch a single resource return `null` when the resource does not exist, rather than
 throwing. API failures are thrown as `ApifyApiException` (see [error handling](../README.md#error-handling)).
 
