@@ -137,6 +137,35 @@ final class HttpClientTest extends TestCase
         self::assertTrue($this->client($transport)->actor('apify/hello-world')->validateInput(['x' => 1]));
     }
 
+    public function testLargeRequestBodyIsCompressed(): void
+    {
+        if (!function_exists('brotli_compress') && !function_exists('gzencode')) {
+            self::markTestSkipped('no compression codec available in this PHP build');
+        }
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'a']]));
+        // A field well over the 1024-byte threshold forces the request body to be compressed.
+        $marker = str_repeat('x', 4096);
+        $this->client($transport)->actors()->create(['name' => 'n', 'title' => $marker]);
+
+        $request = $transport->lastRequest();
+        $encoding = $request->getHeaderLine('Content-Encoding');
+        self::assertContains($encoding, ['br', 'gzip']);
+
+        // The body is actually compressed on the wire, not merely labelled.
+        self::assertLessThan(strlen($marker), strlen((string) $request->getBody()));
+        // ...yet it round-trips back to the original JSON once decoded.
+        self::assertStringContainsString($marker, MockTransport::readBody($request));
+    }
+
+    public function testSmallRequestBodyIsNotCompressed(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'a']]));
+        $this->client($transport)->actors()->create(['name' => 'n']);
+
+        $request = $transport->lastRequest();
+        self::assertSame('', $request->getHeaderLine('Content-Encoding'));
+    }
+
     public function testSafeIdReplacesFirstSlashWithTilde(): void
     {
         $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'x']]));

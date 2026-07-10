@@ -114,7 +114,7 @@ final class BatchAddRequestsTest extends TestCase
         self::assertSame([], $result->getUnprocessedRequests());
 
         // The retry must send only the still-unprocessed request (r1), not the whole batch again.
-        $retryBody = Json::decode((string) $transport->received[1]->getBody());
+        $retryBody = Json::decode(MockTransport::readBody($transport->received[1]));
         self::assertIsArray($retryBody);
         self::assertCount(1, $retryBody);
         self::assertSame('r1', $retryBody[0]['uniqueKey']);
@@ -150,7 +150,7 @@ final class BatchAddRequestsTest extends TestCase
         self::assertSame(2, $transport->callCount());
         self::assertCount(30, $result->getProcessedRequests());
         // First batch must respect the 25-request count limit.
-        $firstBody = Json::decode((string) $transport->received[0]->getBody());
+        $firstBody = Json::decode(MockTransport::readBody($transport->received[0]));
         self::assertIsArray($firstBody);
         self::assertCount(25, $firstBody);
     }
@@ -172,7 +172,7 @@ final class BatchAddRequestsTest extends TestCase
 
         self::assertSame(2, $transport->callCount());
         self::assertCount(3, $result->getProcessedRequests());
-        $firstBody = Json::decode((string) $transport->received[0]->getBody());
+        $firstBody = Json::decode(MockTransport::readBody($transport->received[0]));
         self::assertIsArray($firstBody);
         self::assertCount(2, $firstBody); // byte limit, not the count limit, governed here
     }

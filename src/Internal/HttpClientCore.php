@@ -70,6 +70,9 @@ final class HttpClientCore
         bool $doNotRetryTimeouts = false,
         array $extraHeaders = []
     ): ResponseInterface {
+        // Compress the body once, up front, so every retry reuses the already-compressed payload.
+        [$body, $extraHeaders] = self::maybeCompressBody($body, $extraHeaders);
+
         $delayMillis = $this->retry->minDelayMillis;
         $maxAttempts = $this->retry->maxRetries + 1;
         $path = self::extractPath($url);
@@ -108,6 +111,46 @@ final class HttpClientCore
 
         // Unreachable in practice (maxAttempts >= 1); defensive.
         throw $lastError ?? new TransportException('request failed with no attempts');
+    }
+
+    /**
+     * Compresses the request body when it is large enough to be worth it, returning the possibly
+     * replaced body together with the (possibly extended) header map. A caller that already set a
+     * {@code Content-Encoding} header is left untouched, so an explicitly-encoded body is never
+     * double-compressed.
+     *
+     * @param array<string,string> $extraHeaders
+     * @return array{0: string|null, 1: array<string,string>}
+     */
+    private static function maybeCompressBody(?string $body, array $extraHeaders): array
+    {
+        if ($body === null || self::hasHeader($extraHeaders, 'Content-Encoding')) {
+            return [$body, $extraHeaders];
+        }
+
+        $compressed = Compression::maybeCompress($body);
+        if ($compressed === null) {
+            return [$body, $extraHeaders];
+        }
+
+        [$encoding, $compressedBody] = $compressed;
+        $extraHeaders['Content-Encoding'] = $encoding;
+        return [$compressedBody, $extraHeaders];
+    }
+
+    /**
+     * Case-insensitive check for a header key, since HTTP header names are case-insensitive.
+     *
+     * @param array<string,string> $headers
+     */
+    private static function hasHeader(array $headers, string $name): bool
+    {
+        foreach (array_keys($headers) as $key) {
+            if (strcasecmp($key, $name) === 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Opens a live streaming response (single attempt, no retry). Used by log streaming. */
