@@ -9,6 +9,9 @@
 - The `User-Agent` OS token now reports the short lowercase platform identifier (e.g. `linux`,
   `darwin`, `win32`), matching the reference JS client's `os.platform()` token, instead of the
   upper-cased `PHP_OS_FAMILY` value.
+- Both request-compression codecs are now covered by deterministic tests: the brotli path (its
+  preference over gzip and its output) and the gzip fallback are each exercised regardless of whether
+  the host PHP build has the PECL `brotli` extension loaded. No behavior change.
 
 ## 0.1.1
 

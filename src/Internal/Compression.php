@@ -46,29 +46,77 @@ final class Compression
      */
     public static function maybeCompress(string $body): ?array
     {
+        return self::compressWith($body, self::brotliEncoder(), self::gzipEncoder());
+    }
+
+    /**
+     * Size gate plus codec selection, split out from {@see maybeCompress} so both the brotli and the
+     * gzip path can be exercised by tests regardless of which extensions the host PHP build loaded.
+     *
+     * Brotli ({@code br}) is preferred over gzip when its encoder is available; each encoder returns
+     * the compressed bytes as a string, or a non-string on failure, in which case the next codec is
+     * tried. Returns {@code null} when the body is below {@see MIN_COMPRESS_BYTES} or no codec
+     * succeeds. A {@code null} encoder means that codec is unavailable and is skipped.
+     *
+     * @param (callable(string): mixed)|null $brotli brotli encoder, or {@code null} when the PECL brotli extension is absent
+     * @param (callable(string): mixed)|null $gzip   gzip encoder, or {@code null} when zlib is absent
+     * @return array{0: string, 1: string}|null
+     */
+    public static function compressWith(string $body, ?callable $brotli, ?callable $gzip): ?array
+    {
         if (strlen($body) < self::MIN_COMPRESS_BYTES) {
             return null;
         }
 
-        if (function_exists('brotli_compress')) {
-            // Called indirectly: brotli_compress only exists when the PECL brotli extension is
-            // loaded, so a direct call would be an unresolved reference for static analysis on the
-            // (common) PHP builds without the extension.
-            $brotliCompress = 'brotli_compress';
-            $compressed = $brotliCompress($body, self::BROTLI_QUALITY);
+        if ($brotli !== null) {
+            $compressed = $brotli($body);
             if (is_string($compressed)) {
                 return ['br', $compressed];
             }
         }
 
-        if (function_exists('gzencode')) {
-            $compressed = gzencode($body);
-            if ($compressed !== false) {
+        if ($gzip !== null) {
+            $compressed = $gzip($body);
+            if (is_string($compressed)) {
                 return ['gzip', $compressed];
             }
         }
 
         return null;
+    }
+
+    /**
+     * The brotli encoder for this build, or {@code null} when the PECL {@code brotli} extension is not
+     * loaded. Frequently absent, since brotli is not part of PHP's standard distribution.
+     *
+     * @return (callable(string): mixed)|null
+     */
+    private static function brotliEncoder(): ?callable
+    {
+        if (!function_exists('brotli_compress')) {
+            return null;
+        }
+
+        // Called indirectly: brotli_compress only exists when the PECL brotli extension is loaded, so
+        // a direct call would be an unresolved reference for static analysis on the (common) PHP
+        // builds without the extension.
+        $brotliCompress = 'brotli_compress';
+        return static fn (string $body) => $brotliCompress($body, self::BROTLI_QUALITY);
+    }
+
+    /**
+     * The gzip encoder for this build, or {@code null} when {@code gzencode} (zlib) is unavailable.
+     * Ships with PHP's standard {@code zlib} extension, so it is the near-universal fallback.
+     *
+     * @return (callable(string): mixed)|null
+     */
+    private static function gzipEncoder(): ?callable
+    {
+        if (!function_exists('gzencode')) {
+            return null;
+        }
+
+        return static fn (string $body) => gzencode($body);
     }
 
     private function __construct()

@@ -27,6 +27,7 @@ final class PlatformTest extends TestCase
             'openbsd' => ['OpenBSD', 'openbsd'],
             'netbsd' => ['NetBSD', 'netbsd'],
             'solaris/sunos' => ['SunOS', 'sunos'],
+            'aix' => ['AIX', 'aix'],
             'cygwin' => ['CYGWIN_NT-10.0-19045', 'cygwin'],
         ];
     }
