@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Synced to Apify OpenAPI spec `v2-2026-07-08T143931Z`. No public interface changes.
+- Request bodies larger than 1024 bytes are now compressed before being sent, using brotli
+  (`Content-Encoding: br`) when the PECL `brotli` extension is available and gzip
+  (`Content-Encoding: gzip`) as a fallback. Matches the reference client's request compression.
+- The `User-Agent` OS token now reports the short lowercase platform identifier (e.g. `linux`,
+  `darwin`, `win32`), matching the reference JS client's `os.platform()` token, instead of the
+  upper-cased `PHP_OS_FAMILY` value.
+
 ## 0.1.1
 
 - Synced to Apify OpenAPI spec `v2-2026-07-07T132551Z`. No public interface changes.

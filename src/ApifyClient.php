@@ -7,6 +7,7 @@ namespace Apify\Client;
 use Apify\Client\Http\GuzzleHttpClient;
 use Apify\Client\Http\HttpClientInterface;
 use Apify\Client\Internal\HttpClientCore;
+use Apify\Client\Internal\Platform;
 use Apify\Client\Internal\RetryConfig;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Options\RequestQueueClientOptions;
@@ -347,7 +348,7 @@ final class ApifyClient
      */
     private static function buildUserAgent(?string $suffix, callable $isAtHomeFn): string
     {
-        $os = strtolower(PHP_OS_FAMILY);
+        $os = Platform::osToken(PHP_OS);
         $atHome = $isAtHomeFn() ? 'true' : 'false';
         $ua = sprintf('ApifyClient/%s (%s; PHP/%s); isAtHome/%s', Version::CLIENT_VERSION, $os, PHP_VERSION, $atHome);
         if ($suffix !== null && $suffix !== '') {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Internal\Platform;
 use Apify\Client\Version;
 use PHPUnit\Framework\TestCase;
 
@@ -18,10 +19,13 @@ final class ConfigTest extends TestCase
         $expected = sprintf(
             'ApifyClient/%s (%s; PHP/%s); isAtHome/false',
             Version::CLIENT_VERSION,
-            strtolower(PHP_OS_FAMILY),
+            Platform::osToken(PHP_OS),
             PHP_VERSION,
         );
         self::assertSame($expected, $ua);
+        // The OS token must be the short lowercase platform identifier (aligned with the other
+        // Apify clients / Node's os.platform()), never an upper-cased uname value.
+        self::assertMatchesRegularExpression('/^ApifyClient\/\S+ \([a-z0-9]+; PHP\//', $ua);
     }
 
     public function testUserAgentIsAtHomeTrueAndSuffix(): void

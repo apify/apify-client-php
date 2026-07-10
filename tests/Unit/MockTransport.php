@@ -50,6 +50,31 @@ final class MockTransport implements HttpClientInterface
         return $this->received[count($this->received) - 1];
     }
 
+    /**
+     * Reads a recorded request's body as a string, transparently decompressing it when the client
+     * applied request compression (a {@code Content-Encoding} header). Tests that assert on the body
+     * shape use this so they stay agnostic to whether the payload went out compressed.
+     */
+    public static function readBody(RequestInterface $request): string
+    {
+        $raw = (string) $request->getBody();
+        $encoding = $request->getHeaderLine('Content-Encoding');
+        if ($encoding === 'gzip') {
+            $decoded = gzdecode($raw);
+        } elseif ($encoding === 'br') {
+            // brotli_uncompress only exists when the PECL brotli extension is loaded; call it
+            // indirectly so the symbol is not referenced statically when the extension is absent.
+            $brotliUncompress = 'brotli_uncompress';
+            $decoded = $brotliUncompress($raw);
+        } else {
+            return $raw;
+        }
+        if (!is_string($decoded)) {
+            throw new RuntimeException('failed to decompress request body (encoding: ' . $encoding . ')');
+        }
+        return $decoded;
+    }
+
     public function callCount(): int
     {
         return count($this->received);
