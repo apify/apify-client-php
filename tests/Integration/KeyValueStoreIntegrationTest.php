@@ -33,6 +33,52 @@ final class KeyValueStoreIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testIterateKeyValueStores(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->keyValueStores()->getOrCreate(self::uniqueName('iter-kvs'))->getId();
+        }
+        try {
+            $seen = [];
+            foreach ($client->keyValueStores()->iterate(new StorageListOptions(desc: true), 2) as $store) {
+                $seen[(string) $store->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created store $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->keyValueStore($id)->delete();
+            }
+        }
+    }
+
+    public function testIterateKeys(): void
+    {
+        $client = $this->requireClient();
+        $store = $client->keyValueStores()->getOrCreate(self::uniqueName('iter-keys'));
+        try {
+            $kvs = $client->keyValueStore((string) $store->getId());
+            $expected = [];
+            for ($i = 0; $i < 5; $i++) {
+                $key = sprintf('key-%02d', $i);
+                $kvs->setRecordJson($key, ['n' => $i]);
+                $expected[] = $key;
+            }
+            $seen = [];
+            // limit as a total cap of 5; the store's cursor pagination threads exclusiveStartKey.
+            foreach ($kvs->iterateKeys(new ListKeysOptions(limit: 5)) as $key) {
+                $seen[] = (string) $key->getKey();
+            }
+            sort($seen);
+            self::assertSame($expected, $seen);
+        } finally {
+            $client->keyValueStore((string) $store->getId())->delete();
+        }
+    }
+
     public function testRecordKeyWithSpecialChars(): void
     {
         $client = $this->requireClient();

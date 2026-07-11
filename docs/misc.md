@@ -5,13 +5,14 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 ## Apify Store — `$client->store()`
 
 - `list(?StoreListOptions $options = null): PaginationList` — one page of Store Actors.
-- `iterate(?StoreListOptions $options): iterable` — lazily iterate all matching Actors, paging on demand.
+- `iterate(?StoreListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all matching Actors, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
 
 ```php
 $page = $client->store()->list(new StoreListOptions(search: 'scraper', limit: 10));
 
 $shown = 0;
-foreach ($client->store()->iterate(new StoreListOptions(limit: 50)) as $item) {
+// $chunkSize (50) is the per-page size; limit (unset) would cap the total across all pages.
+foreach ($client->store()->iterate(new StoreListOptions(search: 'scraper'), 50) as $item) {
     echo $item->getName() . PHP_EOL;
     if (++$shown >= 5) {
         break;

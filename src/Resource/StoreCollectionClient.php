@@ -36,25 +36,21 @@ final class StoreCollectionClient
     }
 
     /**
-     * Lazily iterates over all Store Actors matching the options, fetching pages on demand. The
-     * options' {@code limit} (if set) is used as the per-page size.
+     * Lazily iterates over Store Actors matching the options, fetching pages on demand.
+     *
+     * The options' {@code limit} caps the total number of Actors yielded across all pages ({@code
+     * null} = all); {@code $chunkSize} is the per-page size ({@code null} = the server default).
      *
      * @return Generator<int,ActorStoreListItem>
      */
-    public function iterate(?StoreListOptions $options = null): Generator
+    public function iterate(?StoreListOptions $options = null, ?int $chunkSize = null): Generator
     {
         $options ??= new StoreListOptions();
-        $offset = $options->offset ?? 0;
-        while (true) {
-            $page = $this->list($options->withOffset($offset));
-            $items = $page->getItems();
-            foreach ($items as $item) {
-                yield $item;
-            }
-            $offset += count($items);
-            if ($items === [] || $offset >= $page->getTotal()) {
-                return;
-            }
-        }
+        return ResourceContext::paginateOffset(
+            $options->offset ?? 0,
+            $options->limit,
+            $chunkSize,
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+        );
     }
 }

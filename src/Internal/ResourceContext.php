@@ -6,6 +6,7 @@ namespace Apify\Client\Internal;
 
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Model\PaginationList;
+use Generator;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 
@@ -186,6 +187,70 @@ final class ResourceContext
     {
         $data = $this->getResourceRequired($subPath, $params);
         return PaginationList::fromData($data, $hydrate);
+    }
+
+    /**
+     * Lazily iterates over every item of an offset/limit-paginated listing, fetching pages on demand.
+     *
+     * Ports the reference client's paginated iterator ({@code _listPaginatedFromCallback}):
+     * {@code $limit} caps the TOTAL number of items yielded across all pages ({@code null} = no cap,
+     * i.e. all items), while {@code $chunkSize} caps how many items are requested per page
+     * ({@code null} = the server default). The two are independent — {@code $limit} is never reused
+     * as the page size. {@code $startOffset} is the offset of the first page.
+     *
+     * @template T
+     * @param callable(int,?int):PaginationList<T> $fetchPage receives (offset, pageLimit) and returns that page
+     * @return Generator<int,T>
+     */
+    public static function paginateOffset(int $startOffset, ?int $limit, ?int $chunkSize, callable $fetchPage): Generator
+    {
+        // First page: request min(limit, chunkSize) items. A null/0 on either side means "unbounded",
+        // so the other bound wins (mirrors the reference client's minForLimitParam).
+        $page = $fetchPage($startOffset, self::minLimit($limit, $chunkSize));
+        $items = $page->getItems();
+        foreach ($items as $item) {
+            yield $item;
+        }
+
+        $total = $page->getTotal();
+        // Effective total cap: the smaller of the requested limit (0/null => all) and what exists.
+        $cap = min(($limit !== null && $limit > 0) ? $limit : $total, $total);
+        $currentOffset = $startOffset + count($items);
+        // Items still to yield, bounded both by what remains after the start offset and by the cap.
+        $remaining = min($total - $startOffset, $cap) - count($items);
+
+        // Guard on the previous page being non-empty so an over-reported total (a page shorter than
+        // its claimed total) terminates instead of looping forever.
+        while (count($items) > 0 && $remaining > 0) {
+            $page = $fetchPage($currentOffset, self::minLimit($remaining, $chunkSize));
+            $items = $page->getItems();
+            foreach ($items as $item) {
+                yield $item;
+            }
+            $currentOffset += count($items);
+            $remaining -= count($items);
+        }
+    }
+
+    /**
+     * Returns the smaller of two optional positive bounds, treating {@code null} or {@code 0} as
+     * "unbounded" (the API treats {@code limit=0} as unset). Mirrors the reference minForLimitParam.
+     */
+    private static function minLimit(?int $a, ?int $b): ?int
+    {
+        if ($a === 0) {
+            $a = null;
+        }
+        if ($b === 0) {
+            $b = null;
+        }
+        if ($a === null) {
+            return $b;
+        }
+        if ($b === null) {
+            return $a;
+        }
+        return min($a, $b);
     }
 
     /**

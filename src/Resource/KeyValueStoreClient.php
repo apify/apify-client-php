@@ -10,11 +10,13 @@ use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\Signatures;
 use Apify\Client\Model\KeyValueStore;
+use Apify\Client\Model\KeyValueStoreKey;
 use Apify\Client\Model\KeyValueStoreKeysPage;
 use Apify\Client\Model\KeyValueStoreRecord;
 use Apify\Client\Options\GetRecordOptions;
 use Apify\Client\Options\ListKeysOptions;
 use Apify\Client\Options\SetRecordOptions;
+use Generator;
 
 /** A client for a specific key-value store (and run-nested variants). */
 final class KeyValueStoreClient
@@ -79,6 +81,54 @@ final class KeyValueStoreClient
         $params = new QueryParams();
         ($options ?? new ListKeysOptions())->appendTo($params);
         return KeyValueStoreKeysPage::fromData($this->ctx->getResourceRequired('keys', $params));
+    }
+
+    /**
+     * Lazily iterates over the store's keys, transparently following cursor pagination
+     * ({@code exclusiveStartKey}/{@code nextExclusiveStartKey}), mirroring the reference client's
+     * async-iterable {@code listKeys()}.
+     *
+     * The options' {@code limit} caps the total number of keys yielded across all pages ({@code null}
+     * = all); {@code exclusiveStartKey} starts the listing after a given key; {@code prefix} and
+     * {@code collection} restrict which keys are listed. Unlike the offset/limit collection iterators,
+     * there is no separate page-size argument: the per-page size follows the remaining total cap (or
+     * the server default when unbounded), exactly as the reference client does.
+     *
+     * @return Generator<int,KeyValueStoreKey>
+     */
+    public function iterateKeys(?ListKeysOptions $options = null): Generator
+    {
+        $options ??= new ListKeysOptions();
+        $limit = $options->limit; // total across all pages; null = unbounded
+        $exclusiveStartKey = $options->exclusiveStartKey;
+        $iterated = 0;
+
+        while (true) {
+            // Ask for only as many keys as remain under the total cap (null = server default).
+            $remaining = $limit !== null ? $limit - $iterated : null;
+            $page = $this->listKeys(new ListKeysOptions(
+                limit: $remaining,
+                exclusiveStartKey: $exclusiveStartKey,
+                prefix: $options->prefix,
+                collection: $options->collection,
+                signature: $options->signature,
+            ));
+
+            $items = $page->getItems();
+            if ($items === []) {
+                return;
+            }
+            foreach ($items as $item) {
+                yield $item;
+            }
+            $iterated += count($items);
+
+            $nextKey = $page->getNextExclusiveStartKey();
+            if (($limit !== null && $iterated >= $limit) || !$page->isTruncated() || $nextKey === null || $nextKey === '') {
+                return;
+            }
+            $exclusiveStartKey = $nextKey;
+        }
     }
 
     /** Reports whether a record with the given key exists. */

@@ -10,6 +10,7 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Model\Dataset;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\StorageListOptions;
+use Generator;
 
 /** A client for the dataset collection ({@code GET/POST /v2/datasets}). */
 final class DatasetCollectionClient
@@ -32,6 +33,24 @@ final class DatasetCollectionClient
         $params = new QueryParams();
         ($options ?? new StorageListOptions())->appendTo($params);
         return $this->ctx->listResource('', $params, static fn (array $d) => new Dataset($d));
+    }
+
+    /**
+     * Lazily iterates over datasets, fetching pages on demand. The options' {@code limit} caps the
+     * total number of datasets yielded across all pages ({@code null} = all); {@code $chunkSize} is
+     * the per-page size ({@code null} = the server default).
+     *
+     * @return Generator<int,Dataset>
+     */
+    public function iterate(?StorageListOptions $options = null, ?int $chunkSize = null): Generator
+    {
+        $options ??= new StorageListOptions();
+        return ResourceContext::paginateOffset(
+            $options->offset ?? 0,
+            $options->limit,
+            $chunkSize,
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+        );
     }
 
     /**

@@ -62,8 +62,9 @@ associative array (or accept an arbitrary value serialized to JSON):
 
 - Read: `me()->monthlyUsage(...)`, `me()->limits()`, `task($id)->getInput()`,
   `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`, and the raw request-queue
-  operations (`listRequests`, `listAndLockHead`, `prolongRequestLock`, `deleteRequestLock`,
-  `unlockRequests`, `batchDeleteRequests`).
+  operations that return a response body (`listRequests`, `listAndLockHead`, `prolongRequestLock`,
+  `unlockRequests`, `batchDeleteRequests`). Note that `deleteRequestLock` returns `void` (it releases
+  a lock and has no meaningful body), so it is not in this list.
 - Write: definition/`update`/`create` arguments accept any JSON-serializable value — typically an
   associative array.
 

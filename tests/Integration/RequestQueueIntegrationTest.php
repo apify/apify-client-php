@@ -33,6 +33,28 @@ final class RequestQueueIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testIterateRequestQueues(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->requestQueues()->getOrCreate(self::uniqueName('iter-rq'))->getId();
+        }
+        try {
+            $seen = [];
+            foreach ($client->requestQueues()->iterate(new StorageListOptions(desc: true), 2) as $queue) {
+                $seen[(string) $queue->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created queue $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->requestQueue($id)->delete();
+            }
+        }
+    }
+
     public function testRequestQueueCrudFlow(): void
     {
         $client = $this->requireClient();

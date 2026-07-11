@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0
+
+- Added lazy iteration helpers matching the reference client, which iterates every collection: an
+  `iterate()` generator on the Actor, Actor-version, Actor-env-var, build, run, dataset,
+  key-value-store, request-queue, schedule, task, webhook (account-wide and nested) and
+  webhook-dispatch collections; `DatasetClient::iterateItems()` for dataset items; and
+  `KeyValueStoreClient::iterateKeys()` for store keys (cursor-based). Each fetches pages on demand.
+- Iteration `limit` semantics: for the offset/limit iterators, the options' `limit` now caps the
+  total number of items yielded across all pages (unset = all) and the per-page size is a separate
+  `$chunkSize` argument. `StoreCollectionClient::iterate()` follows the same rule (previously its
+  `limit` was used as the page size); `StoreListOptions::withOffset()` is replaced by
+  `withPagination()`.
+- `KeyValueStoreClient::iterateKeys()` follows the store's cursor pagination
+  (`exclusiveStartKey`/`nextExclusiveStartKey`) and stops on the total-item cap or an untruncated page.
+- Documented every new iteration method with runnable examples and clarified the request-queue
+  method list, the key-value-store record snippet, and when `TransportException` surfaces versus
+  `ApifyApiException`.
+
 ## 0.2.2
 
 - `batchAddRequests` now validates every request's individual payload size up front, before any

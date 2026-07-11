@@ -14,6 +14,7 @@ use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\DatasetDownloadOptions;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\DownloadItemsFormat;
+use Generator;
 use Psr\Http\Message\ResponseInterface;
 
 /** A client for a specific dataset (and run-nested variants). */
@@ -100,6 +101,28 @@ final class DatasetClient
             $this->headerInt($response, 'X-Apify-Pagination-Limit', $count),
             $count,
             $options->desc ?? false,
+        );
+    }
+
+    /**
+     * Lazily iterates over the dataset's items, fetching pages on demand. Each item is decoded to a
+     * PHP value (an associative array for objects), like {@see listItems()}.
+     *
+     * The options' {@code limit} caps the total number of items yielded across all pages ({@code null}
+     * = all), {@code offset} is the starting offset, and {@code $chunkSize} is the per-page size
+     * ({@code null} = the server default). All other {@see DatasetListItemsOptions} fields (field
+     * selection, filtering, ordering) are applied to every page.
+     *
+     * @return Generator<int,mixed>
+     */
+    public function iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): Generator
+    {
+        $options ??= new DatasetListItemsOptions();
+        return ResourceContext::paginateOffset(
+            $options->offset ?? 0,
+            $options->limit,
+            $chunkSize,
+            fn (int $offset, ?int $pageLimit) => $this->listItems($options->withPagination($offset, $pageLimit)),
         );
     }
 

@@ -6,6 +6,7 @@ Tasks are pre-configured Actor runs with stored input. Snippets assume
 ## Task collection — `$client->tasks()`
 
 - `list(?ListOptions $options = null): PaginationList`
+- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all tasks, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
 - `create(mixed $task): Task`
 
 ```php
@@ -14,6 +15,10 @@ $task = $client->tasks()->create([
     'name' => 'my-task',
     'input' => ['message' => 'hello'],
 ]);
+
+foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
+    echo $t->getId() . PHP_EOL;
+}
 ```
 
 ## A single task — `$client->task($id)`

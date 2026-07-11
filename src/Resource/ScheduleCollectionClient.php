@@ -10,6 +10,7 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Model\Schedule;
 use Apify\Client\Options\ListOptions;
+use Generator;
 
 /** A client for the schedule collection ({@code GET/POST /v2/schedules}). */
 final class ScheduleCollectionClient
@@ -32,6 +33,24 @@ final class ScheduleCollectionClient
         $params = new QueryParams();
         ($options ?? new ListOptions())->appendTo($params);
         return $this->ctx->listResource('', $params, static fn (array $d) => new Schedule($d));
+    }
+
+    /**
+     * Lazily iterates over the account's schedules, fetching pages on demand. The options'
+     * {@code limit} caps the total number of schedules yielded across all pages ({@code null} = all);
+     * {@code $chunkSize} is the per-page size ({@code null} = the server default).
+     *
+     * @return Generator<int,Schedule>
+     */
+    public function iterate(?ListOptions $options = null, ?int $chunkSize = null): Generator
+    {
+        $options ??= new ListOptions();
+        return ResourceContext::paginateOffset(
+            $options->offset ?? 0,
+            $options->limit,
+            $chunkSize,
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+        );
     }
 
     /**

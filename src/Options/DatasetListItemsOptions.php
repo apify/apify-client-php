@@ -48,6 +48,31 @@ final class DatasetListItemsOptions
     ) {
     }
 
+    /**
+     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving every other
+     * field. Used by {@see \Apify\Client\Resource\DatasetClient::iterateItems()} to request pages.
+     */
+    public function withPagination(?int $offset, ?int $limit): self
+    {
+        return new self(
+            $offset,
+            $limit,
+            $this->desc,
+            $this->fields,
+            $this->outputFields,
+            $this->omit,
+            $this->skipEmpty,
+            $this->skipHidden,
+            $this->clean,
+            $this->unwind,
+            $this->flatten,
+            $this->view,
+            $this->simplified,
+            $this->skipFailedPages,
+            $this->signature,
+        );
+    }
+
     /** @internal */
     public function appendTo(QueryParams $q): void
     {

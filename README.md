@@ -115,7 +115,11 @@ try {
 | `getData(): ?array` | Additional structured error data provided by the API, if any. |
 
 Transport-level failures (network errors, timeouts) are retried internally; only if every retry is
-exhausted does the underlying error surface. Requests are retried on network errors, HTTP 429 and 5xx.
+exhausted does the underlying error surface, as an `Apify\Client\Exception\TransportException`
+(a `RuntimeException`; `isTimeout()` reports whether a request timed out). In short:
+`ApifyApiException` means the server returned an error response (a 4xx/5xx with a body), whereas
+`TransportException` means the request never produced a usable response (network failure or timeout)
+after all retries. Requests are retried on network errors, HTTP 429 and 5xx.
 
 ## Versioning
 

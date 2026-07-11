@@ -5,10 +5,15 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 ## Actor collection — `$client->actors()`
 
 - `list(?ActorListOptions $options = null): PaginationList` — list the account's Actors.
+- `iterate(?ActorListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all matching Actors, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
 - `create(mixed $actor): Actor` — create a new Actor from a JSON-serializable definition.
 
 ```php
 $page = $client->actors()->list(new ActorListOptions(my: true, limit: 10));
+
+foreach ($client->actors()->iterate(new ActorListOptions(my: true), 100) as $actor) {
+    echo $actor->getName() . PHP_EOL;
+}
 
 $actor = $client->actors()->create([
     'name' => 'my-actor',
@@ -47,7 +52,7 @@ $lastSucceeded = $client->actor('apify/hello-world')->lastRun(new LastRunOptions
 
 ## Actor versions — `$client->actor($id)->versions()` / `->version($n)`
 
-- Collection: `list(?ListOptions): PaginationList`, `create(mixed $version): ActorVersion`.
+- Collection: `list(?ListOptions): PaginationList`, `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable`, `create(mixed $version): ActorVersion`.
 - Single: `get(): ?ActorVersion`, `update(mixed $newFields): ActorVersion`, `delete(): void`.
 
 ```php
@@ -60,8 +65,11 @@ $version = $client->actor('me~my-actor')->versions()->create([
 
 ## Environment variables — `->version($n)->envVars()` / `->envVar($name)`
 
-- Collection: `list(): PaginationList`, `create(ActorEnvVar $envVar): ActorEnvVar`.
+- Collection: `list(): PaginationList`, `iterate(?int $chunkSize = null): iterable`, `create(ActorEnvVar $envVar): ActorEnvVar`.
 - Single: `get(): ?ActorEnvVar`, `update(ActorEnvVar $envVar): ActorEnvVar`, `delete(): void`.
+
+`iterate()` on the environment-variable collection takes only the optional `$chunkSize` (per-page
+size); the endpoint has no filters, mirroring the reference client's parameterless iterator.
 
 ```php
 $client->actor('me~my-actor')->version('0.0')->envVars()->create(new ActorEnvVar('API_KEY', 'secret', isSecret: true));

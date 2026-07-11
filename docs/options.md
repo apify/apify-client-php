@@ -51,7 +51,7 @@ For `store()->list()` / `store()->iterate()`.
 | Field | Type | Description |
 |---|---|---|
 | `offset` | `?int` | Number of Actors to skip. |
-| `limit` | `?int` | Maximum number of Actors to return (also the per-page size when iterating). |
+| `limit` | `?int` | Maximum number of Actors to return. When iterating, caps the total across all pages (the per-page size is `iterate()`'s separate `$chunkSize` argument). |
 | `search` | `?string` | Full-text search query. |
 | `sortBy` | `?string` | The sort field (e.g. `popularity`, `newest`). |
 | `category` | `?string` | Filter Actors by category. |

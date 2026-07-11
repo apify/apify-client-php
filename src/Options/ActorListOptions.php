@@ -23,6 +23,15 @@ final class ActorListOptions
     ) {
     }
 
+    /**
+     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving the other
+     * filters. Used by lazy iteration to request successive pages.
+     */
+    public function withPagination(?int $offset, ?int $limit): self
+    {
+        return new self($offset, $limit, $this->desc, $this->my, $this->sortBy);
+    }
+
     /** @internal */
     public function appendTo(QueryParams $q): void
     {

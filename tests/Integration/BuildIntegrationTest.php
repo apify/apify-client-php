@@ -18,6 +18,25 @@ final class BuildIntegrationTest extends IntegrationTestCase
         self::assertGreaterThanOrEqual(count($page->getItems()), $page->getTotal());
     }
 
+    public function testIterateBuilds(): void
+    {
+        $client = $this->requireClient();
+        $created = $client->actors()->create(self::minimalActor(self::uniqueName('iter-build')));
+        try {
+            $actor = $client->actor((string) $created->getId());
+            $build = $actor->build('0.0', new ActorBuildOptions());
+            $client->build((string) $build->getId())->waitForFinish(300);
+            // Iterate the Actor's builds (scoped, so the created build is the only expected entry).
+            $seen = [];
+            foreach ($actor->builds()->iterate(new ListOptions(), 1) as $b) {
+                $seen[(string) $b->getId()] = true;
+            }
+            self::assertArrayHasKey((string) $build->getId(), $seen, 'iterate() did not yield the created build');
+        } finally {
+            $client->actor((string) $created->getId())->delete();
+        }
+    }
+
     public function testBuildActorFlow(): void
     {
         $client = $this->requireClient();

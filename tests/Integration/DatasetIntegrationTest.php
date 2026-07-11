@@ -33,6 +33,49 @@ final class DatasetIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testIterateDatasets(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->datasets()->getOrCreate(self::uniqueName('iter-ds'))->getId();
+        }
+        try {
+            $seen = [];
+            foreach ($client->datasets()->iterate(new StorageListOptions(desc: true), 2) as $dataset) {
+                $seen[(string) $dataset->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created dataset $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->dataset($id)->delete();
+            }
+        }
+    }
+
+    public function testIterateDatasetItems(): void
+    {
+        $client = $this->requireClient();
+        $ds = $client->datasets()->getOrCreate(self::uniqueName('iter-items'));
+        try {
+            $dataset = $client->dataset((string) $ds->getId());
+            for ($i = 0; $i < 5; $i++) {
+                $dataset->pushItems([['n' => $i]]);
+            }
+            $values = [];
+            // chunkSize=2 across 5 items => three pages (2, 2, 1).
+            foreach ($dataset->iterateItems(new DatasetListItemsOptions(), 2) as $item) {
+                $values[] = $item['n'];
+            }
+            sort($values);
+            self::assertSame([0, 1, 2, 3, 4], $values);
+        } finally {
+            $client->dataset((string) $ds->getId())->delete();
+        }
+    }
+
     public function testDatasetCrudFlow(): void
     {
         $client = $this->requireClient();

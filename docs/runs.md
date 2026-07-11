@@ -5,9 +5,14 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 ## Run collection — `$client->runs()`
 
 - `list(?ListOptions $options = null, ?RunListOptions $filter = null): PaginationList` — list runs.
+- `iterate(?ListOptions $options = null, ?RunListOptions $filter = null, ?int $chunkSize = null): iterable` — lazily iterate all runs, applying the filters to every page. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
 
 ```php
 $page = $client->runs()->list(new ListOptions(limit: 10), new RunListOptions(status: ['SUCCEEDED']));
+
+foreach ($client->runs()->iterate(new ListOptions(limit: 100), new RunListOptions(status: ['SUCCEEDED']), 50) as $run) {
+    echo $run->getId() . PHP_EOL;
+}
 ```
 
 An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$client->task($id)->runs()`.

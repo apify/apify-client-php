@@ -120,7 +120,8 @@ if ($last !== null) {
 
 ```php
 $shown = 0;
-foreach ($client->store()->iterate(new StoreListOptions(limit: 10)) as $item) {
+// The second argument is the per-page (chunk) size; StoreListOptions::limit would cap the total.
+foreach ($client->store()->iterate(new StoreListOptions(), 10) as $item) {
     echo $item->getName() . PHP_EOL;
     if (++$shown >= 5) {
         break;
