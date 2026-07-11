@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.3
+
+- Added `failOnEmptyTestSuite="true"` to `phpunit.xml.dist` so a suite matching zero tests fails
+  instead of passing green.
+- Replaced magic literals with named constants: `HttpClientCore::attemptTimeout()` now reuses
+  `BACKOFF_FACTOR` for the per-attempt timeout doubling, and `Json::decode()` uses a named
+  `MAX_JSON_DEPTH` constant.
+- Corrected the `RunClient::get()` and `BuildClient::get()` doc comments to state that the 60s cap
+  on `waitForFinishSecs` is enforced by the server, not the client.
+- Reworded the docs namespace table so the `Options` row no longer implies its example list is
+  exhaustive.
+
 ## 0.3.2
 
 - Fixed `RunClient::metamorph()` to normalize a slash-form `targetActorId` (e.g. `username/actor-name`)

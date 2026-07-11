@@ -213,7 +213,7 @@ final class HttpClientCore
     {
         $scaled = $base;
         for ($i = 1; $i < $attempt; $i++) {
-            $scaled *= 2;
+            $scaled *= self::BACKOFF_FACTOR;
             if ($scaled >= $this->retry->timeoutSecs) {
                 return $this->retry->timeoutSecs;
             }

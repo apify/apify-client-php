@@ -13,6 +13,9 @@ use JsonException;
  */
 final class Json
 {
+    /** Maximum nesting depth passed to {@see json_decode()} (PHP's own default). */
+    private const MAX_JSON_DEPTH = 512;
+
     private function __construct()
     {
     }
@@ -33,7 +36,7 @@ final class Json
         if ($body === '') {
             return null;
         }
-        return json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        return json_decode($body, true, self::MAX_JSON_DEPTH, JSON_THROW_ON_ERROR);
     }
 
     /**

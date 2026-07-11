@@ -23,7 +23,7 @@ Every class is under the `Apify\Client\` PSR-4 root. Use these when writing `use
 |---|---|---|
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
-| `Apify\Client\Options\` | Option objects (the `*Options` classes) **and** enums. | `ActorListOptions`, `ActorStartOptions`, `ActorBuildOptions`, `LastRunOptions`, `RunListOptions`, `RunChargeOptions`, `ListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `DatasetDownloadOptions`, `PaginateRequestsOptions`, `RequestQueueClientOptions`, `DownloadItemsFormat` |
+| `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
 | `Apify\Client\Http\` | The replaceable transport and its adapters. | `HttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient` |
 | `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException`, `TransportException` |
 
