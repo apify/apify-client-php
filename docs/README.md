@@ -58,7 +58,8 @@ $actions = $schedule?->toArray()['actions'] ?? null;
 ## Raw JSON values
 
 A few methods return data whose shape is not modelled and is instead returned as a decoded
-associative array (or accept an arbitrary value serialized to JSON):
+JSON value — typically an associative array, though `getInput()` is typed `mixed` and returns
+whatever JSON value was stored (or accept an arbitrary value serialized to JSON):
 
 - Read: `me()->monthlyUsage(...)`, `me()->limits()`, `task($id)->getInput()`,
   `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`, and the raw request-queue

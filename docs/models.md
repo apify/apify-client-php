@@ -168,7 +168,7 @@ One page returned by `listKeys()`.
 | `getTotalRequestCount(): ?int` | Total number of requests ever added. |
 
 ### `RequestQueueHead`
-Returned by `listHead()` / `listAndLockHead()`.
+Returned by `listHead()`. (`listAndLockHead()` returns a raw `array<string,mixed>`, not this model.)
 | Getter | Description |
 |---|---|
 | `getItems(): array` | The `RequestQueueRequest` items at the head of the queue. |
