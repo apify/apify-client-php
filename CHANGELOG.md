@@ -3,17 +3,6 @@
 ## 0.2.1
 
 - Synced to Apify OpenAPI spec `v2-2026-07-10T105921Z`. No public interface changes.
-- The spec update only relaxed field constraints and documented already-supported behavior, so no
-  client code changed:
-  - Several response fields became nullable/optional (`Webhook.requestUrl`, `Actor.notice`,
-    `StoreListActor.notice`/`currentPricingInfo`, `UserPrivateInfo.proxy`,
-    `KeyValueStoreStats.deleteCount`/`listCount`). The models already read these fields defensively.
-  - Run options `maxItems` (now `minimum: 0`) and `maxTotalChargeUsd` (now nullable) were already
-    optional inputs without a lower-bound check.
-  - `br`/`gzip` are now documented as accepted `Content-Encoding` values for dataset-item uploads;
-    the client already compresses large request bodies with brotli (or gzip fallback).
-  - Endpoints gained `401`/`402` error responses, which are surfaced generically by
-    `ApifyApiException` and are correctly treated as non-retryable.
 
 ## 0.2.0
 
