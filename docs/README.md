@@ -42,6 +42,44 @@ PSR-7 `Psr\Http\Message\StreamInterface` (from the `psr/http-message` package), 
 Methods that fetch a single resource return `null` when the resource does not exist, rather than
 throwing. API failures are thrown as `ApifyApiException` (see [error handling](../README.md#error-handling)).
 
+## ApifyClient methods
+
+`ApifyClient` is the entry point: construct one, then call an accessor to get a sub-client for a
+specific resource or collection. Single-resource accessors take an ID (or, where the API allows it,
+a name) and return that resource's client; collection accessors take no arguments and return a
+collection client for listing and creating. Method detail lives on the linked [resource
+pages](#resource-pages); the signatures below are the entry points.
+
+| Method | Returns | Notes |
+|---|---|---|
+| `actor(string $id): ActorClient` | Actor client | Single Actor, by ID or `username/name`. |
+| `actors(): ActorCollectionClient` | Actor collection | List and create Actors. |
+| `build(string $id): BuildClient` | Build client | Single Actor build. |
+| `builds(): BuildCollectionClient` | Build collection | List builds across Actors. |
+| `run(string $id): RunClient` | Run client | Single Actor run. |
+| `runs(): RunCollectionClient` | Run collection | List runs across Actors. |
+| `dataset(string $id): DatasetClient` | Dataset client | Single dataset, by ID or name. |
+| `datasets(): DatasetCollectionClient` | Dataset collection | List and create datasets. |
+| `keyValueStore(string $id): KeyValueStoreClient` | Key-value store client | Single store, by ID or name. |
+| `keyValueStores(): KeyValueStoreCollectionClient` | Key-value store collection | List and create stores. |
+| `requestQueue(string $id, ?RequestQueueClientOptions $options = null): RequestQueueClient` | Request queue client | Single queue, by ID or name; optional client options (`clientKey`, per-request `timeoutSecs`). |
+| `requestQueues(): RequestQueueCollectionClient` | Request queue collection | List and create queues. |
+| `task(string $id): TaskClient` | Task client | Single task. |
+| `tasks(): TaskCollectionClient` | Task collection | List and create tasks. |
+| `schedule(string $id): ScheduleClient` | Schedule client | Single schedule. |
+| `schedules(): ScheduleCollectionClient` | Schedule collection | List and create schedules. |
+| `webhook(string $id): WebhookClient` | Webhook client | Single webhook. |
+| `webhooks(): WebhookCollectionClient` | Webhook collection | List and create webhooks. |
+| `webhookDispatch(string $id): WebhookDispatchClient` | Webhook dispatch client | Single webhook dispatch. |
+| `webhookDispatches(): WebhookDispatchCollectionClient` | Webhook dispatch collection | List webhook dispatches. |
+| `store(): StoreCollectionClient` | Store collection | Browse the public Apify Store. |
+| `log(string $buildOrRunId): LogClient` | Log client | Log for a build or run, by ID. |
+| `me(): UserClient` | User client | The authenticated user (`users/me`). |
+| `user(string $id): UserClient` | User client | A public user profile, by ID. |
+| `setStatusMessage(string $message, bool $isTerminal = false): ActorRun` | Updated run | Set the current run's status message; see [Setting single-resource status](#setting-single-resource-status). |
+| `getUserAgent(): string` | User-Agent string | The `User-Agent` the client sends. |
+| `getApiBaseUrl(): string` | Base URL | The resolved API base URL (with `/v2`). |
+
 ## Models and unmodeled data (`toArray`)
 
 Response models expose the commonly-used fields as typed getters (e.g. `$actor->getId()`). The

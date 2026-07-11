@@ -31,8 +31,9 @@ $client = new ApifyClient('my-api-token');
 // pass a value (e.g. 120) to bound the wait, or null to wait indefinitely (as here).
 $run = $client->actor('apify/hello-world')->call(null, null, null);
 
-// Read items from the run's default dataset.
-$items = $client->dataset($run->getDefaultDatasetId())->listItems();
+// Read items from the run's default dataset. getDefaultDatasetId() is ?string, so cast it
+// to satisfy dataset(string $id).
+$items = $client->dataset((string) $run->getDefaultDatasetId())->listItems();
 echo 'Item count: ' . $items->getCount() . PHP_EOL;
 ```
 

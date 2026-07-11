@@ -3,9 +3,11 @@
 Each snippet below assumes a configured `$client` and that the types it uses are imported with the
 appropriate `use` statements (see [Namespaces](README.md#namespaces)); the first
 [complete program](#a-complete-standalone-program) shows the full scaffolding the shorter snippets
-omit for brevity. The same programs live under [`tests/Examples/`](../tests/Examples) and are executed
-end-to-end against the live API by the `Test examples` CI step (see `ExamplesTest`), so they are
-guaranteed to stay runnable.
+omit for brevity. The complete programs on this page live under
+[`tests/Examples/`](../tests/Examples) and are executed end-to-end against the live API by the
+`Test examples` CI step (see `ExamplesTest`), so those programs are guaranteed to stay runnable.
+Inline snippets on the other documentation pages are not executed: they are only syntax-checked with
+`php -l` by `DocSnippetsTest`, which catches parse errors but does not resolve classes or check types.
 
 ## A complete, standalone program
 
@@ -30,8 +32,9 @@ try {
     // Run a public store Actor and wait up to 120s for it to finish.
     $run = $client->actor('apify/hello-world')->call(null, null, 120);
 
-    // Read the items the run produced into its default dataset.
-    $items = $client->dataset($run->getDefaultDatasetId())->listItems();
+    // Read the items the run produced into its default dataset. getDefaultDatasetId() is
+    // ?string, so cast it to satisfy dataset(string $id).
+    $items = $client->dataset((string) $run->getDefaultDatasetId())->listItems();
     echo 'Item count: ' . $items->getCount() . PHP_EOL;
 } catch (ApifyApiException $e) {
     echo 'API error ' . $e->getStatusCode() . ': ' . $e->getApiMessage() . PHP_EOL;
@@ -42,7 +45,8 @@ try {
 
 ```php
 $run = $client->actor('apify/hello-world')->call(null, null, 120);
-$items = $client->dataset($run->getDefaultDatasetId())->listItems();
+// getDefaultDatasetId() is ?string, so cast it to satisfy dataset(string $id).
+$items = $client->dataset((string) $run->getDefaultDatasetId())->listItems();
 echo 'Item count: ' . $items->getCount() . PHP_EOL;
 ```
 
