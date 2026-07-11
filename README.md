@@ -72,8 +72,9 @@ $configured = new ApifyClient(
 
 Requests are retried on network errors, HTTP 429 (rate limit) and 5xx responses, with exponential
 backoff and jitter. Other 4xx responses are thrown immediately as `ApifyApiException`, with one
-exception: a 404 (not found) on a single-resource fetch is not thrown — `get()` returns `null` and
-`delete()` is treated as a successful no-op (see [Error handling](#error-handling)).
+exception: a resource-not-found 404 (the API's `record-not-found` / `record-or-token-not-found`
+error type) on a single-resource fetch is not thrown — `get()` returns `null` and `delete()` is
+treated as a successful no-op (see [Error handling](#error-handling)).
 
 ### Replaceable HTTP transport
 
