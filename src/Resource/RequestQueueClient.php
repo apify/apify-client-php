@@ -213,6 +213,13 @@ final class RequestQueueClient
         $options ??= new BatchAddRequestsOptions();
         $requests = array_values($requests);
 
+        $payloadSizeLimitBytes = self::MAX_PAYLOAD_SIZE_BYTES
+            - (int) ceil(self::MAX_PAYLOAD_SIZE_BYTES * self::PAYLOAD_SAFETY_BUFFER_PERCENT);
+
+        // Validate the whole input up front, before any HTTP call. Both the empty-uniqueKey check and
+        // the per-request oversized check must run here (not inside the send loop): otherwise an
+        // oversized request in the middle of a large batch would only be discovered after earlier
+        // chunks had already been POSTed, leaving the queue partially mutated.
         foreach ($requests as $i => $request) {
             $uniqueKey = $request->getUniqueKey();
             if ($uniqueKey === null || $uniqueKey === '') {
@@ -220,10 +227,15 @@ final class RequestQueueClient
                     sprintf('batchAddRequests: the request at index %d is missing a non-empty uniqueKey', $i)
                 );
             }
+            $itemBytes = strlen(Json::encode($request->toArray()));
+            if ($itemBytes > $payloadSizeLimitBytes) {
+                throw new InvalidArgumentException(sprintf(
+                    'batchAddRequests: the request at index %d exceeds the maximum payload size (%d bytes)',
+                    $i,
+                    $payloadSizeLimitBytes
+                ));
+            }
         }
-
-        $payloadSizeLimitBytes = self::MAX_PAYLOAD_SIZE_BYTES
-            - (int) ceil(self::MAX_PAYLOAD_SIZE_BYTES * self::PAYLOAD_SAFETY_BUFFER_PERCENT);
 
         $merged = new BatchAddResult();
         $index = 0;
@@ -231,7 +243,7 @@ final class RequestQueueClient
         while ($index < $count) {
             // Bound each batch first by the count limit (25), then by payload byte size.
             $countSlice = array_slice($requests, $index, self::MAX_REQUESTS_PER_BATCH);
-            $chunk = self::sliceByByteLength($countSlice, $payloadSizeLimitBytes, $index);
+            $chunk = self::sliceByByteLength($countSlice, $payloadSizeLimitBytes);
             $merged->merge($this->batchAddChunkWithRetries($chunk, $forefront, $options));
             $index += count($chunk);
         }
@@ -243,11 +255,15 @@ final class RequestQueueClient
      * {@code $maxByteLength}, always keeping at least one request so iteration makes progress. Ports
      * the reference client's {@code sliceArrayByByteLength}.
      *
+     * Callers must have already validated (in {@see batchAddRequests()}) that every individual request
+     * fits under {@code $maxByteLength}, so the always-keep-one fallback never produces an over-limit
+     * chunk. That up-front validation is what lets this slicer run inside the send loop without risking
+     * a partially-mutated queue.
+     *
      * @param list<RequestQueueRequest> $requests
      * @return list<RequestQueueRequest>
-     * @throws InvalidArgumentException if a single request exceeds {@code $maxByteLength}
      */
-    private static function sliceByByteLength(array $requests, int $maxByteLength, int $startIndex): array
+    private static function sliceByByteLength(array $requests, int $maxByteLength): array
     {
         $payloads = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), $requests);
         if (strlen(Json::encode($payloads)) < $maxByteLength) {
@@ -256,15 +272,8 @@ final class RequestQueueClient
 
         $sliced = [];
         $byteLength = 2; // the two bytes of an empty array "[]"
-        foreach ($requests as $i => $request) {
+        foreach ($requests as $request) {
             $itemBytes = strlen(Json::encode($request->toArray()));
-            if ($itemBytes > $maxByteLength) {
-                throw new InvalidArgumentException(sprintf(
-                    'batchAddRequests: the request at index %d exceeds the maximum payload size (%d bytes)',
-                    $startIndex + $i,
-                    $maxByteLength
-                ));
-            }
             if ($byteLength + $itemBytes >= $maxByteLength) {
                 break;
             }
@@ -272,7 +281,7 @@ final class RequestQueueClient
             $sliced[] = $request;
         }
 
-        // Guarantee forward progress: keep at least the first request (it fits under the hard max).
+        // Guarantee forward progress: keep at least the first request (pre-validated to fit under the max).
         if ($sliced === []) {
             $sliced[] = $requests[0];
         }

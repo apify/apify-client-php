@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- `batchAddRequests` now validates every request's individual payload size up front, before any
+  HTTP call, so an oversized request anywhere in a large batch is rejected without POSTing earlier
+  chunks (previously later chunks could partially mutate the queue before the error was raised).
+
 ## 0.2.1
 
 - Synced to Apify OpenAPI spec `v2-2026-07-10T105921Z`. No public interface changes.
