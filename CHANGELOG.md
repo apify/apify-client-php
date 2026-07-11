@@ -9,6 +9,10 @@
   `prolongRequestLock`/`deleteRequestLock` methods and the `?bool $gracefully` parameter on
   `run()->abort()`, and added behavior descriptions for `recordExists`, `setRecordJson`,
   `deleteRecord`, `getRecordPublicUrl`, `createKeysPublicUrl`, and `createItemsPublicUrl`.
+- Corrected the README error-handling description so the "4xx are thrown" rule notes its exception:
+  a 404 on a single-resource fetch returns `null` from `get()` and is a no-op for `delete()`.
+- Added the optional `baseUrl` argument to the README configuration snippet and documented that
+  `paginateRequests()` yields `RequestQueueRequest` instances.
 
 ## 0.3.0
 

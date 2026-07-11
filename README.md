@@ -50,6 +50,7 @@ The constructor accepts named arguments for non-default settings:
 ```php
 $configured = new ApifyClient(
     token: 'my-api-token',
+    baseUrl: 'https://api.apify.com',
     maxRetries: 5,
     minDelayBetweenRetriesMillis: 1000,
     timeoutSecs: 120,
@@ -70,7 +71,9 @@ $configured = new ApifyClient(
 | `httpClient` | Guzzle | The replaceable transport (`Apify\Client\Http\HttpClientInterface`). |
 
 Requests are retried on network errors, HTTP 429 (rate limit) and 5xx responses, with exponential
-backoff and jitter. 4xx responses (other than 429) are thrown immediately as `ApifyApiException`.
+backoff and jitter. Other 4xx responses are thrown immediately as `ApifyApiException`, with one
+exception: a 404 (not found) on a single-resource fetch is not thrown — `get()` returns `null` and
+`delete()` is treated as a successful no-op (see [Error handling](#error-handling)).
 
 ### Replaceable HTTP transport
 
