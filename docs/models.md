@@ -138,7 +138,7 @@ Returned when listing/iterating the Apify Store.
 | Getter | Description |
 |---|---|
 | `getKey(): string` | The record key. |
-| `getValue(): mixed` | The record value (decoded for JSON, raw string otherwise). |
+| `getValue(): string` | The raw record value, as a string (decode it yourself when it is JSON). |
 | `getContentType(): ?string` | The record's content type. |
 
 ### `KeyValueStoreKey`

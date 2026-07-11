@@ -61,7 +61,7 @@ Single — `$client->keyValueStore($id)`:
 $store = $client->keyValueStores()->getOrCreate('my-store');
 $client->keyValueStore($store->getId())->setRecordJson('OUTPUT', ['answer' => 42]);
 $record = $client->keyValueStore($store->getId())->getRecord('OUTPUT');
-// getRecord() returns the raw record bytes as a string; decode them yourself when the value is JSON.
+// getRecord() returns a KeyValueStoreRecord; getValue() gives the raw string - decode it yourself when it is JSON.
 $decoded = json_decode($record?->getValue() ?? 'null', true);
 echo ($decoded['answer'] ?? '') . PHP_EOL;
 
