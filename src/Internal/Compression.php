@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Apify\Client\Internal;
 
 /**
- * Optional request-body compression.
+ * Optional request-body compression, matching the reference JS client's behaviour.
  *
  * Large request bodies are compressed before being sent, saving bandwidth on uploads (Actor inputs,
  * key-value-store records, dataset item batches, ...). Brotli ({@code Content-Encoding: br}) is
- * preferred when available and gzip ({@code Content-Encoding: gzip}) is used as a fallback. The API
- * accepts br/gzip/deflate as request {@code Content-Encoding} (see apify-docs #2750), so preferring
- * brotli is valid. Note this differs from the reference JS client, which compresses request bodies
- * with gzip only; the size threshold below is shared with the reference, the codec choice is not.
+ * preferred when available and gzip ({@code Content-Encoding: gzip}) is used as a fallback — the same
+ * codec choice, brotli quality (6), and size threshold (1024 bytes) as the reference client's
+ * {@code maybeCompressValue}. The API accepts br/gzip/deflate as request {@code Content-Encoding}
+ * (see apify-docs #2750), so preferring brotli is valid.
  *
  * In PHP, brotli lives in the optional PECL {@code brotli} extension, which is frequently absent,
  * while gzip ({@code gzencode}) ships with the standard {@code zlib} extension. We therefore prefer
@@ -32,8 +32,8 @@ final class Compression
     public const MIN_COMPRESS_BYTES = 1024;
 
     /**
-     * Brotli quality level. Level 6 trades a little compression ratio for much faster compression
-     * than the brotli default (11), which suits request-body sizes.
+     * Brotli quality level. Level 6 mirrors the reference client and trades a little ratio for much
+     * faster compression than the brotli default (11).
      */
     private const BROTLI_QUALITY = 6;
 
