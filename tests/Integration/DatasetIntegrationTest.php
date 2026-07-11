@@ -61,9 +61,19 @@ final class DatasetIntegrationTest extends IntegrationTestCase
         $ds = $client->datasets()->getOrCreate(self::uniqueName('iter-items'));
         try {
             $dataset = $client->dataset((string) $ds->getId());
-            for ($i = 0; $i < 5; $i++) {
-                $dataset->pushItems([['n' => $i]]);
+            $dataset->pushItems([['n' => 0], ['n' => 1], ['n' => 2], ['n' => 3], ['n' => 4]]);
+
+            // The dataset's item total is computed asynchronously and can briefly lag a write.
+            // iterateItems() pages by the reported total (matching the reference client), so wait for
+            // the count to settle before iterating; otherwise a stale total would stop it early.
+            $deadline = microtime(true) + 30.0;
+            while (
+                $dataset->listItems(new DatasetListItemsOptions())->getTotal() < 5
+                && microtime(true) < $deadline
+            ) {
+                usleep(500_000);
             }
+
             $values = [];
             // chunkSize=2 across 5 items => three pages (2, 2, 1).
             foreach ($dataset->iterateItems(new DatasetListItemsOptions(), 2) as $item) {
