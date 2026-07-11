@@ -106,7 +106,9 @@ final class RunClient
     {
         $options ??= new MetamorphOptions();
         $params = new QueryParams();
-        $params->addString('targetActorId', $targetActorId);
+        // Normalize the target Actor id to the URL-safe `username~actor-name` form (first `/`→`~`),
+        // matching the reference JS client, so a slash-form id is sent as the same wire value.
+        $params->addString('targetActorId', ResourceContext::toSafeId($targetActorId));
         if ($options->build !== null && $options->build !== '') {
             $params->addString('build', $options->build);
         }

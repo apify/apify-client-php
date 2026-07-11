@@ -23,7 +23,7 @@ foreach ($client->store()->iterate(new StoreListOptions(search: 'scraper'), 50) 
 ## Users — `$client->me()` / `$client->user($id)`
 
 - `get(): ?User` — for `me()`, private account details are available via `toArray()`.
-- `monthlyUsage(?string $date = null): array` — current-account monthly usage (only for `me()`).
+- `monthlyUsage(?string $date = null): array` — current-account monthly usage (only for `me()`). `$date` is an ISO date in `YYYY-MM-DD` format; the report covers the monthly usage cycle containing that date. Omit it (or pass `null`) to report the current month.
 - `limits(): array`, `updateLimits(mixed $newLimits): void` — account limits (only for `me()`).
 
 ```php

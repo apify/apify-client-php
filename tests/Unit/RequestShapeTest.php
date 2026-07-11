@@ -52,9 +52,20 @@ final class RequestShapeTest extends TestCase
         self::assertSame('POST', $request->getMethod());
         $uri = (string) $request->getUri();
         self::assertStringContainsString('/actor-runs/run1/metamorph', $uri);
-        self::assertStringContainsString('targetActorId=apify%2Fother', $uri);
+        self::assertStringContainsString('targetActorId=apify~other', $uri);
         self::assertStringContainsString('build=latest', $uri);
         self::assertSame(['x' => 1], Json::decode((string) $request->getBody()));
+    }
+
+    public function testMetamorphNormalizesSlashFormTargetActorId(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'r']]));
+        $this->client($transport)->run('run1')->metamorph('username/actor-name');
+
+        $uri = (string) $transport->lastRequest()->getUri();
+        // The first `/` must be normalized to `~` (matching the JS reference), not percent-encoded.
+        self::assertStringContainsString('targetActorId=username~actor-name', $uri);
+        self::assertStringNotContainsString('username%2Factor-name', $uri);
     }
 
     public function testResurrectSendsOptions(): void

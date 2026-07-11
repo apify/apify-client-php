@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+- Fixed `RunClient::metamorph()` to normalize a slash-form `targetActorId` (e.g. `username/actor-name`)
+  to the URL-safe `username~actor-name` form before sending it, matching the reference JS client.
+- Documented the expected `YYYY-MM-DD` date format for `me()->monthlyUsage()` in the docs.
+- Expanded the docs namespace table with the commonly-used option classes so their `use` namespace
+  is discoverable.
+
 ## 0.3.1
 
 - Fixed `KeyValueStoreClient::iterateKeys()` so a `limit` of `0` (like `null`) iterates the whole
