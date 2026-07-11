@@ -4,7 +4,7 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Apify Store — `$client->store()`
 
-- `list(?StoreListOptions $options): PaginationList` — one page of Store Actors.
+- `list(?StoreListOptions $options = null): PaginationList` — one page of Store Actors.
 - `iterate(?StoreListOptions $options): iterable` — lazily iterate all matching Actors, paging on demand.
 
 ```php

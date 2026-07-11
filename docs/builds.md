@@ -4,7 +4,7 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Build collection — `$client->builds()`
 
-- `list(?ListOptions $options): PaginationList` — list the account's builds.
+- `list(?ListOptions $options = null): PaginationList` — list the account's builds.
 
 ```php
 $page = $client->builds()->list(new ListOptions(limit: 20, desc: true));

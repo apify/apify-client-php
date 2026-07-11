@@ -42,7 +42,7 @@ Single — `$client->keyValueStore($id)`:
 - `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null): void`
 - `setRecordJson(string $key, mixed $value): void`
 - `deleteRecord(string $key): void`
-- `getRecordPublicUrl(string $key): string`, `createKeysPublicUrl(?ListKeysOptions, ?int $expiresInSecs): string`
+- `getRecordPublicUrl(string $key): string`, `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null): string`
 
 ```php
 $store = $client->keyValueStores()->getOrCreate('my-store');
@@ -67,9 +67,12 @@ Single — `$client->requestQueue($id)`:
 - `addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo`
 - `getRequest(string $id): ?RequestQueueRequest`, `updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo`, `deleteRequest(string $id): void`
 - `batchAddRequests(array $requests, bool $forefront = false, ?BatchAddRequestsOptions $options = null): BatchAddResult` — every request must have a non-empty `uniqueKey`; input is split into batches of at most 25 requests that also respect the ~9 MiB payload limit.
-- `batchDeleteRequests(mixed $requests): array`
-- `listRequests(?ListRequestsOptions $options = null): array`, `paginateRequests(?PaginateRequestsOptions $options = null): iterable`
-- `listAndLockHead(int $lockSecs, ?int $limit = null): array`, `prolongRequestLock(...)`, `deleteRequestLock(...)`, `unlockRequests(): array`
+- `batchDeleteRequests(mixed $requests): array` — `$requests` is a list of entries that each identify a request to delete (e.g. by `id` or `uniqueKey`); returns the raw batch result as a decoded `array<string,mixed>`.
+- `listRequests(?ListRequestsOptions $options = null): array` — returns the raw paginated response as a decoded `array<string,mixed>`. `paginateRequests(?PaginateRequestsOptions $options = null): iterable`
+- `listAndLockHead(int $lockSecs, ?int $limit = null): array` — atomically returns and locks up to `$limit` requests for `$lockSecs` seconds; returns the raw locked-head object as a decoded `array<string,mixed>`.
+- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): array` — extends a request's lock by `$lockSecs`; returns the raw response as a decoded `array<string,mixed>`.
+- `deleteRequestLock(string $id, bool $forefront = false): void` — releases the lock on a single request.
+- `unlockRequests(): array` — releases all locks the client holds on this queue; returns the raw response as a decoded `array<string,mixed>`.
 - `withClientKey(string $clientKey): RequestQueueClient`
 
 `paginateRequests()` accepts a `PaginateRequestsOptions` with `limit` (total across all pages),

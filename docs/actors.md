@@ -4,7 +4,7 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Actor collection — `$client->actors()`
 
-- `list(?ActorListOptions $options): PaginationList` — list the account's Actors.
+- `list(?ActorListOptions $options = null): PaginationList` — list the account's Actors.
 - `create(mixed $actor): Actor` — create a new Actor from a JSON-serializable definition.
 
 ```php

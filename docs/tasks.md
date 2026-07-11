@@ -5,7 +5,7 @@ Tasks are pre-configured Actor runs with stored input. Snippets assume
 
 ## Task collection — `$client->tasks()`
 
-- `list(?ListOptions $options): PaginationList`
+- `list(?ListOptions $options = null): PaginationList`
 - `create(mixed $task): Task`
 
 ```php

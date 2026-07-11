@@ -4,7 +4,7 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Webhook collection — `$client->webhooks()`
 
-- `list(?ListOptions $options): PaginationList`
+- `list(?ListOptions $options = null): PaginationList`
 - `create(mixed $webhook): Webhook`
 
 Webhooks nested under an Actor or task (`$client->actor($id)->webhooks()`,
@@ -32,7 +32,7 @@ $client->webhook('WEBHOOK_ID')->dispatches()->list(new ListOptions(limit: 10));
 
 ## Webhook dispatches — `$client->webhookDispatches()` / `$client->webhookDispatch($id)`
 
-- Collection: `list(?ListOptions $options): PaginationList`.
+- Collection: `list(?ListOptions $options = null): PaginationList`.
 - Single: `get(): ?WebhookDispatch`.
 
 ```php

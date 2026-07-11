@@ -5,7 +5,7 @@ Schedules automatically start Actor or task runs at specified times. Snippets as
 
 ## Schedule collection — `$client->schedules()`
 
-- `list(?ListOptions $options): PaginationList`
+- `list(?ListOptions $options = null): PaginationList`
 - `create(mixed $schedule): Schedule`
 
 ```php
