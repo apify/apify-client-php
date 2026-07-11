@@ -4,11 +4,12 @@
 
 - Added `failOnEmptyTestSuite="true"` to `phpunit.xml.dist` so a suite matching zero tests fails
   instead of passing green.
-- Replaced magic literals with named constants: `HttpClientCore::attemptTimeout()` now reuses
-  `BACKOFF_FACTOR` for the per-attempt timeout doubling, and `Json::decode()` uses a named
-  `MAX_JSON_DEPTH` constant.
-- Corrected the `RunClient::get()` and `BuildClient::get()` doc comments to state that the 60s cap
-  on `waitForFinishSecs` is enforced by the server, not the client.
+- Replaced magic literals with named constants: `HttpClientCore::attemptTimeout()` now scales the
+  per-attempt timeout by a dedicated `TIMEOUT_BACKOFF_FACTOR` constant, and `Json::decode()` uses a
+  named `MAX_JSON_DEPTH` constant.
+- Corrected the `RunClient::get()` and `BuildClient::get()` doc comments to explain that the
+  `waitForFinishSecs` value is clamped client-side to the request-timeout budget and additionally
+  capped at 60s by the server.
 - Reworded the docs namespace table so the `Options` row no longer implies its example list is
   exhaustive.
 

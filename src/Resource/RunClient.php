@@ -58,7 +58,9 @@ final class RunClient
 
     /**
      * Fetches the run, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * for the run to reach a terminal state (the server caps this wait at 60s). Returns
+     * for the run to reach a terminal state. The value is clamped client-side to the per-request
+     * timeout budget (minus a safety margin) so the server is never asked to hold the connection
+     * longer than the client will wait; the server additionally caps the wait at 60s. Returns
      * {@code null} if it does not exist.
      */
     public function get(?int $waitForFinishSecs = null): ?ActorRun
