@@ -485,7 +485,10 @@ final class RequestQueueClient
         $options->validate();
 
         $maxPageLimit = $options->maxPageLimit ?? PaginateRequestsOptions::DEFAULT_MAX_PAGE_LIMIT;
-        $limit = $options->limit; // total across all pages; null = unbounded
+        // Total cap across all pages. null or 0 means "iterate all" (the API treats limit=0 as
+        // unset). Normalizing 0 -> null here matches iterateKeys and the offset paginator's minLimit
+        // convention, and stops a per-page limit=0 from short-circuiting the iteration after one page.
+        $limit = ($options->limit !== null && $options->limit > 0) ? $options->limit : null;
         $nextCursor = $options->cursor;
         $nextExclusiveStartId = $options->exclusiveStartId; // used for the first page only
         $iterated = 0;

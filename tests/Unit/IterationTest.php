@@ -9,6 +9,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Options\ActorListOptions;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\ListKeysOptions;
+use Apify\Client\Options\PaginateRequestsOptions;
 use Apify\Client\Options\StoreListOptions;
 use PHPUnit\Framework\TestCase;
 
@@ -151,6 +152,33 @@ final class IterationTest extends TestCase
         $uri = (string) $transport->received[0]->getUri();
         self::assertStringContainsString('fields=n', $uri);
         self::assertStringContainsString('clean=1', $uri);
+    }
+
+    /** Builds a cursor-paged request-queue list envelope ({@code {"data": {items, nextCursor}}}). */
+    private static function requestsPage(?string $nextCursor, string ...$ids): string
+    {
+        return Json::encode(['data' => [
+            'items' => array_map(static fn (string $id): array => ['id' => $id, 'url' => "https://e/$id"], $ids),
+            'count' => count($ids),
+            'limit' => 1000,
+            'nextCursor' => $nextCursor,
+        ]]);
+    }
+
+    public function testPaginateRequestsLimitZeroIteratesAll(): void
+    {
+        // limit=0 is a total cap of "unbounded": iterate every page, and never forward limit=0 as a
+        // per-page cap (which would short-circuit the iteration after a single page).
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::requestsPage('cursor2', 'r1', 'r2'))
+            ->queueResponse(200, self::requestsPage(null, 'r3'));
+        $ids = [];
+        foreach ($this->client($transport)->requestQueue('rq')->paginateRequests(new PaginateRequestsOptions(limit: 0)) as $request) {
+            $ids[] = $request->getId();
+        }
+        self::assertSame(['r1', 'r2', 'r3'], $ids);
+        self::assertSame(2, $transport->callCount());
+        self::assertStringNotContainsString('limit=0', (string) $transport->received[0]->getUri());
     }
 
     private static function keysPage(bool $isTruncated, ?string $nextKey, string ...$keys): string

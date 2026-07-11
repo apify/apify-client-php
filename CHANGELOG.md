@@ -13,6 +13,11 @@
   a 404 on a single-resource fetch returns `null` from `get()` and is a no-op for `delete()`.
 - Added the optional `baseUrl` argument to the README configuration snippet and documented that
   `paginateRequests()` yields `RequestQueueRequest` instances.
+- Fixed `RequestQueueClient::paginateRequests()` so a `limit` of `0` (like `null`) iterates all
+  requests instead of yielding a single page, matching `iterateKeys` and the offset paginator.
+- Documented that combining content-dropping dataset item filters (`skipEmpty`, `skipHidden`,
+  `clean`) with multi-page `iterateItems()` can repeat or skip items, mirroring the reference JS
+  client's offset advancement.
 
 ## 0.3.0
 

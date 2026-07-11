@@ -113,6 +113,15 @@ final class DatasetClient
      * ({@code null} = the server default). All other {@see DatasetListItemsOptions} fields (field
      * selection, filtering, ordering) are applied to every page.
      *
+     * Note: server-side item filters ({@code skipEmpty}, {@code skipHidden}, {@code clean}) are
+     * applied after {@code offset}/{@code limit}, so a page can return fewer items than requested
+     * while {@code X-Apify-Pagination-Total} still reflects the raw total. Because the iterator
+     * advances the offset by the post-filter item count (matching the reference JS client),
+     * combining those filters with multi-page iteration can repeat items across overlapping windows
+     * or, if a whole offset window is filtered out, end iteration early and skip the remaining items.
+     * Iterate without server-side item filters, or page explicitly with {@see listItems()} and
+     * filter client-side.
+     *
      * @return Generator<int,mixed>
      */
     public function iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): Generator
