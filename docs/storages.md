@@ -19,7 +19,7 @@ Single — `$client->dataset($id)`:
 
 - `get(): ?Dataset`, `update(mixed $newFields): Dataset`, `delete(): void`
 - `listItems(?DatasetListItemsOptions $options = null): PaginationList` — one page of items decoded to PHP values.
-- `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. Note: server-side item filters (`skipEmpty`, `skipHidden`, `clean`) are applied after `offset`/`limit`, so combining them with multi-page iteration can repeat or skip items (the iterator advances the offset by the post-filter count, matching the reference JS client). Iterate without those filters, or page explicitly with `listItems()` and filter client-side.
+- `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. Note: item-dropping filters (`skipEmpty`, and `clean` which implies it) are applied after `offset`/`limit`, so combining them with multi-page iteration can repeat or skip items (the iterator advances the offset by the post-filter count, matching the reference JS client). Iterate without those filters, or page explicitly with `listItems()` and filter client-side. (`skipHidden` only strips hidden fields from each item, not whole items, so it does not affect paging.)
 - `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string` — raw export bytes.
 - `pushItems(mixed $items): void`
 - `getStatistics(): ?array`

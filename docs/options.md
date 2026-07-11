@@ -168,7 +168,7 @@ For `actor()->build()`.
 ## Datasets
 
 ### `DatasetListItemsOptions`
-For `dataset()->listItems()` and `createItemsPublicUrl()`.
+For `dataset()->listItems()`, `iterateItems()`, and `createItemsPublicUrl()`.
 | Field | Type | Description |
 |---|---|---|
 | `offset` | `?int` | Number of items to skip. |
