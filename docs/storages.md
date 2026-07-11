@@ -23,7 +23,7 @@ Single — `$client->dataset($id)`:
 - `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string` — raw export bytes.
 - `pushItems(mixed $items): void`
 - `getStatistics(): ?array`
-- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null): string`
+- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`.
 
 ```php
 $dataset = $client->datasets()->getOrCreate('my-dataset');
@@ -50,12 +50,13 @@ Single — `$client->keyValueStore($id)`:
 - `get(): ?KeyValueStore`, `update(mixed $newFields): KeyValueStore`, `delete(): void`
 - `listKeys(?ListKeysOptions $options = null): KeyValueStoreKeysPage`
 - `iterateKeys(?ListKeysOptions $options = null): iterable` — lazily iterate all keys, following cursor pagination (`exclusiveStartKey`/`nextExclusiveStartKey`). The options' `limit` caps the total number of keys yielded across all pages (unset = all); there is no separate page-size argument (the per-page size follows the remaining cap, like the reference client).
-- `recordExists(string $key): bool`
+- `recordExists(string $key): bool` — reports whether a record with the given key exists, without downloading its value (a `HEAD` request).
 - `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord`
 - `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null): void`
-- `setRecordJson(string $key, mixed $value): void`
-- `deleteRecord(string $key): void`
-- `getRecordPublicUrl(string $key): string`, `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null): string`
+- `setRecordJson(string $key, mixed $value): void` — convenience over `setRecord()` that JSON-encodes `$value` and stores it with a JSON content type.
+- `deleteRecord(string $key): void` — permanently removes the record with the given key.
+- `getRecordPublicUrl(string $key): string` — builds a shareable URL for downloading a single record; for a private store it appends an access signature so the URL works without an API token.
+- `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null): string` — builds a shareable URL for listing this store's keys (forwarding the given key filters); for a private store it appends an access signature, optionally bounded to `$expiresInSecs`.
 
 ```php
 $store = $client->keyValueStores()->getOrCreate('my-store');
@@ -87,15 +88,15 @@ Single — `$client->requestQueue($id)`:
 
 - `get(): ?RequestQueue`, `update(mixed $newFields): RequestQueue`, `delete(): void`
 - `listHead(?int $limit = null): RequestQueueHead`
-- `addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo`
-- `getRequest(string $id): ?RequestQueueRequest`, `updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo`, `deleteRequest(string $id): void`
-- `batchAddRequests(array $requests, bool $forefront = false, ?BatchAddRequestsOptions $options = null): BatchAddResult` — every request must have a non-empty `uniqueKey`; input is split into batches of at most 25 requests that also respect the ~9 MiB payload limit.
+- `addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` — adds a request to the queue; when `$forefront` is `true` it is added to the front (handled before the rest) instead of the back.
+- `getRequest(string $id): ?RequestQueueRequest`, `updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` (with `$forefront` `true` the updated request is moved to the front of the queue), `deleteRequest(string $id): void`
+- `batchAddRequests(array $requests, bool $forefront = false, ?BatchAddRequestsOptions $options = null): BatchAddResult` — every request must have a non-empty `uniqueKey`; with `$forefront` `true` the requests are added to the front of the queue; input is split into batches of at most 25 requests that also respect the ~9 MiB payload limit.
 - `batchDeleteRequests(mixed $requests): array` — `$requests` is a list of entries that each identify a request to delete (e.g. by `id` or `uniqueKey`); returns the raw batch result as a decoded `array<string,mixed>`.
 - `listRequests(?ListRequestsOptions $options = null): array` — returns the raw paginated response as a decoded `array<string,mixed>`.
 - `paginateRequests(?PaginateRequestsOptions $options = null): iterable` — lazily iterate the queue's requests, following cursor pagination (see the options note below).
 - `listAndLockHead(int $lockSecs, ?int $limit = null): array` — atomically returns and locks up to `$limit` requests for `$lockSecs` seconds; returns the raw locked-head object as a decoded `array<string,mixed>`.
-- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): array` — extends a request's lock by `$lockSecs`; returns the raw response as a decoded `array<string,mixed>`.
-- `deleteRequestLock(string $id, bool $forefront = false): void` — releases the lock on a single request.
+- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): array` — extends a request's lock by `$lockSecs`; with `$forefront` `true` the request is placed at the front of the queue once its lock expires; returns the raw response as a decoded `array<string,mixed>`.
+- `deleteRequestLock(string $id, bool $forefront = false): void` — releases the lock on a single request; with `$forefront` `true` the request is returned to the front of the queue.
 - `unlockRequests(): array` — releases all locks the client holds on this queue; returns the raw response as a decoded `array<string,mixed>`.
 - `withClientKey(string $clientKey): RequestQueueClient`
 

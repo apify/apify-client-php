@@ -205,4 +205,21 @@ final class IterationTest extends TestCase
         self::assertSame(1, $transport->callCount());
         self::assertStringContainsString('limit=2', (string) $transport->received[0]->getUri());
     }
+
+    public function testIterateKeysLimitZeroIteratesAll(): void
+    {
+        // limit=0 is a total cap of "unbounded": iterate every page, and never forward limit=0 as a
+        // per-page cap (which would short-circuit the iteration after a single page).
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::keysPage(true, 'k2', 'k1', 'k2'))
+            ->queueResponse(200, self::keysPage(false, null, 'k3'));
+        $keys = [];
+        foreach ($this->client($transport)->keyValueStore('kvs')->iterateKeys(new ListKeysOptions(limit: 0)) as $key) {
+            $keys[] = $key->getKey();
+        }
+        self::assertSame(['k1', 'k2', 'k3'], $keys);
+        self::assertSame(2, $transport->callCount());
+        self::assertStringNotContainsString('limit=0', (string) $transport->received[0]->getUri());
+        self::assertStringNotContainsString('limit=', (string) $transport->received[0]->getUri());
+    }
 }

@@ -22,7 +22,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `get(?int $waitForFinishSecs = null): ?ActorRun` — fetch, optionally waiting server-side (max 60s).
 - `update(mixed $newFields): ActorRun`
 - `delete(): void`
-- `abort(?bool $gracefully = null): ActorRun`
+- `abort(?bool $gracefully = null): ActorRun` — aborts the run; with `$gracefully` `true` the run is signalled so it can finish its current request before terminating, `false` aborts immediately, and `null` (the default) lets the server apply its default (immediate abort).
 - `metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun`
 - `reboot(): ActorRun`
 - `resurrect(?RunResurrectOptions $options = null): ActorRun`

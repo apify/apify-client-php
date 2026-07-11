@@ -89,7 +89,7 @@ final class KeyValueStoreClient
      * async-iterable {@code listKeys()}.
      *
      * The options' {@code limit} caps the total number of keys yielded across all pages ({@code null}
-     * = all); {@code exclusiveStartKey} starts the listing after a given key; {@code prefix} and
+     * or {@code 0} = all); {@code exclusiveStartKey} starts the listing after a given key; {@code prefix} and
      * {@code collection} restrict which keys are listed. Unlike the offset/limit collection iterators,
      * there is no separate page-size argument: the per-page size follows the remaining total cap (or
      * the server default when unbounded), exactly as the reference client does.
@@ -99,7 +99,11 @@ final class KeyValueStoreClient
     public function iterateKeys(?ListKeysOptions $options = null): Generator
     {
         $options ??= new ListKeysOptions();
-        $limit = $options->limit; // total across all pages; null = unbounded
+        // Total cap across all pages. null or 0 means "iterate the whole store" (the API treats
+        // limit=0 as unset). Normalizing 0 -> null here matches the offset paginator's minLimit
+        // convention and the sibling clients, and stops a per-page limit=0 from short-circuiting
+        // the iteration after a single page.
+        $limit = ($options->limit !== null && $options->limit > 0) ? $options->limit : null;
         $exclusiveStartKey = $options->exclusiveStartKey;
         $iterated = 0;
 

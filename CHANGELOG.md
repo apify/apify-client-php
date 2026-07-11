@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1
+
+- Fixed `KeyValueStoreClient::iterateKeys()` so a `limit` of `0` (like `null`) iterates the whole
+  store instead of stopping after a single page; a positive `limit` still caps the total keys
+  yielded across all pages.
+- Documented the `bool $forefront` parameter on the request-queue `addRequest`/`updateRequest`/
+  `prolongRequestLock`/`deleteRequestLock` methods and the `?bool $gracefully` parameter on
+  `run()->abort()`, and added behavior descriptions for `recordExists`, `setRecordJson`,
+  `deleteRecord`, `getRecordPublicUrl`, `createKeysPublicUrl`, and `createItemsPublicUrl`.
+
 ## 0.3.0
 
 - Added lazy iteration helpers matching the reference client, which iterates every collection: an
