@@ -12,11 +12,8 @@ $options = new ActorListOptions(my: true, limit: 10);
 
 ### Manual offset paging with `withPagination()`
 The offset-based options classes — `ListOptions`, `ActorListOptions`, `StorageListOptions`,
-`StoreListOptions` and `DatasetListItemsOptions` — each expose a helper:
-
-```php
-withPagination(?int $offset, ?int $limit): self
-```
+`StoreListOptions` and `DatasetListItemsOptions` — each expose a helper
+`withPagination(?int $offset, ?int $limit): self`.
 
 It returns a copy of the options with the given `offset` and `limit`, preserving every other field.
 The `iterate()` helpers use it internally to request successive pages, but you can also call it to
