@@ -31,8 +31,9 @@ $client = new ApifyClient('my-api-token');
 // pass a value (e.g. 120) to bound the wait, or null to wait indefinitely (as here).
 $run = $client->actor('apify/hello-world')->call(null, null, null);
 
-// Read items from the run's default dataset.
-$items = $client->dataset($run->getDefaultDatasetId())->listItems();
+// Read items from the run's default dataset. getDefaultDatasetId() is ?string, so cast it
+// to satisfy dataset(string $id).
+$items = $client->dataset((string) $run->getDefaultDatasetId())->listItems();
 echo 'Item count: ' . $items->getCount() . PHP_EOL;
 ```
 
@@ -50,6 +51,7 @@ The constructor accepts named arguments for non-default settings:
 ```php
 $configured = new ApifyClient(
     token: 'my-api-token',
+    baseUrl: 'https://api.apify.com',
     maxRetries: 5,
     minDelayBetweenRetriesMillis: 1000,
     timeoutSecs: 120,
@@ -70,7 +72,10 @@ $configured = new ApifyClient(
 | `httpClient` | Guzzle | The replaceable transport (`Apify\Client\Http\HttpClientInterface`). |
 
 Requests are retried on network errors, HTTP 429 (rate limit) and 5xx responses, with exponential
-backoff and jitter. 4xx responses (other than 429) are thrown immediately as `ApifyApiException`.
+backoff and jitter. Other 4xx responses are thrown immediately as `ApifyApiException`, with one
+exception: a resource-not-found 404 (the API's `record-not-found` / `record-or-token-not-found`
+error type) on a single-resource fetch is not thrown — `get()` returns `null` and `delete()` is
+treated as a successful no-op (see [Error handling](#error-handling)).
 
 ### Replaceable HTTP transport
 
@@ -115,7 +120,11 @@ try {
 | `getData(): ?array` | Additional structured error data provided by the API, if any. |
 
 Transport-level failures (network errors, timeouts) are retried internally; only if every retry is
-exhausted does the underlying error surface. Requests are retried on network errors, HTTP 429 and 5xx.
+exhausted does the underlying error surface, as an `Apify\Client\Exception\TransportException`
+(a `RuntimeException`; `isTimeout()` reports whether a request timed out). In short:
+`ApifyApiException` means the server returned an error response (a 4xx/5xx with a body), whereas
+`TransportException` means the request never produced a usable response (network failure or timeout)
+after all retries. Requests are retried on network errors, HTTP 429 and 5xx.
 
 ## Versioning
 

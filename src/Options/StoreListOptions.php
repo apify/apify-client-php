@@ -12,7 +12,10 @@ final class StoreListOptions
     public function __construct(
         /** Number of Actors to skip. */
         public readonly ?int $offset = null,
-        /** Maximum number of Actors to return (also the per-page size when iterating). */
+        /**
+         * Maximum number of Actors to return. When iterating, this caps the total number of Actors
+         * yielded across all pages (the per-page size is the separate {@code chunkSize} argument).
+         */
         public readonly ?int $limit = null,
         /** Full-text search query. */
         public readonly ?string $search = null,
@@ -36,12 +39,15 @@ final class StoreListOptions
     ) {
     }
 
-    /** Returns a copy of these options with a new {@code offset} (used by lazy iteration). */
-    public function withOffset(?int $offset): self
+    /**
+     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving the other
+     * filters. Used by lazy iteration to request successive pages.
+     */
+    public function withPagination(?int $offset, ?int $limit): self
     {
         return new self(
             $offset,
-            $this->limit,
+            $limit,
             $this->search,
             $this->sortBy,
             $this->category,

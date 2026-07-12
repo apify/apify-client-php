@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.3.3
+
+- Added `failOnEmptyTestSuite="true"` to `phpunit.xml.dist` so a suite matching zero tests fails
+  instead of passing green.
+- Replaced magic literals with named constants: `HttpClientCore::attemptTimeout()` now scales the
+  per-attempt timeout by a dedicated `TIMEOUT_BACKOFF_FACTOR` constant, and `Json::decode()` uses a
+  named `MAX_JSON_DEPTH` constant.
+- Corrected the `RunClient::get()` and `BuildClient::get()` doc comments to explain that the
+  `waitForFinishSecs` value is clamped client-side to the request-timeout budget and additionally
+  capped at 60s by the server.
+- Reworded the docs namespace table so the `Options` row no longer implies its example list is
+  exhaustive.
+
+## 0.3.2
+
+- Fixed `RunClient::metamorph()` to normalize a slash-form `targetActorId` (e.g. `username/actor-name`)
+  to the URL-safe `username~actor-name` form before sending it, matching the reference JS client.
+- Documented the expected `YYYY-MM-DD` date format for `me()->monthlyUsage()` in the docs.
+- Expanded the docs namespace table with the commonly-used option classes so their `use` namespace
+  is discoverable.
+
+## 0.3.1
+
+- Fixed `KeyValueStoreClient::iterateKeys()` so a `limit` of `0` (like `null`) iterates the whole
+  store instead of stopping after a single page; a positive `limit` still caps the total keys
+  yielded across all pages.
+- Documented the `bool $forefront` parameter on the request-queue `addRequest`/`updateRequest`/
+  `prolongRequestLock`/`deleteRequestLock` methods and the `?bool $gracefully` parameter on
+  `run()->abort()`, and added behavior descriptions for `recordExists`, `setRecordJson`,
+  `deleteRecord`, `getRecordPublicUrl`, `createKeysPublicUrl`, and `createItemsPublicUrl`.
+- Corrected the README error-handling description so the "4xx are thrown" rule notes its exception:
+  a 404 on a single-resource fetch returns `null` from `get()` and is a no-op for `delete()`.
+- Added the optional `baseUrl` argument to the README configuration snippet and documented that
+  `paginateRequests()` yields `RequestQueueRequest` instances.
+- Fixed `RequestQueueClient::paginateRequests()` so a `limit` of `0` (like `null`) iterates all
+  requests instead of yielding a single page, matching `iterateKeys` and the offset paginator.
+- Documented that combining item-dropping dataset filters (`skipEmpty`, and `clean` which implies
+  it) with multi-page `iterateItems()` can repeat or skip items, mirroring the reference JS client's
+  offset advancement.
+
+## 0.3.0
+
+- Added lazy iteration helpers matching the reference client, which iterates every collection: an
+  `iterate()` generator on the Actor, Actor-version, Actor-env-var, build, run, dataset,
+  key-value-store, request-queue, schedule, task, webhook (account-wide and nested) and
+  webhook-dispatch collections; `DatasetClient::iterateItems()` for dataset items; and
+  `KeyValueStoreClient::iterateKeys()` for store keys (cursor-based). Each fetches pages on demand.
+- Iteration `limit` semantics: for the offset/limit iterators, the options' `limit` now caps the
+  total number of items yielded across all pages (unset = all) and the per-page size is a separate
+  `$chunkSize` argument. `StoreCollectionClient::iterate()` follows the same rule (previously its
+  `limit` was used as the page size); `StoreListOptions::withOffset()` is replaced by
+  `withPagination()`.
+- `KeyValueStoreClient::iterateKeys()` follows the store's cursor pagination
+  (`exclusiveStartKey`/`nextExclusiveStartKey`) and stops on the total-item cap or an untruncated page.
+- Documented every new iteration method with runnable examples and clarified the request-queue
+  method list, the key-value-store record snippet, and when `TransportException` surfaces versus
+  `ApifyApiException`.
+
+## 0.2.2
+
+- `batchAddRequests` now validates every request's individual payload size up front, before any
+  HTTP call, so an oversized request anywhere in a large batch is rejected without POSTing earlier
+  chunks (previously later chunks could partially mutate the queue before the error was raised).
+
+## 0.2.1
+
+- Synced to Apify OpenAPI spec `v2-2026-07-10T105921Z`. No public interface changes.
+
 ## 0.2.0
 
 - Synced to Apify OpenAPI spec `v2-2026-07-08T143931Z`. No public interface changes.

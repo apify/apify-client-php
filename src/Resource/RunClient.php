@@ -58,7 +58,10 @@ final class RunClient
 
     /**
      * Fetches the run, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * (max 60) for the run to reach a terminal state. Returns {@code null} if it does not exist.
+     * for the run to reach a terminal state. The value is clamped client-side to the per-request
+     * timeout budget (minus a safety margin) so the server is never asked to hold the connection
+     * longer than the client will wait; the server additionally caps the wait at 60s. Returns
+     * {@code null} if it does not exist.
      */
     public function get(?int $waitForFinishSecs = null): ?ActorRun
     {
@@ -106,7 +109,9 @@ final class RunClient
     {
         $options ??= new MetamorphOptions();
         $params = new QueryParams();
-        $params->addString('targetActorId', $targetActorId);
+        // Normalize the target Actor id to the URL-safe `username~actor-name` form (first `/`→`~`),
+        // matching the reference JS client, so a slash-form id is sent as the same wire value.
+        $params->addString('targetActorId', ResourceContext::toSafeId($targetActorId));
         if ($options->build !== null && $options->build !== '') {
             $params->addString('build', $options->build);
         }

@@ -23,7 +23,7 @@ Every class is under the `Apify\Client\` PSR-4 root. Use these when writing `use
 |---|---|---|
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
-| `Apify\Client\Options\` | Option objects (the `*Options` classes) **and** enums. | `ActorListOptions`, `DatasetListItemsOptions`, `PaginateRequestsOptions`, `RequestQueueClientOptions`, `DownloadItemsFormat` |
+| `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
 | `Apify\Client\Http\` | The replaceable transport and its adapters. | `HttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient` |
 | `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException`, `TransportException` |
 
@@ -42,6 +42,44 @@ PSR-7 `Psr\Http\Message\StreamInterface` (from the `psr/http-message` package), 
 Methods that fetch a single resource return `null` when the resource does not exist, rather than
 throwing. API failures are thrown as `ApifyApiException` (see [error handling](../README.md#error-handling)).
 
+## ApifyClient methods
+
+`ApifyClient` is the entry point: construct one, then call an accessor to get a sub-client for a
+specific resource or collection. Single-resource accessors take an ID (or, where the API allows it,
+a name) and return that resource's client; collection accessors take no arguments and return a
+collection client for listing and creating. Method detail lives on the linked [resource
+pages](#resource-pages); the signatures below are the entry points.
+
+| Method | Returns | Notes |
+|---|---|---|
+| `actor(string $id): ActorClient` | Actor client | Single Actor, by ID or `username/name`. |
+| `actors(): ActorCollectionClient` | Actor collection | List and create Actors. |
+| `build(string $id): BuildClient` | Build client | Single Actor build. |
+| `builds(): BuildCollectionClient` | Build collection | List builds across Actors. |
+| `run(string $id): RunClient` | Run client | Single Actor run. |
+| `runs(): RunCollectionClient` | Run collection | List runs across Actors. |
+| `dataset(string $id): DatasetClient` | Dataset client | Single dataset, by ID or name. |
+| `datasets(): DatasetCollectionClient` | Dataset collection | List and create datasets. |
+| `keyValueStore(string $id): KeyValueStoreClient` | Key-value store client | Single store, by ID or name. |
+| `keyValueStores(): KeyValueStoreCollectionClient` | Key-value store collection | List and create stores. |
+| `requestQueue(string $id, ?RequestQueueClientOptions $options = null): RequestQueueClient` | Request queue client | Single queue, by ID or name; optional client options (`clientKey`, per-request `timeoutSecs`). |
+| `requestQueues(): RequestQueueCollectionClient` | Request queue collection | List and create queues. |
+| `task(string $id): TaskClient` | Task client | Single task. |
+| `tasks(): TaskCollectionClient` | Task collection | List and create tasks. |
+| `schedule(string $id): ScheduleClient` | Schedule client | Single schedule. |
+| `schedules(): ScheduleCollectionClient` | Schedule collection | List and create schedules. |
+| `webhook(string $id): WebhookClient` | Webhook client | Single webhook. |
+| `webhooks(): WebhookCollectionClient` | Webhook collection | List and create webhooks. |
+| `webhookDispatch(string $id): WebhookDispatchClient` | Webhook dispatch client | Single webhook dispatch. |
+| `webhookDispatches(): WebhookDispatchCollectionClient` | Webhook dispatch collection | List webhook dispatches. |
+| `store(): StoreCollectionClient` | Store collection | Browse the public Apify Store. |
+| `log(string $buildOrRunId): LogClient` | Log client | Log for a build or run, by ID. |
+| `me(): UserClient` | User client | The authenticated user (`users/me`). |
+| `user(string $id): UserClient` | User client | A public user profile, by ID. |
+| `setStatusMessage(string $message, bool $isTerminal = false): ActorRun` | Updated run | Set the current run's status message; see [Setting single-resource status](#setting-single-resource-status). |
+| `getUserAgent(): string` | User-Agent string | The `User-Agent` the client sends. |
+| `getApiBaseUrl(): string` | Base URL | The resolved API base URL (with `/v2`). |
+
 ## Models and unmodeled data (`toArray`)
 
 Response models expose the commonly-used fields as typed getters (e.g. `$actor->getId()`). The
@@ -58,12 +96,14 @@ $actions = $schedule?->toArray()['actions'] ?? null;
 ## Raw JSON values
 
 A few methods return data whose shape is not modelled and is instead returned as a decoded
-associative array (or accept an arbitrary value serialized to JSON):
+JSON value — typically an associative array, though `getInput()` is typed `mixed` and returns
+whatever JSON value was stored (or accept an arbitrary value serialized to JSON):
 
 - Read: `me()->monthlyUsage(...)`, `me()->limits()`, `task($id)->getInput()`,
   `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`, and the raw request-queue
-  operations (`listRequests`, `listAndLockHead`, `prolongRequestLock`, `unlockRequests`,
-  `batchDeleteRequests`).
+  operations that return a response body (`listRequests`, `listAndLockHead`, `prolongRequestLock`,
+  `unlockRequests`, `batchDeleteRequests`). Note that `deleteRequestLock` returns `void` (it releases
+  a lock and has no meaningful body), so it is not in this list.
 - Write: definition/`update`/`create` arguments accept any JSON-serializable value — typically an
   associative array.
 

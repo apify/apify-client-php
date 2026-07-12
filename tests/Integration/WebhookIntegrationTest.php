@@ -39,6 +39,45 @@ final class WebhookIntegrationTest extends IntegrationTestCase
         self::assertGreaterThanOrEqual(count($page->getItems()), $page->getTotal());
     }
 
+    public function testIterateWebhooks(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->webhooks()->create(self::webhookDef('https://example.com/iter-' . $i))->getId();
+        }
+        try {
+            $seen = [];
+            foreach ($client->webhooks()->iterate(new ListOptions(desc: true), 2) as $webhook) {
+                $seen[(string) $webhook->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created webhook $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->webhook($id)->delete();
+            }
+        }
+    }
+
+    public function testIterateWebhookDispatches(): void
+    {
+        $client = $this->requireClient();
+        $wh = $client->webhooks()->create(self::webhookDef('https://example.com/dispatch-iter'));
+        try {
+            // test() synchronously creates an ad-hoc dispatch listed under the webhook.
+            $dispatch = $client->webhook((string) $wh->getId())->test();
+            $seen = [];
+            foreach ($client->webhook((string) $wh->getId())->dispatches()->iterate(new ListOptions(), 2) as $d) {
+                $seen[(string) $d->getId()] = true;
+            }
+            self::assertArrayHasKey((string) $dispatch->getId(), $seen, 'iterate() did not yield the test dispatch');
+        } finally {
+            $client->webhook((string) $wh->getId())->delete();
+        }
+    }
+
     public function testGetWebhook(): void
     {
         $client = $this->requireClient();

@@ -74,6 +74,71 @@ final class ActorIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testIterateActors(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->actors()->create(self::minimalActor(self::uniqueName('iter')))->getId();
+        }
+        try {
+            $seen = [];
+            // chunkSize=2 forces multi-page iteration across at least the three created Actors.
+            foreach ($client->actors()->iterate(new ActorListOptions(my: true), 2) as $actor) {
+                $seen[(string) $actor->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created Actor $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->actor($id)->delete();
+            }
+        }
+    }
+
+    public function testIterateActorVersions(): void
+    {
+        $client = $this->requireClient();
+        $created = $client->actors()->create(self::minimalActor(self::uniqueName('iter-ver')));
+        try {
+            $actor = $client->actor((string) $created->getId());
+            $actor->versions()->create([
+                'versionNumber' => '0.1',
+                'sourceType' => 'SOURCE_FILES',
+                'buildTag' => 'latest',
+                'sourceFiles' => [],
+            ]);
+            $seen = [];
+            foreach ($actor->versions()->iterate(null, 1) as $version) {
+                $seen[(string) $version->getVersionNumber()] = true;
+            }
+            self::assertArrayHasKey('0.0', $seen);
+            self::assertArrayHasKey('0.1', $seen);
+        } finally {
+            $client->actor((string) $created->getId())->delete();
+        }
+    }
+
+    public function testIterateActorEnvVars(): void
+    {
+        $client = $this->requireClient();
+        $created = $client->actors()->create(self::minimalActor(self::uniqueName('iter-env')));
+        try {
+            $version = $client->actor((string) $created->getId())->version('0.0');
+            $version->envVars()->create(new ActorEnvVar('ITER_VAR_1', 'v1'));
+            $version->envVars()->create(new ActorEnvVar('ITER_VAR_2', 'v2'));
+            $seen = [];
+            foreach ($version->envVars()->iterate(1) as $envVar) {
+                $seen[(string) $envVar->getName()] = true;
+            }
+            self::assertArrayHasKey('ITER_VAR_1', $seen);
+            self::assertArrayHasKey('ITER_VAR_2', $seen);
+        } finally {
+            $client->actor((string) $created->getId())->delete();
+        }
+    }
+
     public function testValidateInput(): void
     {
         $client = $this->requireClient();

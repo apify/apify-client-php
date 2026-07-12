@@ -10,6 +10,7 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Model\Task;
 use Apify\Client\Options\ListOptions;
+use Generator;
 
 /** A client for the Actor task collection ({@code GET/POST /v2/actor-tasks}). */
 final class TaskCollectionClient
@@ -32,6 +33,24 @@ final class TaskCollectionClient
         $params = new QueryParams();
         ($options ?? new ListOptions())->appendTo($params);
         return $this->ctx->listResource('', $params, static fn (array $d) => new Task($d));
+    }
+
+    /**
+     * Lazily iterates over the account's tasks, fetching pages on demand. The options' {@code limit}
+     * caps the total number of tasks yielded across all pages ({@code null} = all); {@code $chunkSize}
+     * is the per-page size ({@code null} = the server default).
+     *
+     * @return Generator<int,Task>
+     */
+    public function iterate(?ListOptions $options = null, ?int $chunkSize = null): Generator
+    {
+        $options ??= new ListOptions();
+        return ResourceContext::paginateOffset(
+            $options->offset ?? 0,
+            $options->limit,
+            $chunkSize,
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+        );
     }
 
     /**

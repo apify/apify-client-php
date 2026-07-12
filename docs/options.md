@@ -10,6 +10,29 @@ $options = new ActorListOptions(my: true, limit: 10);
 
 ## Listing and pagination
 
+### Manual offset paging with `withPagination()`
+The offset-based options classes — `ListOptions`, `ActorListOptions`, `StorageListOptions`,
+`StoreListOptions` and `DatasetListItemsOptions` — each expose a helper
+`withPagination(?int $offset, ?int $limit): self`.
+
+It returns a copy of the options with the given `offset` and `limit`, preserving every other field.
+The `iterate()` helpers use it internally to request successive pages, but you can also call it to
+page manually through `list()` results — most useful for the Apify Store, whose collection is
+otherwise only pageable via `iterate()`:
+
+```php
+$options = new StoreListOptions(search: 'scraper');
+for ($offset = 0; ; $offset += 100) {
+    $page = $client->store()->list($options->withPagination($offset, 100));
+    foreach ($page->getItems() as $item) {
+        // process each Actor
+    }
+    if ($page->getCount() < 100) {
+        break; // last page reached
+    }
+}
+```
+
 ### `ListOptions`
 Shared pagination/ordering controls used by most `list()` methods (builds, runs, tasks, schedules,
 webhooks, dispatches, Actor versions).
@@ -18,6 +41,8 @@ webhooks, dispatches, Actor versions).
 | `offset` | `?int` | Number of items to skip. |
 | `limit` | `?int` | Maximum number of items to return. |
 | `desc` | `?bool` | Return items newest-first. |
+
+Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
 
 ### `ActorListOptions`
 | Field | Type | Description |
@@ -28,6 +53,8 @@ webhooks, dispatches, Actor versions).
 | `my` | `?bool` | Return only Actors owned by the current user. |
 | `sortBy` | `?string` | The sort field (e.g. `createdAt`, `stats.lastRunStartedAt`). |
 
+Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
+
 ### `StorageListOptions`
 Used when listing datasets, key-value stores and request queues.
 | Field | Type | Description |
@@ -37,6 +64,8 @@ Used when listing datasets, key-value stores and request queues.
 | `desc` | `?bool` | Return items newest-first. |
 | `unnamed` | `?bool` | Include unnamed storages in the result. |
 | `ownership` | `?string` | Filter by ownership (e.g. `OWNED`, `ACCESSIBLE`). |
+
+Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
 
 ### `RunListOptions`
 Extra filters for `runs()->list()`, combined with a `ListOptions`.
@@ -51,7 +80,7 @@ For `store()->list()` / `store()->iterate()`.
 | Field | Type | Description |
 |---|---|---|
 | `offset` | `?int` | Number of Actors to skip. |
-| `limit` | `?int` | Maximum number of Actors to return (also the per-page size when iterating). |
+| `limit` | `?int` | Maximum number of Actors to return. When iterating, caps the total across all pages (the per-page size is `iterate()`'s separate `$chunkSize` argument). |
 | `search` | `?string` | Full-text search query. |
 | `sortBy` | `?string` | The sort field (e.g. `popularity`, `newest`). |
 | `category` | `?string` | Filter Actors by category. |
@@ -60,6 +89,8 @@ For `store()->list()` / `store()->iterate()`.
 | `includeUnrunnableActors` | `?bool` | Include Actors the current user cannot run. |
 | `allowsAgenticUsers` | `?bool` | Filter to Actors that allow agentic users. |
 | `responseFormat` | `?string` | The response format (`full`, `agent`). |
+
+Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
 
 ### `LastRunOptions`
 For `actor()->lastRun()` / `task()->lastRun()`.
@@ -137,7 +168,7 @@ For `actor()->build()`.
 ## Datasets
 
 ### `DatasetListItemsOptions`
-For `dataset()->listItems()` and `createItemsPublicUrl()`.
+For `dataset()->listItems()`, `iterateItems()`, and `createItemsPublicUrl()`.
 | Field | Type | Description |
 |---|---|---|
 | `offset` | `?int` | Number of items to skip. |
@@ -155,6 +186,8 @@ For `dataset()->listItems()` and `createItemsPublicUrl()`.
 | `simplified` | `?bool` | Return simplified (flattened, cleaned) items. |
 | `skipFailedPages` | `?bool` | Skip items that come from failed pages. |
 | `signature` | `?string` | A pre-shared URL signature granting access without an API token. |
+
+Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
 
 ### `DatasetDownloadOptions`
 For `dataset()->downloadItems()` (export formatting on top of the filtering above).

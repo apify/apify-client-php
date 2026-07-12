@@ -44,6 +44,28 @@ final class ScheduleIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testIterateSchedules(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->schedules()->create(self::scheduleDef(self::uniqueName('iter-sch')))->getId();
+        }
+        try {
+            $seen = [];
+            foreach ($client->schedules()->iterate(new ListOptions(desc: true), 2) as $schedule) {
+                $seen[(string) $schedule->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created schedule $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->schedule($id)->delete();
+            }
+        }
+    }
+
     public function testScheduleCrudFlow(): void
     {
         $client = $this->requireClient();

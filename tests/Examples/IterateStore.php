@@ -13,7 +13,9 @@ final class IterateStore
     public static function run(ApifyClient $client): void
     {
         $shown = 0;
-        foreach ($client->store()->iterate(new StoreListOptions(limit: 10)) as $item) {
+        // The second argument is the per-page (chunk) size; the iterator fetches pages lazily as we
+        // consume items. StoreListOptions::limit (unset here) would cap the total across all pages.
+        foreach ($client->store()->iterate(new StoreListOptions(), 10) as $item) {
             echo $item->getName() . PHP_EOL;
             if (++$shown >= 5) {
                 break;

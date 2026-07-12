@@ -33,6 +33,59 @@ final class DatasetIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testIterateDatasets(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = (string) $client->datasets()->getOrCreate(self::uniqueName('iter-ds'))->getId();
+        }
+        try {
+            $seen = [];
+            foreach ($client->datasets()->iterate(new StorageListOptions(desc: true), 2) as $dataset) {
+                $seen[(string) $dataset->getId()] = true;
+            }
+            foreach ($ids as $id) {
+                self::assertArrayHasKey($id, $seen, "iterate() did not yield created dataset $id");
+            }
+        } finally {
+            foreach ($ids as $id) {
+                $client->dataset($id)->delete();
+            }
+        }
+    }
+
+    public function testIterateDatasetItems(): void
+    {
+        $client = $this->requireClient();
+        $ds = $client->datasets()->getOrCreate(self::uniqueName('iter-items'));
+        try {
+            $dataset = $client->dataset((string) $ds->getId());
+            $dataset->pushItems([['n' => 0], ['n' => 1], ['n' => 2], ['n' => 3], ['n' => 4]]);
+
+            // The dataset's item total is computed asynchronously and can briefly lag a write.
+            // iterateItems() pages by the reported total (matching the reference client), so wait for
+            // the count to settle before iterating; otherwise a stale total would stop it early.
+            $deadline = microtime(true) + 30.0;
+            while (
+                $dataset->listItems(new DatasetListItemsOptions())->getTotal() < 5
+                && microtime(true) < $deadline
+            ) {
+                usleep(500_000);
+            }
+
+            $values = [];
+            // chunkSize=2 across 5 items => three pages (2, 2, 1).
+            foreach ($dataset->iterateItems(new DatasetListItemsOptions(), 2) as $item) {
+                $values[] = $item['n'];
+            }
+            sort($values);
+            self::assertSame([0, 1, 2, 3, 4], $values);
+        } finally {
+            $client->dataset((string) $ds->getId())->delete();
+        }
+    }
+
     public function testDatasetCrudFlow(): void
     {
         $client = $this->requireClient();

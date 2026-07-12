@@ -9,7 +9,10 @@ namespace Apify\Client\Internal;
  *
  * Large request bodies are compressed before being sent, saving bandwidth on uploads (Actor inputs,
  * key-value-store records, dataset item batches, ...). Brotli ({@code Content-Encoding: br}) is
- * preferred when available and gzip ({@code Content-Encoding: gzip}) is used as a fallback.
+ * preferred when available and gzip ({@code Content-Encoding: gzip}) is used as a fallback — the same
+ * codec choice, brotli quality (6), and size threshold (1024 bytes) as the reference client's
+ * {@code maybeCompressValue}. The API accepts br/gzip/deflate as request {@code Content-Encoding}
+ * (see apify-docs #2750), so preferring brotli is valid.
  *
  * In PHP, brotli lives in the optional PECL {@code brotli} extension, which is frequently absent,
  * while gzip ({@code gzencode}) ships with the standard {@code zlib} extension. We therefore prefer

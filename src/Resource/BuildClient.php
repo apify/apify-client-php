@@ -23,7 +23,10 @@ final class BuildClient
 
     /**
      * Fetches the build, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * (max 60) for the build to finish before responding. Returns {@code null} if it does not exist.
+     * for the build to finish before responding. The value is clamped client-side to the per-request
+     * timeout budget (minus a safety margin) so the server is never asked to hold the connection
+     * longer than the client will wait; the server additionally caps the wait at 60s. Returns
+     * {@code null} if it does not exist.
      */
     public function get(?int $waitForFinishSecs = null): ?Build
     {

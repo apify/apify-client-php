@@ -4,10 +4,15 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Build collection — `$client->builds()`
 
-- `list(?ListOptions $options): PaginationList` — list the account's builds.
+- `list(?ListOptions $options = null): PaginationList` — list the account's builds.
+- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all builds, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
 
 ```php
 $page = $client->builds()->list(new ListOptions(limit: 20, desc: true));
+
+foreach ($client->builds()->iterate(new ListOptions(desc: true), 50) as $build) {
+    echo $build->getId() . PHP_EOL;
+}
 ```
 
 An Actor's builds are available at `$client->actor($id)->builds()`.

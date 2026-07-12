@@ -19,7 +19,9 @@ final class StoreIntegrationTest extends IntegrationTestCase
     {
         $client = $this->requireClient();
         $count = 0;
-        foreach ($client->store()->iterate(new StoreListOptions(limit: 5)) as $item) {
+        // chunkSize=5 is the per-page size; with no limit the iterator keeps fetching pages until we
+        // break, proving pagination is followed across more than two pages.
+        foreach ($client->store()->iterate(new StoreListOptions(), 5) as $item) {
             self::assertNotNull($item->getId());
             self::assertNotSame('', $item->getId());
             if (++$count >= 12) {
@@ -27,5 +29,17 @@ final class StoreIntegrationTest extends IntegrationTestCase
             }
         }
         self::assertGreaterThanOrEqual(12, $count, 'expected to iterate at least 12 store actors');
+    }
+
+    public function testIterateStoreRespectsTotalLimit(): void
+    {
+        $client = $this->requireClient();
+        $count = 0;
+        // limit is a total-item cap across all pages: iteration must stop at 3 even with tiny pages.
+        foreach ($client->store()->iterate(new StoreListOptions(limit: 3), 1) as $item) {
+            self::assertNotNull($item->getId());
+            $count++;
+        }
+        self::assertSame(3, $count, 'limit must cap the total number of iterated items');
     }
 }

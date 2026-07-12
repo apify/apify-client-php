@@ -185,4 +185,31 @@ final class BatchAddRequestsTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->client(new MockTransport())->requestQueue('q1')->batchAddRequests($requests);
     }
+
+    public function testOversizedRequestInMiddleOfLargeBatchThrowsBeforeAnyCall(): void
+    {
+        // 30 small requests (would be two chunks of 25 + 5) with an oversized request at index 27,
+        // i.e. only reached by the SECOND chunk. Validation must run entirely up front, so the whole
+        // call throws before the first (valid) chunk is ever POSTed — leaving the queue unmutated.
+        $huge = str_repeat('x', 10 * 1024 * 1024); // > 9 MiB on its own
+        $requests = [];
+        for ($i = 0; $i < 30; $i++) {
+            $request = new RequestQueueRequest('https://x/' . $i, 'u' . $i);
+            if ($i === 27) {
+                $request->setUserData(['blob' => $huge]);
+            }
+            $requests[] = $request;
+        }
+
+        $transport = new MockTransport();
+        try {
+            $this->client($transport)->requestQueue('q1')->batchAddRequests($requests);
+            self::fail('expected InvalidArgumentException');
+        } catch (InvalidArgumentException $e) {
+            self::assertStringContainsString('index 27', $e->getMessage());
+            self::assertStringContainsString('maximum payload size', $e->getMessage());
+        }
+        // The crucial assertion: no chunk was POSTed before the oversized request was rejected.
+        self::assertSame(0, $transport->callCount());
+    }
 }

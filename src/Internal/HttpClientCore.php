@@ -33,6 +33,9 @@ final class HttpClientCore
     /** Exponential-backoff multiplier applied to the inter-retry delay after each attempt. */
     private const BACKOFF_FACTOR = 2;
 
+    /** Multiplier applied to the per-attempt timeout on each retry (independent of {@see BACKOFF_FACTOR}). */
+    private const TIMEOUT_BACKOFF_FACTOR = 2;
+
     private const NOT_FOUND = 404;
 
     public function __construct(
@@ -205,15 +208,15 @@ final class HttpClientCore
     }
 
     /**
-     * Returns {@code min(overall, base * 2^(attempt-1))}: the first attempt uses the base timeout;
-     * each retry doubles it (a slow-but-progressing connection gets more time) while never exceeding
-     * the overall budget.
+     * Returns {@code min(overall, base * TIMEOUT_BACKOFF_FACTOR^(attempt-1))}: the first attempt uses
+     * the base timeout; each retry scales it up by {@see TIMEOUT_BACKOFF_FACTOR} (a slow-but-progressing
+     * connection gets more time) while never exceeding the overall budget.
      */
     private function attemptTimeout(float $base, int $attempt): float
     {
         $scaled = $base;
         for ($i = 1; $i < $attempt; $i++) {
-            $scaled *= 2;
+            $scaled *= self::TIMEOUT_BACKOFF_FACTOR;
             if ($scaled >= $this->retry->timeoutSecs) {
                 return $this->retry->timeoutSecs;
             }
