@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.4
+
+- Synced to Apify OpenAPI spec `v2-2026-07-13T092445Z`. No public interface changes. The spec update
+  only adds `402` (payment required) and `408` (request timeout) error responses to the synchronous
+  run endpoints and the run-resurrect endpoint, and relaxes several store/run/build/webhook stats
+  counters from required to optional; both are already handled by the client's generic error mapping
+  and nullable model accessors, so no code change was required beyond the version bump.
+
 ## 0.3.3
 
 - Added `failOnEmptyTestSuite="true"` to `phpunit.xml.dist` so a suite matching zero tests fails
