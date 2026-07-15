@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+- Synced to Apify OpenAPI spec `v2-2026-07-13T092445Z` (adds `402`/`408` error responses to the
+  synchronous run and run-resurrect endpoints; relaxes store/run/build/webhook stats counters to
+  optional). No public interface or code changes.
+
 ## 0.3.3
 
 - Added `failOnEmptyTestSuite="true"` to `phpunit.xml.dist` so a suite matching zero tests fails
