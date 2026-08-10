@@ -75,8 +75,9 @@ final class TaskClient
      * {@see update()}.
      *
      * The public display configuration ({@code publicConfig}) is preserved, so the task can be
-     * published again without re-entering it. Requires write permission to both the task and its
-     * Actor. Unpublishing a task that is not published does nothing.
+     * published again without re-entering it. Unlike {@see publish()}, this only requires write
+     * permission to the task itself (not its Actor), since it does not need to validate the
+     * Actor's public/display eligibility. Unpublishing a task that is not published does nothing.
      */
     public function unpublish(): Task
     {

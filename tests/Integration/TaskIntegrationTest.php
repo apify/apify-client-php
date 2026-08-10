@@ -74,19 +74,22 @@ final class TaskIntegrationTest extends IntegrationTestCase
         try {
             $tc = $client->task((string) $task->getId());
 
-            // unpublish() is safe to call even on an unpublished task (no publicConfig required)
-            // and always echoes the isPublic value back, unlike publish() below.
+            // unpublish() is safe to call even on an unpublished task (no publicConfig required).
+            // isPublic() may come back null rather than false if the API omits the field entirely
+            // for a task that never had publicConfig set up, so only assert it isn't true.
             $unpublished = $tc->unpublish();
-            self::assertFalse($unpublished->isPublic());
+            self::assertNotSame(true, $unpublished->isPublic());
 
-            // publish() requires write permission to the task's Actor. The task's Actor
-            // (apify/hello-world) is not owned by the test account, so this is expected to fail
-            // with a 403 rather than silently succeed.
+            // publish() validates the task's Actor (must be public, write-permitted) and its
+            // publicConfig (must be set up). This task has neither: its Actor (apify/hello-world)
+            // is not owned by the test account, and it has no publicConfig, so this is expected to
+            // fail (403 for the permission check, or 400 if the API rejects the missing
+            // publicConfig first) rather than silently succeed.
             try {
                 $tc->publish();
-                self::fail('expected publish() to fail: the task Actor is not owned by the test account');
+                self::fail('expected publish() to fail: the task has no publicConfig and its Actor is not owned by the test account');
             } catch (ApifyApiException $e) {
-                self::assertSame(403, $e->getStatusCode());
+                self::assertContains($e->getStatusCode(), [400, 403]);
             }
         } finally {
             $client->task((string) $task->getId())->delete();
