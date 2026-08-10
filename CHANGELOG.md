@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- Synced to Apify OpenAPI spec `v2-2026-08-05T133145Z` (additive nullability/response/description
+  changes only; no client code changes required beyond the version constant).
+- Added `TaskClient::publish()` and `TaskClient::unpublish()` convenience methods (mirroring the
+  reference JS client), plus `Task::isPublic()` and `Task::getPublicConfig()` getters.
+- Removed the duplicated "official, but experimental, AI-generated" disclaimer from
+  `docs/README.md` and the `ApifyClient` class docblock; it is now stated only once, in the
+  top-level `README.md`.
+
 ## 0.3.4
 
 - Synced to Apify OpenAPI spec `v2-2026-07-13T092445Z` (adds `402`/`408` error responses to the

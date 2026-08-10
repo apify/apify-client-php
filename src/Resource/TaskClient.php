@@ -58,6 +58,32 @@ final class TaskClient
     }
 
     /**
+     * Publishes the task on its public landing page, by setting {@code isPublic} through
+     * {@see update()}.
+     *
+     * The task's Actor must be public and the task must have its public display configuration
+     * ({@code publicConfig}) set up first. Requires write permission to both the task and its
+     * Actor. Publishing an already published task does nothing.
+     */
+    public function publish(): Task
+    {
+        return $this->update(['isPublic' => true]);
+    }
+
+    /**
+     * Unpublishes the task from its public landing page, by setting {@code isPublic} through
+     * {@see update()}.
+     *
+     * The public display configuration ({@code publicConfig}) is preserved, so the task can be
+     * published again without re-entering it. Requires write permission to both the task and its
+     * Actor. Unpublishing a task that is not published does nothing.
+     */
+    public function unpublish(): Task
+    {
+        return $this->update(['isPublic' => false]);
+    }
+
+    /**
      * Starts the task and returns immediately with the created run.
      *
      * @param mixed $input optionally overrides the task's stored input ({@code null} to use it)

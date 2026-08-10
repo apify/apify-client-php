@@ -42,10 +42,6 @@ use RuntimeException;
 /**
  * The entry point for interacting with the Apify API.
  *
- * <b>Official, but experimental — AI-generated and AI-maintained.</b> This is an official Apify
- * client, but it is experimental: it is generated and maintained by AI. Review the code before
- * relying on it in production and report issues on the repository.
- *
  * Construct it with an API token (and optional settings via named arguments), then obtain resource
  * clients via the accessor methods, e.g. {@see actor()}, {@see dataset()}, {@see run()}.
  *

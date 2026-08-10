@@ -48,4 +48,27 @@ final class Task extends ApifyResource
     {
         return $this->getString('modifiedAt');
     }
+
+    /**
+     * Whether the task is published on its public landing page. Derived from
+     * {@code publicConfig.publishedAt} — use {@see TaskClient::publish()} and
+     * {@see TaskClient::unpublish()} to change it.
+     */
+    public function isPublic(): ?bool
+    {
+        return $this->getBool('isPublic');
+    }
+
+    /**
+     * The public-facing display configuration of the task's public landing page, or {@code null}
+     * if the task is not published. Contains fields such as {@code publishedAt}, {@code seoTitle}
+     * and {@code datasetView}.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getPublicConfig(): ?array
+    {
+        $value = $this->get('publicConfig');
+        return is_array($value) ? $value : null;
+    }
 }

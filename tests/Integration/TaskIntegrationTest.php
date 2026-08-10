@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Tests\Integration;
 
+use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Options\ListOptions;
 use Apify\Client\Options\RunListOptions;
 
@@ -63,6 +64,32 @@ final class TaskIntegrationTest extends IntegrationTestCase
             foreach ($ids as $id) {
                 $client->task($id)->delete();
             }
+        }
+    }
+
+    public function testPublishUnpublish(): void
+    {
+        $client = $this->requireClient();
+        $task = $client->tasks()->create(self::taskDef(self::uniqueName('task-publish')));
+        try {
+            $tc = $client->task((string) $task->getId());
+
+            // unpublish() is safe to call even on an unpublished task (no publicConfig required)
+            // and always echoes the isPublic value back, unlike publish() below.
+            $unpublished = $tc->unpublish();
+            self::assertFalse($unpublished->isPublic());
+
+            // publish() requires write permission to the task's Actor. The task's Actor
+            // (apify/hello-world) is not owned by the test account, so this is expected to fail
+            // with a 403 rather than silently succeed.
+            try {
+                $tc->publish();
+                self::fail('expected publish() to fail: the task Actor is not owned by the test account');
+            } catch (ApifyApiException $e) {
+                self::assertSame(403, $e->getStatusCode());
+            }
+        } finally {
+            $client->task((string) $task->getId())->delete();
         }
     }
 

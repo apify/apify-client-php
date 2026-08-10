@@ -24,6 +24,9 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
 ## A single task — `$client->task($id)`
 
 - `get(): ?Task`, `update(mixed $newFields): Task`, `delete(): void`
+- `publish(): Task`, `unpublish(): Task` — publish/unpublish the task's public landing page, by
+  setting `isPublic` through `update()`. Publishing requires the task's Actor to be public and the
+  task to already have its `publicConfig` set up.
 - `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun`
 - `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun`
 - `getInput(): mixed`, `updateInput(mixed $input): mixed`
@@ -34,4 +37,5 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
 ```php
 $run = $client->task('me~my-task')->call(['message' => 'override'], null, 120);
 $input = $client->task('me~my-task')->getInput();
+$client->task('me~my-task')->publish();
 ```
