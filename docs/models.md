@@ -183,7 +183,7 @@ Returned by `listAndLockHead()`.
 | Getter | Description |
 |---|---|
 | `getItems(): array` | The locked `RequestQueueRequest` items at the head of the queue. |
-| `getLimit(): ?int` | The requested head size limit. |
+| `getLimit(): int` | The requested head size limit. |
 | `hadMultipleClients(): bool` | Whether multiple clients have accessed the queue. |
 | `getLockSecs(): int` | The lock duration applied to every returned request. |
 | `queueHasLockedRequests(): ?bool` | Whether the queue has any requests locked by any client. |
@@ -195,7 +195,7 @@ Returned by `listRequests()`.
 | Getter | Description |
 |---|---|
 | `getItems(): array` | The `RequestQueueRequest` items in this page. |
-| `getLimit(): ?int` | The requested page size limit. |
+| `getLimit(): int` | The requested page size limit. |
 | `getExclusiveStartId(): ?string` | The exclusive start ID used for this page (deprecated; use the cursor). |
 | `getCursor(): ?string` | The cursor that produced this page. |
 | `getNextCursor(): ?string` | The cursor to request the next page, or `null` if this is the last page. |
@@ -264,6 +264,8 @@ Pass `url` and `uniqueKey` positionally for the common case; `data` seeds any ad
 | `getUniqueKey(): ?string` / `setUniqueKey(string): self` | The deduplication key. |
 | `getMethod(): ?string` / `setMethod(string): self` | The HTTP method (defaults to `GET`). |
 | `getUserData(): mixed` / `setUserData(array): self` | Arbitrary user data attached to the request. |
+| `getRetryCount(): ?int` | How many times this request has already been retried (read-only, populated by `listHead()`/`listAndLockHead()`/`listRequests()`). |
+| `getLockExpiresAt(): ?string` | When this request's lock expires (read-only, populated by `listAndLockHead()` only). |
 
 ### `ActorEnvVar`
 Constructor: `new ActorEnvVar(?string $name = null, ?string $value = null, ?bool $isSecret = null, array $data = [])`.

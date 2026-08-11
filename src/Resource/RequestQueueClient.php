@@ -398,12 +398,30 @@ final class RequestQueueClient
      * either {@see RequestQueueRequest::setId()} or {@see RequestQueueRequest::setUniqueKey()} (other
      * fields, if present, are ignored by the API).
      *
+     * Unlike {@see batchAddRequests()}, this does not chunk oversized input: the API caps a single
+     * batch at 25 requests (matching the reference client), so a larger input is rejected up front
+     * rather than silently split (a delete is idempotent, so callers can simply call this again per
+     * chunk).
+     *
      * @param list<RequestQueueRequest> $requests
+     * @throws InvalidArgumentException if {@code $requests} is empty or exceeds the per-call limit
      */
     public function batchDeleteRequests(array $requests): BatchDeleteResult
     {
+        $requests = array_values($requests);
+        if ($requests === []) {
+            throw new InvalidArgumentException('batchDeleteRequests: $requests must not be empty');
+        }
+        if (count($requests) > self::MAX_REQUESTS_PER_BATCH) {
+            throw new InvalidArgumentException(sprintf(
+                'batchDeleteRequests: got %d requests, which exceeds the maximum of %d per call',
+                count($requests),
+                self::MAX_REQUESTS_PER_BATCH
+            ));
+        }
+
         $params = $this->applyClientKey(new QueryParams());
-        $payload = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), array_values($requests));
+        $payload = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), $requests);
         return BatchDeleteResult::fromData($this->ctx->deleteWithBody('requests/batch', $params, $payload));
     }
 

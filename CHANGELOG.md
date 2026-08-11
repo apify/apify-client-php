@@ -15,6 +15,10 @@ OpenAPI-documented response schemas and the reference client's typed result inte
 - `RequestQueueHead` and the new `LockedRequestQueueHead` gained the previously-missing
   `getQueueModifiedAt()` getter (the field is present in the OpenAPI spec and the reference client,
   but was not yet exposed by this client).
+- `RequestQueueRequest` gained `getRetryCount()`/`getLockExpiresAt()` getters, populated on requests
+  returned by `listHead()`/`listAndLockHead()`/`listRequests()`.
+- `batchDeleteRequests()` now throws `InvalidArgumentException` up front for an empty or
+  over-25-request input, matching `batchAddRequests()`'s and the reference client's validation.
 
 ## 0.4.0
 

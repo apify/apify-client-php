@@ -48,8 +48,8 @@ final class LockedRequestQueueHead
     }
 
     /**
-     * The locked requests from the head of the queue. Each item carries its own
-     * {@see RequestQueueRequest} lock-expiry field as reported by the API.
+     * The locked requests from the head of the queue. Each item's own
+     * {@see RequestQueueRequest::getLockExpiresAt()} reports when its individual lock expires.
      *
      * @return list<RequestQueueRequest>
      */

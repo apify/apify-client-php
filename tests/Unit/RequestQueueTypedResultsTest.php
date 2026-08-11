@@ -7,6 +7,7 @@ namespace Apify\Client\Tests\Unit;
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\Json;
 use Apify\Client\Model\RequestQueueRequest;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -47,7 +48,7 @@ final class RequestQueueTypedResultsTest extends TestCase
             'queueHasLockedRequests' => true,
             'clientKey' => 'my-client-key',
             'items' => [
-                ['id' => 'r1', 'uniqueKey' => 'r1', 'url' => 'https://a.com'],
+                ['id' => 'r1', 'uniqueKey' => 'r1', 'url' => 'https://a.com', 'retryCount' => 2, 'lockExpiresAt' => '2026-08-01T00:01:00.000Z'],
             ],
         ]]));
 
@@ -55,6 +56,8 @@ final class RequestQueueTypedResultsTest extends TestCase
 
         self::assertCount(1, $locked->getItems());
         self::assertSame('r1', $locked->getItems()[0]->getId());
+        self::assertSame(2, $locked->getItems()[0]->getRetryCount());
+        self::assertSame('2026-08-01T00:01:00.000Z', $locked->getItems()[0]->getLockExpiresAt());
         self::assertSame(60, $locked->getLockSecs());
         self::assertTrue($locked->queueHasLockedRequests());
         self::assertSame('my-client-key', $locked->getClientKey());
@@ -124,5 +127,34 @@ final class RequestQueueTypedResultsTest extends TestCase
 
         $sentBody = Json::decode(MockTransport::readBody($transport->lastRequest()));
         self::assertSame([['id' => 'r1'], ['id' => 'r2']], $sentBody);
+    }
+
+    public function testBatchDeleteRequestsRejectsEmptyInputBeforeAnyCall(): void
+    {
+        $transport = new MockTransport();
+
+        $this->expectException(InvalidArgumentException::class);
+        try {
+            $this->client($transport)->requestQueue('q1')->batchDeleteRequests([]);
+        } finally {
+            self::assertSame(0, $transport->callCount());
+        }
+    }
+
+    public function testBatchDeleteRequestsRejectsOversizedInputBeforeAnyCall(): void
+    {
+        $transport = new MockTransport();
+        $requests = array_map(
+            static fn (int $i) => (new RequestQueueRequest())->setId('r' . $i),
+            range(0, 25) // 26 > the 25-per-call limit
+        );
+
+        try {
+            $this->client($transport)->requestQueue('q1')->batchDeleteRequests($requests);
+            self::fail('expected InvalidArgumentException');
+        } catch (InvalidArgumentException $e) {
+            self::assertStringContainsString('26', $e->getMessage());
+        }
+        self::assertSame(0, $transport->callCount());
     }
 }
