@@ -72,6 +72,8 @@ model is also used as an input object and therefore additionally exposes setters
 | `getTitle(): ?string` | Human-readable title. |
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
+| `isPublic(): ?bool` | Whether the task is published on its public landing page. |
+| `getPublicConfig(): ?array` | Public landing page display configuration, or `null` if not published. |
 
 ### `Schedule`
 | Getter | Description |

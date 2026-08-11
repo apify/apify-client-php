@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Tests\Integration;
 
+use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Options\ListOptions;
 use Apify\Client\Options\RunListOptions;
 
@@ -63,6 +64,35 @@ final class TaskIntegrationTest extends IntegrationTestCase
             foreach ($ids as $id) {
                 $client->task($id)->delete();
             }
+        }
+    }
+
+    public function testPublishUnpublish(): void
+    {
+        $client = $this->requireClient();
+        $task = $client->tasks()->create(self::taskDef(self::uniqueName('task-publish')));
+        try {
+            $tc = $client->task((string) $task->getId());
+
+            // unpublish() is safe to call even on an unpublished task (no publicConfig required).
+            // isPublic() may come back null rather than false if the API omits the field entirely
+            // for a task that never had publicConfig set up, so only assert it isn't true.
+            $unpublished = $tc->unpublish();
+            self::assertNotSame(true, $unpublished->isPublic());
+
+            // publish() validates the task's Actor (must be public, write-permitted) and its
+            // publicConfig (must be set up). This task has neither: its Actor (apify/hello-world)
+            // is not owned by the test account, and it has no publicConfig, so this is expected to
+            // fail (403 for the permission check, or 400 if the API rejects the missing
+            // publicConfig first) rather than silently succeed.
+            try {
+                $tc->publish();
+                self::fail('expected publish() to fail: the task has no publicConfig and its Actor is not owned by the test account');
+            } catch (ApifyApiException $e) {
+                self::assertContains($e->getStatusCode(), [400, 403]);
+            }
+        } finally {
+            $client->task((string) $task->getId())->delete();
         }
     }
 
