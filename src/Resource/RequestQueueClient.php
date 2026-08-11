@@ -29,7 +29,11 @@ use InvalidArgumentException;
 /** A client for a specific request queue (and run-nested variants). */
 final class RequestQueueClient
 {
-    /** The API limit on requests per batch call; larger inputs are split into chunks of this size. */
+    /**
+     * The API limit on requests per batch call. {@see batchAddRequests()} splits larger input into
+     * chunks of this size; {@see batchDeleteRequests()} instead rejects input larger than this
+     * up front (a delete is idempotent, so the caller can simply call it again per chunk).
+     */
     private const MAX_REQUESTS_PER_BATCH = 25;
 
     /**
