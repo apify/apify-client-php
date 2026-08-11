@@ -174,7 +174,7 @@ Returned by `listHead()`.
 | Getter | Description |
 |---|---|
 | `getItems(): array` | The `RequestQueueRequest` items at the head of the queue. |
-| `getLimit(): ?int` | The requested head size limit. |
+| `getLimit(): int` | The requested head size limit. |
 | `hadMultipleClients(): bool` | Whether multiple clients have accessed the queue. |
 | `getQueueModifiedAt(): ?string` | ISO-8601 timestamp of the last modification to the queue. |
 

@@ -407,8 +407,13 @@ final class RequestQueueClient
      * rather than silently split (a delete is idempotent, so callers can simply call this again per
      * chunk).
      *
+     * Every entry must identify the request to delete via a non-empty {@see RequestQueueRequest::setId()}
+     * or {@see RequestQueueRequest::setUniqueKey()}, matching the reference client's validation:
+     * an identifier-less entry is rejected up front rather than forwarded to the API.
+     *
      * @param list<RequestQueueRequest> $requests
-     * @throws InvalidArgumentException if {@code $requests} is empty or exceeds the per-call limit
+     * @throws InvalidArgumentException if {@code $requests} is empty, exceeds the per-call limit, or
+     *         any entry is missing a non-empty id or uniqueKey
      */
     public function batchDeleteRequests(array $requests): BatchDeleteResult
     {
@@ -422,6 +427,16 @@ final class RequestQueueClient
                 count($requests),
                 self::MAX_REQUESTS_PER_BATCH
             ));
+        }
+        foreach ($requests as $i => $request) {
+            $id = $request->getId();
+            $uniqueKey = $request->getUniqueKey();
+            if (($id === null || $id === '') && ($uniqueKey === null || $uniqueKey === '')) {
+                throw new InvalidArgumentException(sprintf(
+                    'batchDeleteRequests: the request at index %d must have a non-empty id or uniqueKey',
+                    $i
+                ));
+            }
         }
 
         $params = $this->applyClientKey(new QueryParams());

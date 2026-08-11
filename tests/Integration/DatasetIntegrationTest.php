@@ -41,13 +41,14 @@ final class DatasetIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->datasets()->getOrCreate(self::uniqueName('iter-ds'))->getId();
         }
         try {
-            $seen = [];
-            foreach ($client->datasets()->iterate(new StorageListOptions(desc: true), 2) as $dataset) {
-                $seen[(string) $dataset->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created dataset $id");
-            }
+            // Retried with backoff: dataset listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->datasets()->iterate(new StorageListOptions(desc: true), 2) as $dataset) {
+                    $seen[(string) $dataset->getId()] = true;
+                }
+                return $seen;
+            }, 'dataset');
         } finally {
             foreach ($ids as $id) {
                 $client->dataset($id)->delete();

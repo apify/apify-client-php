@@ -63,6 +63,43 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
+     * Repeatedly re-runs an iterate()-and-collect pass (via {@code $collect}) until every ID in
+     * {@code $expectedIds} has been seen, or a bounded number of attempts with backoff is exhausted.
+     *
+     * Apify's list/pagination endpoints are eventually consistent, and this suite is designed to run
+     * concurrently with other test runs (including other language clients) against the same shared
+     * test account; under that load, a resource created immediately before an {@code iterate()} call
+     * can take a few seconds to be reflected in a collection listing. Retrying the whole pass (rather
+     * than looping forever or giving up after one try) keeps the test genuinely exercising
+     * {@code iterate()} while tolerating that lag: it still fails, with the same diagnostic message,
+     * if a resource never appears within the bounded timeout.
+     *
+     * @param list<string> $expectedIds identifiers that must all be present in a collected pass
+     * @param callable(): array<string,bool> $collect performs one iterate() pass and returns the set
+     *        (map of identifier => true) of everything it saw
+     */
+    protected static function assertEventuallyIterated(array $expectedIds, callable $collect, string $label): void
+    {
+        $maxAttempts = 8;
+        $delaySecs = 0.5;
+        $seen = [];
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $seen = $collect();
+            $missing = array_filter($expectedIds, static fn (string $id): bool => !isset($seen[$id]));
+            if ($missing === [] || $attempt === $maxAttempts) {
+                break;
+            }
+            usleep((int) ($delaySecs * 1_000_000));
+            $delaySecs = min($delaySecs * 1.6, 5.0);
+        }
+        // Always assert (even on a first-attempt success) so the test genuinely records assertions
+        // instead of relying on an early return, which PHPUnit flags as a "risky" no-assertion test.
+        foreach ($expectedIds as $id) {
+            self::assertArrayHasKey($id, $seen, "iterate() did not yield $label $id after retrying");
+        }
+    }
+
+    /**
      * A minimal Actor definition; the API requires at least one version.
      *
      * @return array<string,mixed>

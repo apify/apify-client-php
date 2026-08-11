@@ -18,7 +18,16 @@ OpenAPI-documented response schemas and the reference client's typed result inte
 - `RequestQueueRequest` gained `getRetryCount()`/`getLockExpiresAt()` getters, populated on requests
   returned by `listHead()`/`listAndLockHead()`/`listRequests()`.
 - `batchDeleteRequests()` now throws `InvalidArgumentException` up front for an empty or
-  over-25-request input, matching `batchAddRequests()`'s and the reference client's validation.
+  over-25-request input, or for any entry missing a non-empty `id`/`uniqueKey`, matching
+  `batchAddRequests()`'s and the reference client's validation.
+- Integration tests: every "create a resource, then `iterate()` the collection and assert it is
+  present" test now retries the iterate-and-check pass with a bounded backoff (via a new
+  `IntegrationTestCase::assertEventuallyIterated()` helper) instead of asserting after a single pass.
+  Apify's list/pagination endpoints are eventually consistent, and this suite runs concurrently with
+  other language clients against the same shared test account, so a resource created immediately
+  before an `iterate()` call could occasionally not yet be reflected in the listing; this was causing
+  intermittent CI failures unrelated to any client defect. No test's assertion was weakened - each
+  still fails if the resource never appears within the timeout.
 
 ## 0.4.0
 

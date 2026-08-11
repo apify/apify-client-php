@@ -53,13 +53,14 @@ final class TaskIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->tasks()->create(self::taskDef(self::uniqueName('iter-task')))->getId();
         }
         try {
-            $seen = [];
-            foreach ($client->tasks()->iterate(new ListOptions(desc: true), 2) as $task) {
-                $seen[(string) $task->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created task $id");
-            }
+            // Retried with backoff: task listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->tasks()->iterate(new ListOptions(desc: true), 2) as $task) {
+                    $seen[(string) $task->getId()] = true;
+                }
+                return $seen;
+            }, 'task');
         } finally {
             foreach ($ids as $id) {
                 $client->task($id)->delete();

@@ -41,13 +41,14 @@ final class RequestQueueIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->requestQueues()->getOrCreate(self::uniqueName('iter-rq'))->getId();
         }
         try {
-            $seen = [];
-            foreach ($client->requestQueues()->iterate(new StorageListOptions(desc: true), 2) as $queue) {
-                $seen[(string) $queue->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created queue $id");
-            }
+            // Retried with backoff: queue listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->requestQueues()->iterate(new StorageListOptions(desc: true), 2) as $queue) {
+                    $seen[(string) $queue->getId()] = true;
+                }
+                return $seen;
+            }, 'queue');
         } finally {
             foreach ($ids as $id) {
                 $client->requestQueue($id)->delete();

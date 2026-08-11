@@ -157,4 +157,21 @@ final class RequestQueueTypedResultsTest extends TestCase
         }
         self::assertSame(0, $transport->callCount());
     }
+
+    public function testBatchDeleteRequestsRejectsEntryMissingIdAndUniqueKeyBeforeAnyCall(): void
+    {
+        $transport = new MockTransport();
+        $requests = [
+            (new RequestQueueRequest())->setId('r1'),
+            new RequestQueueRequest(), // no id, no uniqueKey
+        ];
+
+        try {
+            $this->client($transport)->requestQueue('q1')->batchDeleteRequests($requests);
+            self::fail('expected InvalidArgumentException');
+        } catch (InvalidArgumentException $e) {
+            self::assertStringContainsString('index 1', $e->getMessage());
+        }
+        self::assertSame(0, $transport->callCount());
+    }
 }

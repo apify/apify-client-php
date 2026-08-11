@@ -41,13 +41,14 @@ final class KeyValueStoreIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->keyValueStores()->getOrCreate(self::uniqueName('iter-kvs'))->getId();
         }
         try {
-            $seen = [];
-            foreach ($client->keyValueStores()->iterate(new StorageListOptions(desc: true), 2) as $store) {
-                $seen[(string) $store->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created store $id");
-            }
+            // Retried with backoff: store listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->keyValueStores()->iterate(new StorageListOptions(desc: true), 2) as $store) {
+                    $seen[(string) $store->getId()] = true;
+                }
+                return $seen;
+            }, 'store');
         } finally {
             foreach ($ids as $id) {
                 $client->keyValueStore($id)->delete();
