@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+Breaking: `RequestQueueClient` methods that previously returned a raw `array<string,mixed>` (or, for
+`batchDeleteRequests`, accepted an untyped `mixed` argument) now use typed models, matching the
+OpenAPI-documented response schemas and the reference client's typed result interfaces:
+
+- `listAndLockHead()` now returns `LockedRequestQueueHead` (was `array`).
+- `prolongRequestLock()` now returns `RequestLockInfo` (was `array`).
+- `unlockRequests()` now returns `UnlockRequestsResult` (was `array`).
+- `listRequests()` now returns `RequestQueueRequestsPage` (was `array`).
+- `batchDeleteRequests()` now takes `list<RequestQueueRequest>` and returns `BatchDeleteResult` (was
+  `mixed $requests` / `array`).
+- `RequestQueueHead` and the new `LockedRequestQueueHead` gained the previously-missing
+  `getQueueModifiedAt()` getter (the field is present in the OpenAPI spec and the reference client,
+  but was not yet exposed by this client).
+
 ## 0.4.0
 
 - Synced to Apify OpenAPI spec `v2-2026-08-05T133145Z` (additive nullability/response/description

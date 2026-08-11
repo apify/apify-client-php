@@ -10,10 +10,15 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Model\BatchAddResult;
+use Apify\Client\Model\BatchDeleteResult;
+use Apify\Client\Model\LockedRequestQueueHead;
+use Apify\Client\Model\RequestLockInfo;
 use Apify\Client\Model\RequestQueue;
 use Apify\Client\Model\RequestQueueHead;
 use Apify\Client\Model\RequestQueueOperationInfo;
 use Apify\Client\Model\RequestQueueRequest;
+use Apify\Client\Model\RequestQueueRequestsPage;
+use Apify\Client\Model\UnlockRequestsResult;
 use Apify\Client\Options\BatchAddRequestsOptions;
 use Apify\Client\Options\ListRequestsOptions;
 use Apify\Client\Options\PaginateRequestsOptions;
@@ -174,16 +179,14 @@ final class RequestQueueClient
 
     /**
      * Atomically returns and locks up to {@code $limit} requests from the head of the queue for
-     * {@code $lockSecs} seconds. Returns the raw locked-head object.
-     *
-     * @return array<string,mixed>
+     * {@code $lockSecs} seconds.
      */
-    public function listAndLockHead(int $lockSecs, ?int $limit = null): array
+    public function listAndLockHead(int $lockSecs, ?int $limit = null): LockedRequestQueueHead
     {
         $params = new QueryParams();
         $params->addInt('lockSecs', $lockSecs)->addInt('limit', $limit);
         $this->applyClientKey($params);
-        return $this->ctx->postWithBody('head/lock', $params, null, '');
+        return LockedRequestQueueHead::fromData($this->ctx->postWithBody('head/lock', $params, null, ''));
     }
 
     /**
@@ -391,41 +394,37 @@ final class RequestQueueClient
     }
 
     /**
-     * Deletes multiple requests in a single call. Each entry identifies a request (e.g. by id or
-     * uniqueKey). Returns the raw batch result.
+     * Deletes multiple requests in a single call. Each entry identifies a request to delete: set
+     * either {@see RequestQueueRequest::setId()} or {@see RequestQueueRequest::setUniqueKey()} (other
+     * fields, if present, are ignored by the API).
      *
-     * @param mixed $requests
-     * @return array<string,mixed>
+     * @param list<RequestQueueRequest> $requests
      */
-    public function batchDeleteRequests(mixed $requests): array
+    public function batchDeleteRequests(array $requests): BatchDeleteResult
     {
         $params = $this->applyClientKey(new QueryParams());
-        return $this->ctx->deleteWithBody('requests/batch', $params, $requests);
+        $payload = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), array_values($requests));
+        return BatchDeleteResult::fromData($this->ctx->deleteWithBody('requests/batch', $params, $payload));
     }
 
     /**
-     * Lists the queue's requests with pagination. Returns the raw response.
-     *
-     * @return array<string,mixed>
+     * Lists the queue's requests with pagination.
      */
-    public function listRequests(?ListRequestsOptions $options = null): array
+    public function listRequests(?ListRequestsOptions $options = null): RequestQueueRequestsPage
     {
         $options ??= new ListRequestsOptions();
         $options->validate();
         $params = new QueryParams();
         $options->appendTo($params);
         $this->applyClientKey($params);
-        $data = $this->ctx->getResourceRequired('requests', $params);
-        return is_array($data) ? $data : [];
+        return RequestQueueRequestsPage::fromData($this->ctx->getResourceRequired('requests', $params));
     }
 
     /**
      * Extends the lock on a request by {@code $lockSecs} seconds. If {@code $forefront} is true, the
-     * request is moved to the front when its lock expires. Returns the raw response.
-     *
-     * @return array<string,mixed>
+     * request is moved to the front when its lock expires.
      */
-    public function prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): array
+    public function prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): RequestLockInfo
     {
         $params = new QueryParams();
         $params->addInt('lockSecs', $lockSecs)->addBool('forefront', $forefront);
@@ -433,8 +432,7 @@ final class RequestQueueClient
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment($id) . '/lock'));
         $response = $this->http->call('PUT', $url, null, '', timeoutSecs: $this->timeoutSecs);
-        $data = Json::decodeData((string) $response->getBody());
-        return is_array($data) ? $data : [];
+        return RequestLockInfo::fromData(Json::decodeData((string) $response->getBody()));
     }
 
     /**
@@ -457,15 +455,11 @@ final class RequestQueueClient
         }
     }
 
-    /**
-     * Releases all locks the client holds on this queue's requests. Returns the raw response.
-     *
-     * @return array<string,mixed>
-     */
-    public function unlockRequests(): array
+    /** Releases all locks the client holds on this queue's requests. */
+    public function unlockRequests(): UnlockRequestsResult
     {
         $params = $this->applyClientKey(new QueryParams());
-        return $this->ctx->postWithBody('requests/unlock', $params, null, '');
+        return UnlockRequestsResult::fromData($this->ctx->postWithBody('requests/unlock', $params, null, ''));
     }
 
     /**
@@ -503,16 +497,16 @@ final class RequestQueueClient
                 filter: $options->filter,
             ));
 
-            $items = (isset($page['items']) && is_array($page['items'])) ? array_values($page['items']) : [];
+            $items = $page->getItems();
             if ($items === []) {
                 return;
             }
             foreach ($items as $item) {
-                yield RequestQueueRequest::fromArray(is_array($item) ? $item : []);
+                yield $item;
             }
             $iterated += count($items);
 
-            $nextCursor = (isset($page['nextCursor']) && is_string($page['nextCursor'])) ? $page['nextCursor'] : null;
+            $nextCursor = $page->getNextCursor();
             if (($limit !== null && $iterated >= $limit) || $nextCursor === null || $nextCursor === '') {
                 return;
             }

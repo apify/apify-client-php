@@ -170,11 +170,47 @@ One page returned by `listKeys()`.
 | `getTotalRequestCount(): ?int` | Total number of requests ever added. |
 
 ### `RequestQueueHead`
-Returned by `listHead()`. (`listAndLockHead()` returns a raw `array<string,mixed>`, not this model.)
+Returned by `listHead()`.
 | Getter | Description |
 |---|---|
 | `getItems(): array` | The `RequestQueueRequest` items at the head of the queue. |
 | `getLimit(): ?int` | The requested head size limit. |
+| `hadMultipleClients(): bool` | Whether multiple clients have accessed the queue. |
+| `getQueueModifiedAt(): ?string` | ISO-8601 timestamp of the last modification to the queue. |
+
+### `LockedRequestQueueHead`
+Returned by `listAndLockHead()`.
+| Getter | Description |
+|---|---|
+| `getItems(): array` | The locked `RequestQueueRequest` items at the head of the queue. |
+| `getLimit(): ?int` | The requested head size limit. |
+| `hadMultipleClients(): bool` | Whether multiple clients have accessed the queue. |
+| `getLockSecs(): int` | The lock duration applied to every returned request. |
+| `queueHasLockedRequests(): ?bool` | Whether the queue has any requests locked by any client. |
+| `getClientKey(): ?string` | The client key used to acquire the locks. |
+| `getQueueModifiedAt(): ?string` | ISO-8601 timestamp of the last modification to the queue. |
+
+### `RequestQueueRequestsPage`
+Returned by `listRequests()`.
+| Getter | Description |
+|---|---|
+| `getItems(): array` | The `RequestQueueRequest` items in this page. |
+| `getLimit(): ?int` | The requested page size limit. |
+| `getExclusiveStartId(): ?string` | The exclusive start ID used for this page (deprecated; use the cursor). |
+| `getCursor(): ?string` | The cursor that produced this page. |
+| `getNextCursor(): ?string` | The cursor to request the next page, or `null` if this is the last page. |
+
+### `RequestLockInfo`
+Returned by `prolongRequestLock()`.
+| Getter | Description |
+|---|---|
+| `getLockExpiresAt(): ?string` | ISO-8601 timestamp of when the (possibly just-extended) lock expires. |
+
+### `UnlockRequestsResult`
+Returned by `unlockRequests()`.
+| Getter | Description |
+|---|---|
+| `getUnlockedCount(): int` | The number of requests that were unlocked. |
 
 ### `RequestQueueOperationInfo`
 Returned by single-request add/update operations.
@@ -189,6 +225,13 @@ Returned by `batchAddRequests()`.
 |---|---|
 | `getProcessedRequests(): array` | Requests the API accepted (as `RequestQueueOperationInfo`). |
 | `getUnprocessedRequests(): array` | Requests that could not be processed. |
+
+### `BatchDeleteResult`
+Returned by `batchDeleteRequests()`.
+| Getter | Description |
+|---|---|
+| `getProcessedRequests(): array` | Requests that were successfully deleted (as `RequestQueueRequest`). |
+| `getUnprocessedRequests(): array` | Requests that failed to be deleted and can be retried. |
 
 ## Iteration and pagination
 

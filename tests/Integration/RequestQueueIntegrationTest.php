@@ -127,14 +127,48 @@ final class RequestQueueIntegrationTest extends IntegrationTestCase
         try {
             $queue = $client->requestQueue((string) $rq->getId())->withClientKey('php-test-client-key');
             $info = $queue->addRequest(new RequestQueueRequest('https://lock.example.com', 'lock'));
-            self::assertArrayHasKey('items', $queue->listRequests(new ListRequestsOptions()));
+
+            $page = $queue->listRequests(new ListRequestsOptions());
+            self::assertNotEmpty($page->getItems());
             $queue->listRequests(new ListRequestsOptions(
                 filter: [ListRequestsOptions::FILTER_LOCKED, ListRequestsOptions::FILTER_PENDING]
             ));
-            self::assertArrayHasKey('items', $queue->listAndLockHead(60, 10));
-            $queue->prolongRequestLock((string) $info->getRequestId(), 30);
+
+            $locked = $queue->listAndLockHead(60, 10);
+            self::assertNotEmpty($locked->getItems());
+            self::assertSame(60, $locked->getLockSecs());
+            self::assertSame('php-test-client-key', $locked->getClientKey());
+
+            $lockInfo = $queue->prolongRequestLock((string) $info->getRequestId(), 30);
+            self::assertNotNull($lockInfo->getLockExpiresAt());
             $queue->deleteRequestLock((string) $info->getRequestId());
-            self::assertIsArray($queue->unlockRequests());
+
+            $unlocked = $queue->unlockRequests();
+            self::assertGreaterThanOrEqual(0, $unlocked->getUnlockedCount());
+        } finally {
+            $client->requestQueue((string) $rq->getId())->delete();
+        }
+    }
+
+    public function testRequestQueueBatchDeleteRequests(): void
+    {
+        $client = $this->requireClient();
+        $rq = $client->requestQueues()->getOrCreate(self::uniqueName('rq-batch-delete'));
+        try {
+            $queue = $client->requestQueue((string) $rq->getId());
+            $added = [
+                $queue->addRequest(new RequestQueueRequest('https://batch-delete.example.com/1', 'bd-1')),
+                $queue->addRequest(new RequestQueueRequest('https://batch-delete.example.com/2', 'bd-2')),
+            ];
+
+            $toDelete = array_map(
+                static fn ($info) => (new RequestQueueRequest())->setId((string) $info->getRequestId()),
+                $added
+            );
+            $result = $queue->batchDeleteRequests($toDelete);
+            self::assertCount(2, $result->getProcessedRequests());
+            self::assertSame([], $result->getUnprocessedRequests());
+            self::assertNull($queue->getRequest((string) $added[0]->getRequestId()));
         } finally {
             $client->requestQueue((string) $rq->getId())->delete();
         }
