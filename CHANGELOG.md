@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0
+
+Breaking: `RequestQueueClient` methods that previously returned a raw `array<string,mixed>` (or, for
+`batchDeleteRequests`, accepted an untyped `mixed` argument) now use typed models, matching the
+OpenAPI-documented response schemas and the reference client's typed result interfaces:
+
+- `listAndLockHead()` now returns `LockedRequestQueueHead` (was `array`).
+- `prolongRequestLock()` now returns `RequestLockInfo` (was `array`).
+- `unlockRequests()` now returns `UnlockRequestsResult` (was `array`).
+- `listRequests()` now returns `RequestQueueRequestsPage` (was `array`).
+- `batchDeleteRequests()` now takes `list<RequestQueueRequest>` and returns `BatchDeleteResult` (was
+  `mixed $requests` / `array`).
+- `RequestQueueHead` and the new `LockedRequestQueueHead` gained the previously-missing
+  `getQueueModifiedAt()` getter (the field is present in the OpenAPI spec and the reference client,
+  but was not yet exposed by this client).
+- `RequestQueueRequest` gained `getRetryCount()`/`getLockExpiresAt()` getters, populated on requests
+  returned by `listHead()`/`listAndLockHead()`/`listRequests()`.
+- `batchDeleteRequests()` now throws `InvalidArgumentException` up front for an empty or
+  over-25-request input, or for any entry missing a non-empty `id`/`uniqueKey`, matching
+  `batchAddRequests()`'s and the reference client's validation.
+- Integration tests: every "create a resource, then `iterate()` the collection and assert it is
+  present" test now retries the iterate-and-check pass with a bounded backoff (via a new
+  `IntegrationTestCase::assertEventuallyIterated()` helper) instead of asserting after a single pass.
+  Apify's list/pagination endpoints are eventually consistent, and this suite runs concurrently with
+  other language clients against the same shared test account, so a resource created immediately
+  before an `iterate()` call could occasionally not yet be reflected in the listing; this was causing
+  intermittent CI failures unrelated to any client defect. No test's assertion was weakened - each
+  still fails if the resource never appears within the timeout.
+
 ## 0.4.0
 
 - Synced to Apify OpenAPI spec `v2-2026-08-05T133145Z` (additive nullability/response/description

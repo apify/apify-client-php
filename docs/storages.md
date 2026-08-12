@@ -91,13 +91,13 @@ Single — `$client->requestQueue($id)`:
 - `addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` — adds a request to the queue; when `$forefront` is `true` it is added to the front (handled before the rest) instead of the back.
 - `getRequest(string $id): ?RequestQueueRequest`, `updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` (with `$forefront` `true` the updated request is moved to the front of the queue), `deleteRequest(string $id): void`
 - `batchAddRequests(array $requests, bool $forefront = false, ?BatchAddRequestsOptions $options = null): BatchAddResult` — every request must have a non-empty `uniqueKey`; with `$forefront` `true` the requests are added to the front of the queue; input is split into batches of at most 25 requests that also respect the ~9 MiB payload limit.
-- `batchDeleteRequests(mixed $requests): array` — `$requests` is a list of entries that each identify a request to delete (e.g. by `id` or `uniqueKey`); returns the raw batch result as a decoded `array<string,mixed>`.
-- `listRequests(?ListRequestsOptions $options = null): array` — returns the raw paginated response as a decoded `array<string,mixed>`.
+- `batchDeleteRequests(array $requests): BatchDeleteResult` — `$requests` is a `list<RequestQueueRequest>` (1-25 entries) where each entry identifies a request to delete via `setId()` or `setUniqueKey()` (other fields, if set, are ignored by the API); throws `InvalidArgumentException` if empty, over 25, or if any entry has neither a non-empty `id` nor `uniqueKey` set (unlike `batchAddRequests()`, oversized input is rejected rather than chunked, since delete is idempotent and can simply be called again).
+- `listRequests(?ListRequestsOptions $options = null): RequestQueueRequestsPage`
 - `paginateRequests(?PaginateRequestsOptions $options = null): iterable` — lazily iterate the queue's requests, yielding `RequestQueueRequest` instances and following cursor pagination (see the options note below).
-- `listAndLockHead(int $lockSecs, ?int $limit = null): array` — atomically returns and locks up to `$limit` requests for `$lockSecs` seconds; returns the raw locked-head object as a decoded `array<string,mixed>`.
-- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): array` — extends a request's lock by `$lockSecs`; with `$forefront` `true` the request is placed at the front of the queue once its lock expires; returns the raw response as a decoded `array<string,mixed>`.
+- `listAndLockHead(int $lockSecs, ?int $limit = null): LockedRequestQueueHead` — atomically returns and locks up to `$limit` requests for `$lockSecs` seconds.
+- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): RequestLockInfo` — extends a request's lock by `$lockSecs`; with `$forefront` `true` the request is placed at the front of the queue once its lock expires.
 - `deleteRequestLock(string $id, bool $forefront = false): void` — releases the lock on a single request; with `$forefront` `true` the request is returned to the front of the queue.
-- `unlockRequests(): array` — releases all locks the client holds on this queue; returns the raw response as a decoded `array<string,mixed>`.
+- `unlockRequests(): UnlockRequestsResult` — releases all locks the client holds on this queue.
 - `withClientKey(string $clientKey): RequestQueueClient`
 
 `paginateRequests()` accepts a `PaginateRequestsOptions` with `limit` (total across all pages),

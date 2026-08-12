@@ -95,4 +95,25 @@ final class RequestQueueRequest extends ApifyResource
         $this->data['userData'] = $userData;
         return $this;
     }
+
+    /**
+     * How many times processing this request has already been retried. Populated on requests
+     * returned by {@see \Apify\Client\Resource\RequestQueueClient::listHead()},
+     * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()} and
+     * {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}; absent when constructing a
+     * request to add.
+     */
+    public function getRetryCount(): ?int
+    {
+        return $this->getInt('retryCount');
+    }
+
+    /**
+     * ISO 8601 timestamp of when this request's processing lock expires. Only present on requests
+     * returned by {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
+     */
+    public function getLockExpiresAt(): ?string
+    {
+        return $this->getString('lockExpiresAt');
+    }
 }

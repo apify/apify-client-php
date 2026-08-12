@@ -82,14 +82,15 @@ final class ActorIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->actors()->create(self::minimalActor(self::uniqueName('iter')))->getId();
         }
         try {
-            $seen = [];
             // chunkSize=2 forces multi-page iteration across at least the three created Actors.
-            foreach ($client->actors()->iterate(new ActorListOptions(my: true), 2) as $actor) {
-                $seen[(string) $actor->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created Actor $id");
-            }
+            // Retried with backoff: Actor listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->actors()->iterate(new ActorListOptions(my: true), 2) as $actor) {
+                    $seen[(string) $actor->getId()] = true;
+                }
+                return $seen;
+            }, 'Actor');
         } finally {
             foreach ($ids as $id) {
                 $client->actor($id)->delete();
@@ -109,12 +110,13 @@ final class ActorIntegrationTest extends IntegrationTestCase
                 'buildTag' => 'latest',
                 'sourceFiles' => [],
             ]);
-            $seen = [];
-            foreach ($actor->versions()->iterate(null, 1) as $version) {
-                $seen[(string) $version->getVersionNumber()] = true;
-            }
-            self::assertArrayHasKey('0.0', $seen);
-            self::assertArrayHasKey('0.1', $seen);
+            self::assertEventuallyIterated(['0.0', '0.1'], static function () use ($actor): array {
+                $seen = [];
+                foreach ($actor->versions()->iterate(null, 1) as $version) {
+                    $seen[(string) $version->getVersionNumber()] = true;
+                }
+                return $seen;
+            }, 'Actor version');
         } finally {
             $client->actor((string) $created->getId())->delete();
         }
@@ -128,12 +130,13 @@ final class ActorIntegrationTest extends IntegrationTestCase
             $version = $client->actor((string) $created->getId())->version('0.0');
             $version->envVars()->create(new ActorEnvVar('ITER_VAR_1', 'v1'));
             $version->envVars()->create(new ActorEnvVar('ITER_VAR_2', 'v2'));
-            $seen = [];
-            foreach ($version->envVars()->iterate(1) as $envVar) {
-                $seen[(string) $envVar->getName()] = true;
-            }
-            self::assertArrayHasKey('ITER_VAR_1', $seen);
-            self::assertArrayHasKey('ITER_VAR_2', $seen);
+            self::assertEventuallyIterated(['ITER_VAR_1', 'ITER_VAR_2'], static function () use ($version): array {
+                $seen = [];
+                foreach ($version->envVars()->iterate(1) as $envVar) {
+                    $seen[(string) $envVar->getName()] = true;
+                }
+                return $seen;
+            }, 'Actor env var');
         } finally {
             $client->actor((string) $created->getId())->delete();
         }

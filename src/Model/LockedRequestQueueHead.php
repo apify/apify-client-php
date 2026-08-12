@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/** The head (front) of a request queue. */
-final class RequestQueueHead
+/**
+ * A batch of requests from the head of a request queue, locked for exclusive processing. Returned by
+ * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
+ */
+final class LockedRequestQueueHead
 {
     /**
      * @param list<RequestQueueRequest> $items
@@ -14,12 +17,15 @@ final class RequestQueueHead
         private array $items,
         private int $limit,
         private bool $hadMultipleClients,
+        private int $lockSecs,
+        private ?bool $queueHasLockedRequests,
+        private ?string $clientKey,
         private ?string $queueModifiedAt = null,
     ) {
     }
 
     /**
-     * @param mixed $data the decoded queue-head object
+     * @param mixed $data the decoded locked-head object
      */
     public static function fromData(mixed $data): self
     {
@@ -34,12 +40,16 @@ final class RequestQueueHead
             $items,
             (int) ($data['limit'] ?? count($items)),
             (bool) ($data['hadMultipleClients'] ?? false),
+            (int) ($data['lockSecs'] ?? 0),
+            isset($data['queueHasLockedRequests']) ? (bool) $data['queueHasLockedRequests'] : null,
+            isset($data['clientKey']) ? (string) $data['clientKey'] : null,
             isset($data['queueModifiedAt']) ? (string) $data['queueModifiedAt'] : null,
         );
     }
 
     /**
-     * The requests at the head of the queue.
+     * The locked requests from the head of the queue. Each item's own
+     * {@see RequestQueueRequest::getLockExpiresAt()} reports when its individual lock expires.
      *
      * @return list<RequestQueueRequest>
      */
@@ -58,6 +68,24 @@ final class RequestQueueHead
     public function hadMultipleClients(): bool
     {
         return $this->hadMultipleClients;
+    }
+
+    /** The lock duration applied to every returned request, in seconds. */
+    public function getLockSecs(): int
+    {
+        return $this->lockSecs;
+    }
+
+    /** Whether the queue has any requests locked by any client (this one or another). */
+    public function queueHasLockedRequests(): ?bool
+    {
+        return $this->queueHasLockedRequests;
+    }
+
+    /** The client key used to acquire the locks. */
+    public function getClientKey(): ?string
+    {
+        return $this->clientKey;
     }
 
     /** ISO 8601 timestamp of the last modification to the queue. */

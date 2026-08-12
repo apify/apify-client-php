@@ -52,13 +52,14 @@ final class ScheduleIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->schedules()->create(self::scheduleDef(self::uniqueName('iter-sch')))->getId();
         }
         try {
-            $seen = [];
-            foreach ($client->schedules()->iterate(new ListOptions(desc: true), 2) as $schedule) {
-                $seen[(string) $schedule->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created schedule $id");
-            }
+            // Retried with backoff: schedule listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->schedules()->iterate(new ListOptions(desc: true), 2) as $schedule) {
+                    $seen[(string) $schedule->getId()] = true;
+                }
+                return $seen;
+            }, 'schedule');
         } finally {
             foreach ($ids as $id) {
                 $client->schedule($id)->delete();

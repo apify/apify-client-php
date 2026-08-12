@@ -47,13 +47,14 @@ final class WebhookIntegrationTest extends IntegrationTestCase
             $ids[] = (string) $client->webhooks()->create(self::webhookDef('https://example.com/iter-' . $i))->getId();
         }
         try {
-            $seen = [];
-            foreach ($client->webhooks()->iterate(new ListOptions(desc: true), 2) as $webhook) {
-                $seen[(string) $webhook->getId()] = true;
-            }
-            foreach ($ids as $id) {
-                self::assertArrayHasKey($id, $seen, "iterate() did not yield created webhook $id");
-            }
+            // Retried with backoff: webhook listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated($ids, static function () use ($client): array {
+                $seen = [];
+                foreach ($client->webhooks()->iterate(new ListOptions(desc: true), 2) as $webhook) {
+                    $seen[(string) $webhook->getId()] = true;
+                }
+                return $seen;
+            }, 'webhook');
         } finally {
             foreach ($ids as $id) {
                 $client->webhook($id)->delete();
@@ -68,11 +69,14 @@ final class WebhookIntegrationTest extends IntegrationTestCase
         try {
             // test() synchronously creates an ad-hoc dispatch listed under the webhook.
             $dispatch = $client->webhook((string) $wh->getId())->test();
-            $seen = [];
-            foreach ($client->webhook((string) $wh->getId())->dispatches()->iterate(new ListOptions(), 2) as $d) {
-                $seen[(string) $d->getId()] = true;
-            }
-            self::assertArrayHasKey((string) $dispatch->getId(), $seen, 'iterate() did not yield the test dispatch');
+            // Retried with backoff: dispatch listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated([(string) $dispatch->getId()], static function () use ($client, $wh): array {
+                $seen = [];
+                foreach ($client->webhook((string) $wh->getId())->dispatches()->iterate(new ListOptions(), 2) as $d) {
+                    $seen[(string) $d->getId()] = true;
+                }
+                return $seen;
+            }, 'dispatch');
         } finally {
             $client->webhook((string) $wh->getId())->delete();
         }

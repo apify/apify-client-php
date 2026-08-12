@@ -27,11 +27,14 @@ final class BuildIntegrationTest extends IntegrationTestCase
             $build = $actor->build('0.0', new ActorBuildOptions());
             $client->build((string) $build->getId())->waitForFinish(300);
             // Iterate the Actor's builds (scoped, so the created build is the only expected entry).
-            $seen = [];
-            foreach ($actor->builds()->iterate(new ListOptions(), 1) as $b) {
-                $seen[(string) $b->getId()] = true;
-            }
-            self::assertArrayHasKey((string) $build->getId(), $seen, 'iterate() did not yield the created build');
+            // Retried with backoff: build listing is eventually consistent under concurrent load.
+            self::assertEventuallyIterated([(string) $build->getId()], static function () use ($actor): array {
+                $seen = [];
+                foreach ($actor->builds()->iterate(new ListOptions(), 1) as $b) {
+                    $seen[(string) $b->getId()] = true;
+                }
+                return $seen;
+            }, 'build');
         } finally {
             $client->actor((string) $created->getId())->delete();
         }

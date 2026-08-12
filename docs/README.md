@@ -96,10 +96,11 @@ JSON value — typically an associative array, though `getInput()` is typed `mix
 whatever JSON value was stored (or accept an arbitrary value serialized to JSON):
 
 - Read: `me()->monthlyUsage(...)`, `me()->limits()`, `task($id)->getInput()`,
-  `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`, and the raw request-queue
-  operations that return a response body (`listRequests`, `listAndLockHead`, `prolongRequestLock`,
-  `unlockRequests`, `batchDeleteRequests`). Note that `deleteRequestLock` returns `void` (it releases
-  a lock and has no meaningful body), so it is not in this list.
+  `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`. Note that
+  `deleteRequestLock` returns `void` (it releases a lock and has no meaningful body), so it is not in
+  this list. The request-queue lock/list/unlock/batch-delete operations
+  (`listRequests`, `listAndLockHead`, `prolongRequestLock`, `unlockRequests`, `batchDeleteRequests`)
+  return typed models (see [Models](models.md)), not raw JSON.
 - Write: definition/`update`/`create` arguments accept any JSON-serializable value — typically an
   associative array.
 
