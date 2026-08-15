@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Corrected the write-permission wording on `TaskClient::publish()`/`unpublish()`: the OpenAPI spec
+  states that both `isPublic` and `publicConfig` require write permission to the task's Actor, not
+  (as `unpublish()`'s docblock previously claimed) permission to the task alone. `publish()`'s
+  docblock now also states the Actor's fewer-than-50-published-tasks limit.
+- `docs/tasks.md` updated to match.
+
 ## 0.5.0
 
 Breaking: `RequestQueueClient` methods that previously returned a raw `array<string,mixed>` (or, for
