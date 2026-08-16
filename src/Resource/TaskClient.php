@@ -59,11 +59,12 @@ final class TaskClient
 
     /**
      * Publishes the task on its public landing page, by setting {@code isPublic} through
-     * {@see update()}.
+     * {@see update()}. Requires write permission to the task's Actor.
      *
-     * The task's Actor must be public and the task must have its public display configuration
-     * ({@code publicConfig}) set up first. Requires write permission to both the task and its
-     * Actor. Publishing an already published task does nothing.
+     * To publish, the task's Actor must be public, its {@code publicConfig.inputSchemaFields} and
+     * {@code publicConfig.datasetView} must be set, and the Actor must have fewer than 50
+     * published tasks; if any of these are not met, the request fails and nothing is changed.
+     * Publishing an already published task does nothing.
      */
     public function publish(): Task
     {
@@ -72,12 +73,12 @@ final class TaskClient
 
     /**
      * Unpublishes the task from its public landing page, by setting {@code isPublic} through
-     * {@see update()}.
+     * {@see update()}. Like {@see publish()}, this requires write permission to the task's Actor:
+     * the API requires Actor write permission for both {@code isPublic} and {@code publicConfig}.
      *
      * The public display configuration ({@code publicConfig}) is preserved, so the task can be
-     * published again without re-entering it. Unlike {@see publish()}, this only requires write
-     * permission to the task itself (not its Actor), since it does not need to validate the
-     * Actor's public/display eligibility. Unpublishing a task that is not published does nothing.
+     * published again without re-entering it. Unpublishing a task that is not published does
+     * nothing.
      */
     public function unpublish(): Task
     {

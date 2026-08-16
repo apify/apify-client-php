@@ -17,7 +17,7 @@ final class Version
      * The semantic version of this client library (see https://semver.org/).
      * Changes to the public interface other than additive ones are considered breaking changes.
      */
-    public const CLIENT_VERSION = '0.5.0';
+    public const CLIENT_VERSION = '0.5.1';
 
     /**
      * The version of the Apify OpenAPI specification this client was generated and verified
