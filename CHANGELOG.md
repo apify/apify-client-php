@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+
+- Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-08-14T072928Z`. This
+  version formally adds `Task.isPublic`/`publicConfig` and the `TaskPublicConfig` schema to the
+  spec; this client already implemented them in `0.4.0`, ahead of the spec, for parity with the
+  reference JS client. No client code or public interface change.
+
 ## 0.5.1
 
 - Corrected the write-permission wording on `TaskClient::publish()`/`unpublish()`: the OpenAPI spec
