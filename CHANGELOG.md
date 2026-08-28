@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.3
+
+- Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-08-27T071624Z`.
+- Bumped `Version::CLIENT_VERSION` to `0.5.3`.
+
 ## 0.5.2
 
 - Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-08-14T072928Z`. This
