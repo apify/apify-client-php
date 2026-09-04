@@ -37,7 +37,7 @@ final class Task extends ApifyResource
         return $this->getString('title');
     }
 
-    /** The human-readable description shown on the task's public landing page. */
+    /** The human-readable description of the task. */
     public function getDescription(): ?string
     {
         return $this->getString('description');

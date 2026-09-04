@@ -3,10 +3,8 @@
 ## 0.6.0
 
 - Synced to Apify OpenAPI spec `v2-2026-09-02T154542Z`.
-- Added `Task::getDescription()` getter, exposing the task's public-landing-page description
+- Added `Task::getDescription()` getter, exposing the task's human-readable description
   (matching the reference JS client's `Task.description`).
-- Corrected the published-tasks limit in `TaskClient::publish()`'s docblock and `docs/tasks.md`:
-  the requirement is fewer than 10 already-published tasks on the Actor, not 50.
 
 ## 0.5.3
 
