@@ -62,7 +62,7 @@ final class TaskClient
      * {@see update()}. Requires write permission to the task's Actor.
      *
      * To publish, the task's Actor must be public, its {@code publicConfig.inputSchemaFields} and
-     * {@code publicConfig.datasetView} must be set, and the Actor must have fewer than 50
+     * {@code publicConfig.datasetView} must be set, and the Actor must have fewer than 10
      * published tasks; if any of these are not met, the request fails and nothing is changed.
      * Publishing an already published task does nothing.
      */

@@ -26,7 +26,7 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
 - `get(): ?Task`, `update(mixed $newFields): Task`, `delete(): void`
 - `publish(): Task`, `unpublish(): Task` — publish/unpublish the task's public landing page, by
   setting `isPublic` through `update()`. Both require write permission to the task's Actor;
-  publishing additionally requires the Actor to be public, to have fewer than 50 already-published
+  publishing additionally requires the Actor to be public, to have fewer than 10 already-published
   tasks, and the task's `publicConfig.inputSchemaFields`/`publicConfig.datasetView` to be set.
 - `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun`
 - `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun`

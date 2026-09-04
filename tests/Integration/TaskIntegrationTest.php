@@ -107,6 +107,9 @@ final class TaskIntegrationTest extends IntegrationTestCase
             $tc->updateInput(['message' => 'updated']);
             self::assertNotNull($tc->getInput());
             $tc->update(['name' => self::uniqueName('task-renamed')]);
+            $updated = $tc->update(['title' => 'Updated Title', 'description' => 'Updated description']);
+            self::assertSame('Updated Title', $updated->getTitle());
+            self::assertSame('Updated description', $updated->getDescription());
             $tc->runs()->list(new ListOptions(), new RunListOptions());
         } finally {
             $client->task((string) $task->getId())->delete();
