@@ -37,6 +37,12 @@ final class Task extends ApifyResource
         return $this->getString('title');
     }
 
+    /** The human-readable description of the task. */
+    public function getDescription(): ?string
+    {
+        return $this->getString('description');
+    }
+
     /** When the task was created (ISO-8601 string). */
     public function getCreatedAt(): ?string
     {

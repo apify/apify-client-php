@@ -70,6 +70,7 @@ model is also used as an input object and therefore additionally exposes setters
 | `getUserId(): ?string` | ID of the task owner. |
 | `getName(): ?string` | The task's technical name. |
 | `getTitle(): ?string` | Human-readable title. |
+| `getDescription(): ?string` | Human-readable description of the task. |
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
 | `isPublic(): ?bool` | Whether the task is published on its public landing page. |
