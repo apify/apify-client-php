@@ -100,7 +100,10 @@ final class DatasetClient
             $this->headerInt($response, 'X-Apify-Pagination-Offset', 0),
             $this->headerInt($response, 'X-Apify-Pagination-Limit', $count),
             $count,
-            $options->desc ?? false,
+            // Prefer the server-reported X-Apify-Pagination-Desc header (matches the reference JS
+            // client's `_createPaginationList`); fall back to the requested option when the header
+            // is absent, e.g. against an older API version that predates it.
+            $this->headerBool($response, 'X-Apify-Pagination-Desc', $options->desc ?? false),
         );
     }
 
@@ -214,5 +217,11 @@ final class DatasetClient
     {
         $value = $response->getHeaderLine($name);
         return $value === '' ? $fallback : (int) $value;
+    }
+
+    private function headerBool(ResponseInterface $response, string $name, bool $fallback): bool
+    {
+        $value = $response->getHeaderLine($name);
+        return $value === '' ? $fallback : $value === 'true';
     }
 }
