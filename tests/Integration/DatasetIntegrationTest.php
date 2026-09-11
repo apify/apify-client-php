@@ -105,6 +105,8 @@ final class DatasetIntegrationTest extends IntegrationTestCase
             self::assertSame(3, $page->getCount());
             self::assertCount(3, $page->getItems());
             self::assertSame(1, $page->getItems()[0]['n']);
+            // isDesc() is sourced from the server's X-Apify-Pagination-Desc response header.
+            self::assertFalse($page->isDesc());
 
             $csv = $dataset->downloadItems(DownloadItemsFormat::CSV, new DatasetDownloadOptions(bom: true));
             self::assertStringContainsString('url', $csv);
