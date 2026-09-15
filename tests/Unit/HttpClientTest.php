@@ -7,6 +7,7 @@ namespace Apify\Client\Tests\Unit;
 use Apify\Client\ApifyClient;
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Internal\Json;
+use Apify\Client\Options\DatasetListItemsOptions;
 use PHPUnit\Framework\TestCase;
 
 final class HttpClientTest extends TestCase
@@ -129,6 +130,44 @@ final class HttpClientTest extends TestCase
         self::assertSame(42, $page->getTotal());
         self::assertSame(3, $page->getCount());
         self::assertSame(1, $page->getItems()[0]['n']);
+        self::assertFalse($page->isDesc());
+    }
+
+    public function testDatasetItemsDescHeaderTakesPrecedenceOverOption(): void
+    {
+        // The server-reported X-Apify-Pagination-Desc header must win over the requested option
+        // (matches the reference JS client), so a page always reflects what the server actually did.
+        $transport = (new MockTransport())->queueResponse(
+            200,
+            Json::encode([['n' => 1]]),
+            ['X-Apify-Pagination-Desc' => 'true']
+        );
+        $page = $this->client($transport)->dataset('ds1')->listItems(new DatasetListItemsOptions(desc: false));
+
+        self::assertTrue($page->isDesc());
+    }
+
+    public function testDatasetItemsDescHeaderFalseTakesPrecedenceOverOption(): void
+    {
+        // Symmetric case: the header must be genuinely *parsed*, not just checked for presence.
+        // A "false" header must win over a contradicting `desc: true` option, so this fails if
+        // headerBool() ever regresses to presence-only ("header is set, so trust the option").
+        $transport = (new MockTransport())->queueResponse(
+            200,
+            Json::encode([['n' => 1]]),
+            ['X-Apify-Pagination-Desc' => 'false']
+        );
+        $page = $this->client($transport)->dataset('ds1')->listItems(new DatasetListItemsOptions(desc: true));
+
+        self::assertFalse($page->isDesc());
+    }
+
+    public function testDatasetItemsDescFallsBackToOptionWhenHeaderMissing(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode([['n' => 1]]));
+        $page = $this->client($transport)->dataset('ds1')->listItems(new DatasetListItemsOptions(desc: true));
+
+        self::assertTrue($page->isDesc());
     }
 
     public function testValidateInputParsesBareObject(): void

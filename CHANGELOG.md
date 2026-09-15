@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1
+
+- Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-09-10T091137Z`. This
+  version formally documents the `X-Apify-Pagination-*` response headers (including the
+  previously-undocumented `X-Apify-Pagination-Desc`) on all offset-paginated list endpoints and
+  the `offset`/`limit`/`desc` query parameters on the webhook dispatches list; this client already
+  implemented all of those.
+- `DatasetClient::listItems()` now prefers the `X-Apify-Pagination-Desc` response header over the
+  requested `desc` option when reporting `PaginationList::isDesc()`, matching the reference JS
+  client's `_createPaginationList` and the header newly documented in the spec above.
+
 ## 0.6.0
 
 - Synced to Apify OpenAPI spec `v2-2026-09-02T154542Z`.
