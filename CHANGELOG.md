@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.2
+
+- Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-09-28T115051Z`. No public
+  interface changes.
+- Updated the `TaskClient::publish()` doc comment and `docs/tasks.md` to reflect the new published-task
+  limits (up to 10 published tasks per Actor, 100 per account; previously documented as "fewer than
+  50 per Actor"), matching the spec's corrected description. Behavior is unchanged: the client already
+  surfaces the API's rejection as-is when a task can't be published.
+- The `idempotency-key` header on `RunClient::charge()` is now a required parameter in the spec (was
+  optional). No client change needed: this client already always sends an idempotency key, generating
+  one automatically when the caller doesn't supply one.
+
 ## 0.6.1
 
 - Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-09-10T091137Z`. This
