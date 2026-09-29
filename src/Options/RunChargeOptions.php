@@ -15,6 +15,8 @@ final class RunChargeOptions
         /**
          * A key that deduplicates the charge across retries. If unset, one is auto-generated as
          * {@code "{runId}-{eventName}-{timestampMillis}-{random}"}, matching the reference client.
+         * The key expires 3 minutes after the charge; a later request reusing it creates a new
+         * charge instead of being deduplicated against the original.
          */
         public readonly ?string $idempotencyKey = null,
     ) {

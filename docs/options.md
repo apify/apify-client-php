@@ -152,7 +152,7 @@ For `run()->charge()` (pay-per-event Actors). `eventName` is **required**.
 |---|---|---|
 | `eventName` | `string` | Name of the event to charge for. |
 | `count` | `?int` | Number of times to charge the event (defaults to 1). |
-| `idempotencyKey` | `?string` | Deduplicates the charge across retries; auto-generated if unset. |
+| `idempotencyKey` | `?string` | Deduplicates the charge across retries; auto-generated if unset. Expires 3 minutes after the charge — reusing it later creates a new charge rather than deduplicating. |
 
 ## Builds
 
