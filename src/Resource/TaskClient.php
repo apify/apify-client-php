@@ -61,10 +61,11 @@ final class TaskClient
      * Publishes the task on its public landing page, by setting {@code isPublic} through
      * {@see update()}. Requires write permission to the task's Actor.
      *
-     * To publish, the task's Actor must be public, its {@code publicConfig.inputSchemaFields} and
-     * {@code publicConfig.datasetView} must be set, and the Actor must have fewer than 50
-     * published tasks; if any of these are not met, the request fails and nothing is changed.
-     * Publishing an already published task does nothing.
+     * To publish, the task's Actor must be public and its {@code publicConfig.inputSchemaFields}
+     * and {@code publicConfig.datasetView} must be set. An Actor can have up to 10 published
+     * tasks and an account up to 100; contact Apify support to raise these limits. If any of
+     * these conditions are not met, the request fails and nothing is changed (including fields
+     * unrelated to publishing). Publishing an already published task does nothing.
      */
     public function publish(): Task
     {
