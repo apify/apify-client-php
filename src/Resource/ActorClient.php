@@ -8,6 +8,7 @@ use Apify\Client\ApifyClient;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Actor;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\Build;
@@ -15,6 +16,7 @@ use Apify\Client\Options\ActorBuildOptions;
 use Apify\Client\Options\ActorStartOptions;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ValidateInputOptions;
+use InvalidArgumentException;
 
 /**
  * A client for a specific Actor.
@@ -43,9 +45,9 @@ final class ActorClient
     }
 
     /** Fetches the Actor object, or {@code null} if it does not exist. */
-    public function get(): ?Actor
+    public function get(int|float|string|null $timeoutSecs = null): ?Actor
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Actor($data) : null;
     }
 
@@ -54,15 +56,15 @@ final class ActorClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Actor
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Actor
     {
-        return new Actor($this->ctx->updateResource('', $newFields));
+        return new Actor($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the Actor. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -112,9 +114,16 @@ final class ActorClient
         return is_array($result) && ($result['valid'] ?? false) === true;
     }
 
-    /** Builds the given version of the Actor and returns the created build. */
+    /**
+     * Builds the given version of the Actor and returns the created build.
+     *
+     * @throws InvalidArgumentException if {@code $versionNumber} is empty
+     */
     public function build(string $versionNumber, ?ActorBuildOptions $options = null): Build
     {
+        if ($versionNumber === '') {
+            throw new InvalidArgumentException('ActorClient::build: $versionNumber must not be empty');
+        }
         $params = new QueryParams();
         $params->addString('version', $versionNumber);
         ($options ?? new ActorBuildOptions())->appendTo($params);

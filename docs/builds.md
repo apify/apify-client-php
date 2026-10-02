@@ -23,8 +23,10 @@ An Actor's builds are available at `$client->actor($id)->builds()`.
 - `abort(): Build`
 - `delete(): void`
 - `waitForFinish(?int $waitSecs = null): Build` — poll until terminal (`null` waits indefinitely).
-- `getOpenApiDefinition(): ?array` — the build's generated OpenAPI document, or `null`.
-- `log(): LogClient`
+- `getOpenApiDefinition(): ?array` — the build's generated OpenAPI document. Throws if the build
+  itself does not exist (a 404 here cannot mean anything else).
+- `log(): LogClient` — `get()` throws instead of resolving to `null` on a 404, since there is no ID
+  to pin the 404 to the build or its log.
 
 ```php
 $build = $client->actor('me~my-actor')->build('0.0', new ActorBuildOptions(tag: 'latest'));

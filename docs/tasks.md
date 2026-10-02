@@ -32,7 +32,8 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
   nothing is changed.
 - `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun`
 - `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun`
-- `getInput(): mixed`, `updateInput(mixed $input): mixed`
+- `getInput(): mixed` (throws if the task itself does not exist — a 404 here cannot mean anything
+  else), `updateInput(mixed $input): mixed`
 - `lastRun(?LastRunOptions $options = null): RunClient`
 - `runs(): RunCollectionClient`
 - `webhooks(): NestedWebhookCollectionClient` — read-only.

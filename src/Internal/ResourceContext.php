@@ -7,6 +7,7 @@ namespace Apify\Client\Internal;
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Model\PaginationList;
 use Generator;
+use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 
@@ -57,6 +58,16 @@ final class ResourceContext
         /** Fully-qualified base URL of the resource, e.g. https://api.apify.com/v2/actors/ID. */
         public string $url,
         string $baseUrl,
+        /**
+         * Whether this context addresses a resource by an explicit ID ({@see single()}) rather than a
+         * fixed, ID-less sub-path ({@see collection()}, used e.g. by {@code run.dataset()}). Gates
+         * whether {@see getResource()}/{@see getRaw()}/{@see deleteResource()} swallow a 404 on the
+         * resource itself ({@code $subPath === ''}): an ID-addressed resource that is missing resolves
+         * to {@code null}/no-op, but a 404 on an ID-less chained resource (e.g. a run's default
+         * dataset) can mean either the parent or the sub-resource is gone, so it is rethrown instead —
+         * matching the reference client's {@code catchNotFoundForResourceOrThrow}.
+         */
+        private bool $hasId = true,
     ) {
         $this->baseParams = new QueryParams();
         $this->apiOrigin = self::originOf($baseUrl);
@@ -79,13 +90,14 @@ final class ResourceContext
     /** Creates a context for a collection endpoint: {@code {base}/{resourcePath}}. */
     public static function collection(HttpClientCore $http, string $baseUrl, string $resourcePath): self
     {
-        return new self($http, $baseUrl . '/' . $resourcePath, $baseUrl);
+        return new self($http, $baseUrl . '/' . $resourcePath, $baseUrl, hasId: false);
     }
 
     /** Creates a context for a single resource: {@code {base}/{resourcePath}/{safeId}}. */
     public static function single(HttpClientCore $http, string $baseUrl, string $resourcePath, string $id): self
     {
-        return new self($http, $baseUrl . '/' . $resourcePath . '/' . self::toSafeId($id), $baseUrl);
+        $segment = self::encodePathSegment(self::toSafeId($id));
+        return new self($http, $baseUrl . '/' . $resourcePath . '/' . $segment, $baseUrl, hasId: true);
     }
 
     /** Overrides the origin used when building public URLs. */
@@ -127,12 +139,12 @@ final class ResourceContext
      *
      * @return mixed
      */
-    public function getResource(string $subPath, QueryParams $params): mixed
+    public function getResource(string $subPath, QueryParams $params, ?float $timeoutSecs = null): mixed
     {
         try {
-            return $this->getResourceRequired($subPath, $params);
+            return $this->getResourceRequired($subPath, $params, $timeoutSecs);
         } catch (ApifyApiException $e) {
-            if (HttpClientCore::isNotFound($e)) {
+            if (HttpClientCore::isNotFound($e) && $this->swallowsNotFound($subPath)) {
                 return null;
             }
             throw $e;
@@ -144,10 +156,10 @@ final class ResourceContext
      *
      * @return mixed
      */
-    public function getResourceRequired(string $subPath, QueryParams $params): mixed
+    public function getResourceRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null): mixed
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('GET', $url, timeoutSecs: $this->requestTimeoutSecs);
+        $response = $this->http->call('GET', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return Json::decodeData((string) $response->getBody());
     }
 
@@ -156,24 +168,50 @@ final class ResourceContext
      *
      * @return array<string,mixed>
      */
-    public function updateResource(string $subPath, mixed $body): array
+    public function updateResource(string $subPath, mixed $body, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams(new QueryParams())->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('PUT', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->requestTimeoutSecs);
+        $response = $this->http->call('PUT', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
-    /** Performs a DELETE; a not-found is treated as a successful no-op. */
-    public function deleteResource(string $subPath): void
+    /**
+     * Performs a DELETE; a not-found is treated as a successful no-op when this context addresses its
+     * resource by ID ({@see $hasId}). A DELETE on an ID-less chained resource (e.g. {@code
+     * run.dataset()->delete()}) rethrows instead, since the 404 could mean the parent run is gone.
+     */
+    public function deleteResource(string $subPath, ?float $timeoutSecs = null): void
     {
         $url = $this->mergedParams(new QueryParams())->applyToUrl($this->subUrl($subPath));
         try {
-            $this->http->call('DELETE', $url, timeoutSecs: $this->requestTimeoutSecs);
+            $this->http->call('DELETE', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         } catch (ApifyApiException $e) {
-            if (!HttpClientCore::isNotFound($e)) {
+            if (!HttpClientCore::isNotFound($e) || !$this->swallowsNotFound($subPath)) {
                 throw $e;
             }
         }
+    }
+
+    /**
+     * A per-call timeout override (seconds), falling back to this context's own configured timeout
+     * ({@see withTimeout()}) when {@code null}, which in turn falls back to the client-wide default.
+     */
+    private function effectiveTimeout(?float $timeoutSecs): ?float
+    {
+        return $timeoutSecs ?? $this->requestTimeoutSecs;
+    }
+
+    /**
+     * Resolves a per-call {@code $timeoutSecs} option (a number of seconds, a timeout tier name, {@see
+     * \Apify\Client\Internal\TimeoutTiers::NO_TIMEOUT}, or {@code null} for {@code $defaultTier}'s
+     * configured duration) against the client's configured {@see TimeoutTiers}, matching the reference
+     * client's per-method tier assignment. See {@see TimeoutTiers} for the tiers and their defaults.
+     *
+     * @param int|float|string|null $timeoutSecs
+     */
+    public function resolveTimeout(int|float|string|null $timeoutSecs, string $defaultTier): ?float
+    {
+        return $this->http->timeoutTiers()->resolve($timeoutSecs, $defaultTier);
     }
 
     /**
@@ -328,18 +366,39 @@ final class ResourceContext
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
-    /** GET returning the raw response (no data envelope). Returns {@code null} on not-found. */
+    /**
+     * GET returning the raw response (no data envelope). Returns {@code null} on not-found, unless
+     * this context addresses an ID-less chained resource ({@see $hasId}) and {@code $subPath} is the
+     * resource itself ({@code ''}), in which case the 404 is rethrown (see {@see deleteResource()}).
+     */
     public function getRaw(string $subPath, QueryParams $params): ?ResponseInterface
     {
-        $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
         try {
-            return $this->http->call('GET', $url, timeoutSecs: $this->requestTimeoutSecs);
+            return $this->getRawRequired($subPath, $params);
         } catch (ApifyApiException $e) {
-            if (HttpClientCore::isNotFound($e)) {
+            if (HttpClientCore::isNotFound($e) && $this->swallowsNotFound($subPath)) {
                 return null;
             }
             throw $e;
         }
+    }
+
+    /** GET returning the raw response (no data envelope). Propagates every error, including a 404. */
+    public function getRawRequired(string $subPath, QueryParams $params): ResponseInterface
+    {
+        $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
+        return $this->http->call('GET', $url, timeoutSecs: $this->requestTimeoutSecs);
+    }
+
+    /**
+     * Whether a 404 on {@code $subPath} should resolve to "not found" ({@code null}/no-op) rather than
+     * being rethrown. True for any fixed sub-path of an ID-addressed resource, and for the resource
+     * itself only when it is addressed by ID; an ID-less chained resource's own 404 is ambiguous
+     * between "parent missing" and "sub-resource missing" and is always rethrown.
+     */
+    private function swallowsNotFound(string $subPath): bool
+    {
+        return $subPath !== '' || $this->hasId;
     }
 
     /** HEAD request; returns whether the resource exists. */
@@ -489,20 +548,34 @@ final class ResourceContext
 
     /**
      * Encodes a resource id so it is safe to embed in a URL path. Apify uses the {@code
-     * username~resourcename} form, so the first {@code /} of an id is replaced with {@code ~}.
+     * username~resourcename} form, so every {@code /} in the id is replaced with {@code ~} — not just
+     * the first — matching the reference client. Replacing only the first occurrence would leave any
+     * further {@code /} in the id as literal path separators once interpolated into a URL, letting an
+     * id such as {@code "a/../.."} introduce extra, attacker-controlled path segments.
      */
     public static function toSafeId(string $id): string
     {
-        $slash = strpos($id, '/');
-        return $slash === false ? $id : substr($id, 0, $slash) . '~' . substr($id, $slash + 1);
+        return str_replace('/', '~', $id);
     }
 
     /**
-     * Percent-encodes a single URL path segment, so values interpolated into the path (record keys,
-     * request IDs) cannot break out of the segment.
+     * Percent-encodes a single URL path segment, so values interpolated into the path (resource ids,
+     * record keys, request ids) cannot break out of the segment or restructure the request path.
+     *
+     * Rejects an empty segment and the dot-segments {@code "."}/{@code ".."} instead of encoding them:
+     * a URL parser (client-side proxy, CDN, or the server itself) resolves dot segments ({@code
+     * RFC 3986 §5.2.4}) from the decoded path, so a literal {@code .}/{@code ..} segment can still
+     * collapse to the parent resource even though the string itself contains no {@code /}.
+     *
+     * @throws InvalidArgumentException if {@code $input} is empty or is {@code "."}/{@code ".."}
      */
     public static function encodePathSegment(string $input): string
     {
+        if ($input === '' || $input === '.' || $input === '..') {
+            throw new InvalidArgumentException(
+                sprintf('a URL path segment must be non-empty and must not be "." or "..", got %s', Json::encode($input))
+            );
+        }
         return rawurlencode($input);
     }
 

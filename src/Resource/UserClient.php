@@ -8,6 +8,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\User;
 use LogicException;
 
@@ -35,9 +36,9 @@ final class UserClient
      * Fetches the user. For {@code me} it returns private account details (via {@see User::toArray()});
      * for other users it returns the public profile. Returns {@code null} if the user does not exist.
      */
-    public function get(): ?User
+    public function get(int|float|string|null $timeoutSecs = null): ?User
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new User($data) : null;
     }
 

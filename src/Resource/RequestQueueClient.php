@@ -9,6 +9,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\BatchAddResult;
 use Apify\Client\Model\BatchDeleteResult;
 use Apify\Client\Model\LockedRequestQueueHead;
@@ -38,7 +39,7 @@ final class RequestQueueClient
 
     /**
      * The API's maximum accepted request payload size (9 MiB). Batches are additionally split so no
-     * single batch call exceeds this, matching the reference client's {@code sliceArrayByByteLength}.
+     * single batch call exceeds this, matching the reference client's {@code splitIntoJsonArrayBatches}.
      */
     private const MAX_PAYLOAD_SIZE_BYTES = 9 * 1024 * 1024;
 
@@ -98,10 +99,15 @@ final class RequestQueueClient
         return $params;
     }
 
-    /** Fetches the queue metadata, or {@code null} if it does not exist. */
-    public function get(): ?RequestQueue
+    /**
+     * Fetches the queue metadata, or {@code null} if it does not exist.
+     *
+     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::requestQueue()}),
+     * a 404 is rethrown instead, since it could mean either the parent resource or the queue is gone.
+     */
+    public function get(int|float|string|null $timeoutSecs = null): ?RequestQueue
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new RequestQueue($data) : null;
     }
 
@@ -110,15 +116,18 @@ final class RequestQueueClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): RequestQueue
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): RequestQueue
     {
-        return new RequestQueue($this->ctx->updateResource('', $newFields));
+        return new RequestQueue($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /** Deletes the queue. */
-    public function delete(): void
+    /**
+     * Deletes the queue. A not-found is a no-op, unless this client was obtained without an ID (e.g.
+     * {@see \Apify\Client\Resource\RunClient::requestQueue()}), in which case it is rethrown.
+     */
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -223,10 +232,15 @@ final class RequestQueueClient
         $payloadSizeLimitBytes = self::MAX_PAYLOAD_SIZE_BYTES
             - (int) ceil(self::MAX_PAYLOAD_SIZE_BYTES * self::PAYLOAD_SAFETY_BUFFER_PERCENT);
 
-        // Validate the whole input up front, before any HTTP call. Both the empty-uniqueKey check and
-        // the per-request oversized check must run here (not inside the send loop): otherwise an
-        // oversized request in the middle of a large batch would only be discovered after earlier
-        // chunks had already been POSTed, leaving the queue partially mutated.
+        // Serialize every request once, up front: the byte lengths (which include the two extra bytes
+        // each item costs in the batch body - a comma or the closing bracket after it) decide the chunk
+        // boundaries below, and the same JSON strings are joined into each chunk's body, so nothing is
+        // re-encoded when the chunk is sent. Matches the reference client's `splitIntoJsonArrayBatches`.
+        //
+        // Both the empty-uniqueKey check and the per-request oversized check must run here (not inside
+        // the send loop): otherwise an oversized request in the middle of a large batch would only be
+        // discovered after earlier chunks had already been POSTed, leaving the queue partially mutated.
+        $serialized = [];
         foreach ($requests as $i => $request) {
             $uniqueKey = $request->getUniqueKey();
             if ($uniqueKey === null || $uniqueKey === '') {
@@ -234,69 +248,60 @@ final class RequestQueueClient
                     sprintf('batchAddRequests: the request at index %d is missing a non-empty uniqueKey', $i)
                 );
             }
-            $itemBytes = strlen(Json::encode($request->toArray()));
-            if ($itemBytes > $payloadSizeLimitBytes) {
+            $json = Json::encode($request->toArray());
+            // +1 for the comma or closing bracket that follows this item in the batch body.
+            $bytes = strlen($json) + 1;
+            if ($bytes > $payloadSizeLimitBytes) {
                 throw new InvalidArgumentException(sprintf(
                     'batchAddRequests: the request at index %d exceeds the maximum payload size (%d bytes)',
                     $i,
                     $payloadSizeLimitBytes
                 ));
             }
+            $serialized[] = ['request' => $request, 'json' => $json, 'bytes' => $bytes];
         }
 
         $merged = new BatchAddResult();
-        $index = 0;
-        $count = count($requests);
-        while ($index < $count) {
-            // Bound each batch first by the count limit (25), then by payload byte size.
-            $countSlice = array_slice($requests, $index, self::MAX_REQUESTS_PER_BATCH);
-            $chunk = self::sliceByByteLength($countSlice, $payloadSizeLimitBytes);
+        foreach (self::splitIntoBatches($serialized, self::MAX_REQUESTS_PER_BATCH, $payloadSizeLimitBytes) as $chunk) {
             $merged->merge($this->batchAddChunkWithRetries($chunk, $forefront, $options));
-            $index += count($chunk);
         }
         return $merged;
     }
 
     /**
-     * Returns the longest leading run of {@code $requests} whose combined JSON payload stays under
-     * {@code $maxByteLength}, always keeping at least one request so iteration makes progress. Ports
-     * the reference client's {@code sliceArrayByByteLength}.
+     * Splits pre-serialized requests into consecutive batches of at most {@code $maxCount} items, each
+     * fitting a JSON array body (items joined by commas between brackets) of at most
+     * {@code $maxByteLength} bytes. Ports the reference client's {@code splitIntoJsonArrayBatches}.
      *
-     * Callers must have already validated (in {@see batchAddRequests()}) that every individual request
-     * fits under {@code $maxByteLength}, so the always-keep-one fallback never produces an over-limit
-     * chunk. That up-front validation is what lets this slicer run inside the send loop without risking
-     * a partially-mutated queue.
+     * Every item's {@code bytes} (pre-validated in {@see batchAddRequests()} to fit under
+     * {@code $maxByteLength} on its own) already includes the one extra byte it costs as either a
+     * separating comma or the batch's closing bracket, so only the opening bracket's byte is added here.
      *
-     * @param list<RequestQueueRequest> $requests
-     * @return list<RequestQueueRequest>
+     * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $items
+     * @return list<list<array{request: RequestQueueRequest, json: string, bytes: int}>>
      */
-    private static function sliceByByteLength(array $requests, int $maxByteLength): array
+    private static function splitIntoBatches(array $items, int $maxCount, int $maxByteLength): array
     {
-        $payloads = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), $requests);
-        if (strlen(Json::encode($payloads)) < $maxByteLength) {
-            return $requests;
-        }
-
-        $sliced = [];
-        $byteLength = 2; // the two bytes of an empty array "[]"
-        foreach ($requests as $request) {
-            $itemBytes = strlen(Json::encode($request->toArray()));
-            if ($byteLength + $itemBytes >= $maxByteLength) {
-                break;
+        $batches = [];
+        $batch = [];
+        $byteLength = 1; // the opening bracket "["
+        foreach ($items as $item) {
+            if ($batch !== [] && (count($batch) >= $maxCount || $byteLength + $item['bytes'] > $maxByteLength)) {
+                $batches[] = $batch;
+                $batch = [];
+                $byteLength = 1;
             }
-            $byteLength += $itemBytes;
-            $sliced[] = $request;
+            $batch[] = $item;
+            $byteLength += $item['bytes'];
         }
-
-        // Guarantee forward progress: keep at least the first request (pre-validated to fit under the max).
-        if ($sliced === []) {
-            $sliced[] = $requests[0];
+        if ($batch !== []) {
+            $batches[] = $batch;
         }
-        return $sliced;
+        return $batches;
     }
 
     /**
-     * @param list<RequestQueueRequest> $chunk
+     * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $chunk
      */
     private function batchAddChunkWithRetries(array $chunk, bool $forefront, BatchAddRequestsOptions $options): BatchAddResult
     {
@@ -318,13 +323,13 @@ final class RequestQueueClient
                 // processed in THIS chunk are reported as unprocessed and we stop — keeping the method's
                 // non-throwing contract so a multi-chunk call still returns every earlier chunk's
                 // already-merged results instead of aborting the whole operation.
-                $unprocessed = self::requestsNotYetProcessed($chunk, $processed);
+                $unprocessed = array_column(self::itemsNotYetProcessed($chunk, $processed), 'request');
                 break;
             }
             $processed = array_merge($processed, $response->getProcessedRequests());
             // Only requests the API reports as unprocessed in this SUCCESSFUL response are retried.
             $unprocessed = $response->getUnprocessedRequests();
-            $remaining = self::requestsNotYetProcessed($chunk, $processed);
+            $remaining = self::itemsNotYetProcessed($chunk, $processed);
             if ($remaining === []) {
                 break;
             }
@@ -340,15 +345,19 @@ final class RequestQueueClient
     }
 
     /**
-     * @param list<RequestQueueRequest> $requests
+     * Sends one already-serialized chunk. The chunk's {@code json} strings — each already validated
+     * and encoded once in {@see batchAddRequests()} — are joined directly into the batch body, so
+     * nothing here is JSON-encoded a second time, including on a retry of the same chunk.
+     *
+     * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $chunk
      */
-    private function batchAddChunk(array $requests, bool $forefront): BatchAddResult
+    private function batchAddChunk(array $chunk, bool $forefront): BatchAddResult
     {
         $params = new QueryParams();
         $params->addBool('forefront', $forefront);
         $this->applyClientKey($params);
-        $payload = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), $requests);
-        $data = $this->ctx->postWithBody('requests/batch', $params, Json::encode($payload), ResourceContext::CONTENT_TYPE_JSON);
+        $body = '[' . implode(',', array_column($chunk, 'json')) . ']';
+        $data = $this->ctx->postWithBody('requests/batch', $params, $body, ResourceContext::CONTENT_TYPE_JSON);
 
         $rawProcessed = (isset($data['processedRequests']) && is_array($data['processedRequests'])) ? $data['processedRequests'] : [];
         $processed = array_map(
@@ -364,11 +373,11 @@ final class RequestQueueClient
     }
 
     /**
-     * @param list<RequestQueueRequest>        $chunk
-     * @param list<RequestQueueOperationInfo>  $processed
-     * @return list<RequestQueueRequest>
+     * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $chunk
+     * @param list<RequestQueueOperationInfo>                                     $processed
+     * @return list<array{request: RequestQueueRequest, json: string, bytes: int}>
      */
-    private static function requestsNotYetProcessed(array $chunk, array $processed): array
+    private static function itemsNotYetProcessed(array $chunk, array $processed): array
     {
         $processedKeys = [];
         foreach ($processed as $info) {
@@ -378,9 +387,9 @@ final class RequestQueueClient
             }
         }
         $remaining = [];
-        foreach ($chunk as $request) {
-            if (!isset($processedKeys[(string) $request->getUniqueKey()])) {
-                $remaining[] = $request;
+        foreach ($chunk as $item) {
+            if (!isset($processedKeys[(string) $item['request']->getUniqueKey()])) {
+                $remaining[] = $item;
             }
         }
         return $remaining;

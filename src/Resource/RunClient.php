@@ -8,6 +8,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\LogOptions;
@@ -63,11 +64,11 @@ final class RunClient
      * longer than the client will wait; the server additionally caps the wait at 60s. Returns
      * {@code null} if it does not exist.
      */
-    public function get(?int $waitForFinishSecs = null): ?ActorRun
+    public function get(?int $waitForFinishSecs = null, int|float|string|null $timeoutSecs = null): ?ActorRun
     {
         $params = new QueryParams();
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinishSecs));
-        $data = $this->ctx->getResource('', $params);
+        $data = $this->ctx->getResource('', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new ActorRun($data) : null;
     }
 
@@ -76,15 +77,15 @@ final class RunClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): ActorRun
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        return new ActorRun($this->ctx->updateResource('', $newFields));
+        return new ActorRun($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the run. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -189,6 +190,11 @@ final class RunClient
     /**
      * A client for this run's default dataset. Any {@code status}/{@code origin} filters pinned by a
      * last-run accessor are inherited so the correct run's dataset is resolved.
+     *
+     * This client has no ID of its own, so {@code get()}/{@code delete()} throw an {@see
+     * \Apify\Client\Exception\ApifyApiException} on a 404 instead of resolving to {@code null}/no-op:
+     * the response cannot tell a missing run apart from a missing dataset (matches the reference
+     * client's {@code catchNotFoundForResourceOrThrow}).
      */
     public function dataset(): DatasetClient
     {
@@ -198,6 +204,12 @@ final class RunClient
     /**
      * A client for this run's default key-value store. Any {@code status}/{@code origin} filters
      * pinned by a last-run accessor are inherited so the correct run's store is resolved.
+     *
+     * {@code get()}/{@code delete()} throw an {@see \Apify\Client\Exception\ApifyApiException} on a 404
+     * instead of resolving to {@code null}/no-op, since this client has no ID of its own and the 404
+     * could mean either the run or its store is gone. Record lookups such as {@see
+     * \Apify\Client\Resource\KeyValueStoreClient::getRecord()} are unaffected and still resolve to
+     * {@code null} for a missing record.
      */
     public function keyValueStore(): KeyValueStoreClient
     {
@@ -207,6 +219,12 @@ final class RunClient
     /**
      * A client for this run's default request queue. Any {@code status}/{@code origin} filters pinned
      * by a last-run accessor are inherited so the correct run's queue is resolved.
+     *
+     * {@code get()}/{@code delete()} throw an {@see \Apify\Client\Exception\ApifyApiException} on a 404
+     * instead of resolving to {@code null}/no-op, since this client has no ID of its own and the 404
+     * could mean either the run or its queue is gone. {@see
+     * \Apify\Client\Resource\RequestQueueClient::getRequest()} is unaffected and still resolves to
+     * {@code null} for a missing request.
      */
     public function requestQueue(): RequestQueueClient
     {
@@ -216,6 +234,10 @@ final class RunClient
     /**
      * A client for accessing this run's log. Any {@code status}/{@code origin} filters pinned by a
      * last-run accessor are inherited so the correct run's log is resolved.
+     *
+     * {@code get()} throws an {@see \Apify\Client\Exception\ApifyApiException} on a 404 instead of
+     * resolving to {@code null}, since this client has no ID of its own and the 404 could mean either
+     * the run or its log is gone (matches the reference client's {@code catchNotFoundForResourceOrThrow}).
      */
     public function log(): LogClient
     {

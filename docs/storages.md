@@ -22,7 +22,8 @@ Single — `$client->dataset($id)`:
 - `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. The iterator advances and terminates by the number of rows the API scanned (the `X-Apify-Pagination-Count` response header), not by the number of items a page returns, matching the reference JS client exactly — see the method's doc comment for why that matters with `skipEmpty`/`clean`/`unwind`.
 - `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string` — raw export bytes.
 - `pushItems(mixed $items): void`
-- `getStatistics(): ?array`
+- `getStatistics(): ?array` — throws if the dataset itself does not exist (a 404 here cannot mean
+  anything else).
 - `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null, ?DownloadItemsFormat $format = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`. `$format` selects the served output format (defaults to `json`).
 
 ```php

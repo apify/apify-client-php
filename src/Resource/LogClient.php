@@ -40,7 +40,13 @@ final class LogClient
         return new self($http, $ctx);
     }
 
-    /** Fetches the log as text, or {@code null} if the log does not exist. */
+    /**
+     * Fetches the log as text, or {@code null} if the log does not exist.
+     *
+     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::log()} or
+     * {@see \Apify\Client\Resource\BuildClient::log()}), a 404 is rethrown instead, since it could mean
+     * either the parent resource or the log is gone.
+     */
     public function get(?LogOptions $options = null): ?string
     {
         $params = new QueryParams();

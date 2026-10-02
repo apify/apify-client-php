@@ -9,6 +9,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\Signatures;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\KeyValueStore;
 use Apify\Client\Model\KeyValueStoreKey;
 use Apify\Client\Model\KeyValueStoreKeysPage;
@@ -52,10 +53,15 @@ final class KeyValueStoreClient
         return $this;
     }
 
-    /** Fetches the store metadata, or {@code null} if it does not exist. */
-    public function get(): ?KeyValueStore
+    /**
+     * Fetches the store metadata, or {@code null} if it does not exist.
+     *
+     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::keyValueStore()}),
+     * a 404 is rethrown instead, since it could mean either the parent resource or the store is gone.
+     */
+    public function get(int|float|string|null $timeoutSecs = null): ?KeyValueStore
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new KeyValueStore($data) : null;
     }
 
@@ -64,15 +70,18 @@ final class KeyValueStoreClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): KeyValueStore
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): KeyValueStore
     {
-        return new KeyValueStore($this->ctx->updateResource('', $newFields));
+        return new KeyValueStore($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /** Deletes the store. */
-    public function delete(): void
+    /**
+     * Deletes the store. A not-found is a no-op, unless this client was obtained without an ID (e.g.
+     * {@see \Apify\Client\Resource\RunClient::keyValueStore()}), in which case it is rethrown.
+     */
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /** Lists the keys stored in this key-value store. */

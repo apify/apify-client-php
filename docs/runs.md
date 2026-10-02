@@ -29,7 +29,9 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `charge(RunChargeOptions $options): void` — for pay-per-event Actors.
 - `waitForFinish(?int $waitSecs = null): ActorRun`
 - `dataset(): DatasetClient`, `keyValueStore(): KeyValueStoreClient`, `requestQueue(): RequestQueueClient`
-- `log(): LogClient`, `getStreamedLog(): StreamInterface`
+  — `get()`/`delete()` on these throw instead of resolving to `null`/no-op on a 404, since there is no
+  ID to pin the 404 to the run or the sub-resource.
+- `log(): LogClient`, `getStreamedLog(): StreamInterface` — `log()->get()` throws on a 404 for the same reason.
 
 ```php
 $run = $client->run('RUN_ID')->waitForFinish(120);

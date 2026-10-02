@@ -9,6 +9,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\Task;
 use Apify\Client\Options\LastRunOptions;
@@ -35,9 +36,9 @@ final class TaskClient
     }
 
     /** Fetches the task object, or {@code null} if it does not exist. */
-    public function get(): ?Task
+    public function get(int|float|string|null $timeoutSecs = null): ?Task
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Task($data) : null;
     }
 
@@ -46,15 +47,15 @@ final class TaskClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Task
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Task
     {
-        return new Task($this->ctx->updateResource('', $newFields));
+        return new Task($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the task. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -112,14 +113,17 @@ final class TaskClient
     }
 
     /**
-     * Fetches the task's stored input, or {@code null} if none is set.
+     * Fetches the task's stored input.
+     *
+     * Unlike {@see get()}, a 404 here is not swallowed: it is always rethrown, since the only way this
+     * fixed sub-path 404s is the task itself being gone (matching the reference client).
      *
      * @return mixed
      */
     public function getInput(): mixed
     {
-        $response = $this->ctx->getRaw('input', new QueryParams());
-        return $response === null ? null : Json::decode((string) $response->getBody());
+        $response = $this->ctx->getRawRequired('input', new QueryParams());
+        return Json::decode((string) $response->getBody());
     }
 
     /**

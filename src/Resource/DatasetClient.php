@@ -9,6 +9,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\Signatures;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Dataset;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\DatasetDownloadOptions;
@@ -51,10 +52,15 @@ final class DatasetClient
         return $this;
     }
 
-    /** Fetches the dataset metadata, or {@code null} if it does not exist. */
-    public function get(): ?Dataset
+    /**
+     * Fetches the dataset metadata, or {@code null} if it does not exist.
+     *
+     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::dataset()}),
+     * a 404 is rethrown instead, since it could mean either the parent resource or the dataset is gone.
+     */
+    public function get(int|float|string|null $timeoutSecs = null): ?Dataset
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Dataset($data) : null;
     }
 
@@ -63,15 +69,18 @@ final class DatasetClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Dataset
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Dataset
     {
-        return new Dataset($this->ctx->updateResource('', $newFields));
+        return new Dataset($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /** Deletes the dataset. */
-    public function delete(): void
+    /**
+     * Deletes the dataset. A not-found is a no-op, unless this client was obtained without an ID (e.g.
+     * {@see \Apify\Client\Resource\RunClient::dataset()}), in which case it is rethrown.
+     */
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -205,16 +214,16 @@ final class DatasetClient
     }
 
     /**
-     * Returns statistical information about the dataset, or {@code null} if unavailable.
+     * Returns statistical information about the dataset.
+     *
+     * Unlike {@see get()}, a 404 here is not swallowed: it is always rethrown, since the only way this
+     * fixed sub-path 404s is the dataset itself being gone (matching the reference client).
      *
      * @return array<string,mixed>|null
      */
     public function getStatistics(): ?array
     {
-        $response = $this->ctx->getRaw('statistics', new QueryParams());
-        if ($response === null) {
-            return null;
-        }
+        $response = $this->ctx->getRawRequired('statistics', new QueryParams());
         $decoded = Json::decodeData((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }
