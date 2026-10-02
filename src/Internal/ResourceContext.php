@@ -237,7 +237,9 @@ final class ResourceContext
      * "unbounded" (the API treats {@code limit=0} as unset). Mirrors the reference minForLimitParam.
      *
      * Public so {@see \Apify\Client\Resource\DatasetClient::iterateItems()} can reuse it for its own
-     * scanned-count-aware pagination loop. @internal
+     * scanned-count-aware pagination loop.
+     *
+     * @internal
      */
     public static function minLimit(?int $a, ?int $b): ?int
     {

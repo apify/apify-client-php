@@ -119,7 +119,7 @@ final class DatasetClient
         }
 
         $total = $page->getTotal();
-        $cap = min(($limit !== null && $limit > 0) ? $limit : $total, $total);
+        $cap = ($limit !== null && $limit > 0) ? $limit : $total;
         $pageScanned = $scanned ?? count($page->getItems());
         $currentOffset = $startOffset + $pageScanned;
         $remaining = min($total - $startOffset, $cap) - $pageScanned;
