@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Webhook;
 use Apify\Client\Model\WebhookDispatch;
 
@@ -22,9 +23,9 @@ final class WebhookClient
     }
 
     /** Fetches the webhook, or {@code null} if it does not exist. */
-    public function get(): ?Webhook
+    public function get(int|float|string|null $timeoutSecs = null): ?Webhook
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Webhook($data) : null;
     }
 
@@ -33,21 +34,23 @@ final class WebhookClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Webhook
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Webhook
     {
-        return new Webhook($this->ctx->updateResource('', $newFields));
+        return new Webhook($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the webhook. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /** Dispatches the webhook immediately and returns the resulting dispatch. */
-    public function test(): WebhookDispatch
+    public function test(int|float|string|null $timeoutSecs = null): WebhookDispatch
     {
-        return new WebhookDispatch($this->ctx->postWithBody('test', new QueryParams(), null, ''));
+        return new WebhookDispatch(
+            $this->ctx->postWithBody('test', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /** A client for this webhook's dispatch collection. */

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\ListOptions;
@@ -33,12 +34,12 @@ final class RunCollectionClient
      *
      * @return PaginationList<ActorRun>
      */
-    public function list(?ListOptions $options = null, ?RunListOptions $filter = null): PaginationList
+    public function list(?ListOptions $options = null, ?RunListOptions $filter = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new ListOptions())->appendTo($params);
         ($filter ?? new RunListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorRun($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorRun($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -48,14 +49,14 @@ final class RunCollectionClient
      *
      * @return Generator<int,ActorRun>
      */
-    public function iterate(?ListOptions $options = null, ?RunListOptions $filter = null, ?int $chunkSize = null): Generator
+    public function iterate(?ListOptions $options = null, ?RunListOptions $filter = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $filter),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $filter, $timeoutSecs),
         );
     }
 }

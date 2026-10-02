@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Actor;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\ActorListOptions;
@@ -28,11 +29,11 @@ final class ActorCollectionClient
      *
      * @return PaginationList<Actor>
      */
-    public function list(?ActorListOptions $options = null): PaginationList
+    public function list(?ActorListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new ActorListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new Actor($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new Actor($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -42,14 +43,14 @@ final class ActorCollectionClient
      *
      * @return Generator<int,Actor>
      */
-    public function iterate(?ActorListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?ActorListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ActorListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 
@@ -58,8 +59,8 @@ final class ActorCollectionClient
      *
      * @param mixed $actor any JSON-serializable Actor definition
      */
-    public function create(mixed $actor): Actor
+    public function create(mixed $actor, int|float|string|null $timeoutSecs = null): Actor
     {
-        return new Actor($this->ctx->createResource(new QueryParams(), $actor));
+        return new Actor($this->ctx->createResource(new QueryParams(), $actor, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 }

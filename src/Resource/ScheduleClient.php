@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Schedule;
 
 /** A client for a specific schedule ({@code /v2/schedules/{scheduleId}}). */
@@ -21,9 +22,9 @@ final class ScheduleClient
     }
 
     /** Fetches the schedule, or {@code null} if it does not exist. */
-    public function get(): ?Schedule
+    public function get(int|float|string|null $timeoutSecs = null): ?Schedule
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Schedule($data) : null;
     }
 
@@ -32,21 +33,26 @@ final class ScheduleClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Schedule
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Schedule
     {
-        return new Schedule($this->ctx->updateResource('', $newFields));
+        return new Schedule($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the schedule. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
-    /** Fetches the schedule's invocation log as text, or {@code null} if absent. */
-    public function getLog(): ?string
+    /**
+     * Fetches the schedule's invocation log as text (an empty string if there is no log yet).
+     *
+     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
+     * this fixed sub-path 404s is the schedule itself being gone (matching the reference client). The
+     * return type is therefore never {@code null}.
+     */
+    public function getLog(int|float|string|null $timeoutSecs = null): string
     {
-        $response = $this->ctx->getRaw('log', new QueryParams());
-        return $response === null ? null : (string) $response->getBody();
+        return (string) $this->ctx->getRawRequired('log', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG))->getBody();
     }
 }

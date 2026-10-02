@@ -76,8 +76,8 @@ final class ScheduleIntegrationTest extends IntegrationTestCase
             self::assertNotNull($schedule->get());
             $updated = $schedule->update(['cronExpression' => '0 12 * * *']);
             self::assertSame('0 12 * * *', $updated->getCronExpression());
-            // A fresh schedule may have no log yet (null), which is a valid result — we only assert
-            // the call itself succeeds.
+            // A fresh schedule may have no invocations yet (an empty string), which is a valid result
+            // — we only assert the call itself succeeds.
             $schedule->getLog();
         } finally {
             $client->schedule((string) $sch->getId())->delete();

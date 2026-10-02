@@ -62,20 +62,72 @@ $configured = new ApifyClient(
 | Argument | Default | Meaning |
 |---|---|---|
 | `token` | `null` | API token, sent as a Bearer token. |
-| `baseUrl` | `https://api.apify.com` | API base URL; the `/v2` suffix is appended automatically. |
-| `publicBaseUrl` | `baseUrl` | Base URL used when building public, shareable resource URLs. |
+| `baseUrl` | `https://api.apify.com` | API base URL, with or without the trailing `/v2` version path — appended automatically when not already present. |
+| `publicBaseUrl` | `baseUrl` | Base URL used when building public, shareable resource URLs. Like `baseUrl`, `/v2` is appended when absent. |
 | `maxRetries` | `8` | Maximum retries for failed requests. |
 | `minDelayBetweenRetriesMillis` | `500` | Minimum delay between retries (exponential backoff). |
 | `maxDelayBetweenRetriesMillis` | `timeoutSecs × 1000` (360000) | Upper bound (milliseconds) on the growing inter-retry delay; defaults to the request timeout expressed in milliseconds. |
-| `timeoutSecs` | `360` | Overall per-request timeout. |
+| `timeoutSecs` | `360` | Overall per-request timeout, and the default duration of every timeout tier below that is left unset. |
+| `timeoutShortSecs` / `timeoutMediumSecs` / `timeoutLongSecs` | `timeoutSecs` | Duration (seconds) of the named timeout tier — see [Timeout tiers](#timeout-tiers). |
+| `timeoutMaxSecs` | `timeoutSecs` | Upper bound on any single request's timeout, including a per-call override. |
+| `compression` | `null` (brotli, falling back to gzip) | Request-body compression: `'brotli'`, `'gzip'`, or a custom `HttpCompressorInterface` — see [HTTP compression](#http-compression). |
 | `userAgentSuffix` | `null` | Custom suffix appended to the `User-Agent` header. |
 | `httpClient` | Guzzle | The replaceable transport (`Apify\Client\Http\HttpClientInterface`). |
 
 Requests are retried on network errors, HTTP 429 (rate limit) and 5xx responses, with exponential
-backoff and jitter. Other 4xx responses are thrown immediately as `ApifyApiException`, with one
-exception: a resource-not-found 404 (the API's `record-not-found` / `record-or-token-not-found`
-error type) on a single-resource fetch is not thrown — `get()` returns `null` and `delete()` is
-treated as a successful no-op (see [Error handling](#error-handling)).
+backoff and jitter. Other 4xx responses are thrown immediately as an `ApifyApiException` subclass
+matching the status code, with one exception: a resource-not-found 404 on a single-resource fetch is
+not thrown — `get()` returns `null` and `delete()` is treated as a successful no-op (see
+[Error handling](#error-handling)).
+
+### Timeout tiers
+
+Every method that sends a request is assigned a timeout tier: `short` (metadata reads/writes, e.g.
+`get()`/`update()`/`delete()`), `medium` (listing/batch/trigger calls), or `long`
+(downloads/uploads/streaming). Each tier's duration defaults to the client's single `timeoutSecs`, so
+a client constructed without the tier options behaves exactly as before they existed; set
+`timeoutShortSecs`/`timeoutMediumSecs`/`timeoutLongSecs` to give a tier its own duration instead.
+
+Every method that sends a request additionally takes an optional trailing `$timeoutSecs`, overriding
+the tier for that one call — a number of seconds, a tier name (`'short'`/`'medium'`/`'long'`), or
+`'noTimeout'` for no request timeout at all:
+
+```php
+$client->actor('my-actor')->get(timeoutSecs: 10); // this call only, 10 seconds
+$client->dataset('my-dataset')->listItems(timeoutSecs: 'long'); // this call only, the 'long' tier
+$client->requestQueue('my-queue')->unlockRequests(timeoutSecs: 'noTimeout'); // no request timeout at all
+```
+
+`timeoutMaxSecs` caps every tier and every per-call override alike (defaulting to `timeoutSecs`), so
+raise it whenever a call legitimately needs longer than the default 360 seconds. A request-queue
+client's own `timeoutSecs` (`requestQueue(id, options)`) caps every tier and per-call override of
+calls made through that client specifically, on top of `timeoutMaxSecs`.
+
+### HTTP compression
+
+Request bodies above 1 KiB are compressed before being sent, unless their `Content-Type` already
+carries its own compression (`image/*`, `audio/*`, `video/*`, common archive/office/font formats) or
+the caller already set a `Content-Encoding` header. By default the client picks brotli when the
+optional PECL `brotli` extension is loaded, falling back to gzip (PHP's standard `zlib` extension)
+otherwise — compression is always best-effort, so a body is sent uncompressed rather than the request
+failing when neither codec is available.
+
+Pass `compression` to pick an algorithm explicitly, or an instance for a custom quality:
+
+```php
+use Apify\Client\Http\BrotliHttpCompressor;
+use Apify\Client\Http\GzipHttpCompressor;
+
+$client = new ApifyClient(token: 'my-api-token', compression: 'gzip');
+
+// A custom quality (brotli: 0-11, default 6; gzip: 1-9, default 6).
+$client = new ApifyClient(token: 'my-api-token', compression: new BrotliHttpCompressor(quality: 11));
+$client = new ApifyClient(token: 'my-api-token', compression: new GzipHttpCompressor(quality: 1));
+```
+
+A custom algorithm is any `Apify\Client\Http\HttpCompressorInterface` implementation (a
+`contentEncoding(): string` plus a `compress(string $body): ?string` that returns `null` to leave a
+body uncompressed).
 
 ### Replaceable HTTP transport
 
@@ -95,16 +147,44 @@ $client = new ApifyClient(token: 'my-api-token', httpClient: new Psr18HttpClient
 
 ## Error handling
 
-Methods that fetch a single resource return `null` when the resource does not exist (rather than
-throwing). Other API failures are thrown as `Apify\Client\Exception\ApifyApiException`:
+Methods that fetch a single resource by ID return `null` when the resource does not exist (rather
+than throwing), and `delete()` is a no-op for a resource that is already gone. Other API failures are
+thrown as `Apify\Client\Exception\ApifyApiException`, or one of its subclasses matching the response's
+HTTP status — `InvalidRequestException` (400), `UnauthorizedException` (401), `ForbiddenException`
+(403), `NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429), or
+`ServerException` (any 5xx) — so a `catch` block can branch on `instanceof` instead of comparing
+status codes or `getType()` strings. Any other status still throws a plain `ApifyApiException`, and
+every subclass extends it, so an existing `instanceof ApifyApiException` check keeps matching all of
+them:
 
 ```php
 try {
     $client->actor('does/not-exist')->update(['title' => 'x']);
+} catch (NotFoundException $e) {
+    // The Actor doesn't exist, or the token can't see it.
 } catch (ApifyApiException $e) {
     echo $e->getStatusCode() . ' ' . $e->getType() . ': ' . $e->getApiMessage() . PHP_EOL;
 }
 ```
+
+A 404 is swallowed (resolving to `null`/no-op) only when it can be pinned to the resource the call
+addresses. A resource client obtained *without* an ID — `RunClient::dataset()`/`keyValueStore()`/
+`requestQueue()`/`log()`, `BuildClient::log()` — throws instead, since the 404 there could mean either
+the parent run/build or the sub-resource is gone:
+
+```php
+try {
+    $client->run('missing-run-id')->dataset()->get();
+} catch (NotFoundException $e) {
+    // Either the run or its default dataset does not exist — the response cannot tell which.
+}
+```
+
+The same rule applies to a handful of fixed sub-paths whose only way to 404 is their parent being
+gone: `DatasetClient::getStatistics()`, `TaskClient::getInput()`, `ScheduleClient::getLog()`, and
+`BuildClient::getOpenApiDefinition()` always throw rather than returning `null`. Lookups by key, such
+as `KeyValueStoreClient::getRecord()`/`RequestQueueClient::getRequest()`, are unaffected and still
+resolve to `null` for a missing record/request.
 
 `ApifyApiException` extends `RuntimeException` and exposes:
 

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorEnvVar;
 
 /**
@@ -24,21 +25,23 @@ final class ActorEnvVarClient
     }
 
     /** Fetches the environment variable, or {@code null} if it does not exist. */
-    public function get(): ?ActorEnvVar
+    public function get(int|float|string|null $timeoutSecs = null): ?ActorEnvVar
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? ActorEnvVar::fromArray($data) : null;
     }
 
     /** Updates the environment variable and returns the updated object. */
-    public function update(ActorEnvVar $envVar): ActorEnvVar
+    public function update(ActorEnvVar $envVar, int|float|string|null $timeoutSecs = null): ActorEnvVar
     {
-        return ActorEnvVar::fromArray($this->ctx->updateResource('', $envVar->toArray()));
+        return ActorEnvVar::fromArray(
+            $this->ctx->updateResource('', $envVar->toArray(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT))
+        );
     }
 
     /** Deletes the environment variable. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 }

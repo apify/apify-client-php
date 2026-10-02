@@ -37,6 +37,10 @@ Addressed by ID or `username~name` (a `username/name` is accepted too).
 - `start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun` — start and return immediately.
 - `call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null): ActorRun` — start and wait.
 - `validateInput(mixed $input = null, ?ValidateInputOptions $options = null): bool`
+
+`$input` is a JSON-serializable array (the normal case), or a raw `string` of bytes sent exactly as
+given — pair a raw string with a non-default `$options->contentType` (e.g. a scraper that takes a
+plain-text URL list instead of JSON).
 - `build(string $versionNumber, ?ActorBuildOptions $options = null): Build`
 - `defaultBuild(?int $waitForFinish = null): BuildClient`
 - `lastRun(?LastRunOptions $options = null): RunClient`

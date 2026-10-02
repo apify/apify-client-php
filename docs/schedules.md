@@ -25,7 +25,8 @@ foreach ($client->schedules()->iterate(new ListOptions(), 50) as $s) {
 ## A single schedule — `$client->schedule($id)`
 
 - `get(): ?Schedule`, `update(mixed $newFields): Schedule`, `delete(): void`
-- `getLog(): ?string` — the schedule's invocation log, or `null` if absent.
+- `getLog(): string` — the schedule's invocation log (an empty string if there is no log yet). Throws
+  if the schedule itself does not exist (a 404 here cannot mean anything else).
 
 ```php
 $updated = $client->schedule('SCHEDULE_ID')->update(['cronExpression' => '0 12 * * *']);

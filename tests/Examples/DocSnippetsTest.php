@@ -75,6 +75,7 @@ final class DocSnippetsTest extends TestCase
             'Apify\Client\Model\RequestQueueRequest',
             'Apify\Client\Model\ActorEnvVar',
             'Apify\Client\Exception\ApifyApiException',
+            'Apify\Client\Exception\NotFoundException',
             'Apify\Client\Http\GuzzleHttpClient',
             'Apify\Client\Http\Psr18HttpClient',
             'Apify\Client\Options\ActorListOptions',

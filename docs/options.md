@@ -189,6 +189,10 @@ For `dataset()->listItems()`, `iterateItems()`, and `createItemsPublicUrl()`.
 
 Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
 
+`createItemsPublicUrl()` also takes a separate `?DownloadItemsFormat $format` parameter (not a
+`DatasetListItemsOptions` field), selecting the output format served by the generated URL — defaults
+to `json` when omitted.
+
 ### `DatasetDownloadOptions`
 For `dataset()->downloadItems()` (export formatting on top of the filtering above).
 | Field | Type | Description |

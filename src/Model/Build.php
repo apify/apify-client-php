@@ -49,6 +49,16 @@ final class Build extends ApifyResource
         return $this->getString('buildNumber');
     }
 
+    /**
+     * Digest of the built Docker image manifest, without the {@code sha256:} prefix, or
+     * {@code null} if unavailable. Compare the digests of two builds to tell whether their image
+     * contents differ.
+     */
+    public function getImageDigest(): ?string
+    {
+        return $this->getString('imageDigest');
+    }
+
     /** Whether the build has reached a terminal (finished) status. */
     public function isTerminal(): bool
     {

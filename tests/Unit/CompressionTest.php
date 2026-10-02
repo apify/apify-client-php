@@ -151,6 +151,35 @@ final class CompressionTest extends TestCase
         ));
     }
 
+    /**
+     * @return array<string,array{0:string,1:bool}>
+     */
+    public static function contentTypeProvider(): array
+    {
+        return [
+            'null content type is compressible' => ['', true],
+            'json is compressible' => ['application/json', true],
+            'json with charset param is compressible' => ['application/json; charset=utf-8', true],
+            'octet-stream is compressible (unknown binary)' => ['application/octet-stream', true],
+            'png is not compressible' => ['image/png', false],
+            'mp4 is not compressible' => ['video/mp4', false],
+            'mp3 is not compressible' => ['audio/mpeg', false],
+            'zip is not compressible' => ['application/zip', false],
+            'docx is not compressible' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', false],
+            'woff2 font is not compressible' => ['font/woff2', false],
+            'bmp raw image is still compressible' => ['image/bmp', true],
+            'wav raw audio is still compressible' => ['audio/wav', true],
+            'svg+xml structured suffix is compressible' => ['image/svg+xml', true],
+            'case-insensitive match' => ['IMAGE/PNG', false],
+        ];
+    }
+
+    /** @dataProvider contentTypeProvider */
+    public function testIsCompressibleContentType(string $contentType, bool $expected): void
+    {
+        self::assertSame($expected, Compression::isCompressibleContentType($contentType === '' ? null : $contentType));
+    }
+
     private static function decode(string $encoding, string $data): string
     {
         if ($encoding === 'br') {

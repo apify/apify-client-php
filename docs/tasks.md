@@ -28,11 +28,12 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
   setting `isPublic` through `update()`. Both require write permission to the task's Actor;
   publishing additionally requires the Actor to be public and the task's
   `publicConfig.inputSchemaFields`/`publicConfig.datasetView` to be set. An Actor can have up to 10
-  published tasks and an account up to 100 (contact Apify support to raise these limits); if the
-  conditions aren't met, the request fails and nothing is changed.
+  published tasks and an account up to 100; if the conditions aren't met, the request fails and
+  nothing is changed.
 - `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun`
 - `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun`
-- `getInput(): mixed`, `updateInput(mixed $input): mixed`
+- `getInput(): mixed` (throws if the task itself does not exist — a 404 here cannot mean anything
+  else), `updateInput(mixed $input): mixed`
 - `lastRun(?LastRunOptions $options = null): RunClient`
 - `runs(): RunCollectionClient`
 - `webhooks(): NestedWebhookCollectionClient` — read-only.

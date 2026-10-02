@@ -9,6 +9,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\Task;
 use Apify\Client\Options\LastRunOptions;
@@ -35,9 +36,9 @@ final class TaskClient
     }
 
     /** Fetches the task object, or {@code null} if it does not exist. */
-    public function get(): ?Task
+    public function get(int|float|string|null $timeoutSecs = null): ?Task
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Task($data) : null;
     }
 
@@ -46,15 +47,15 @@ final class TaskClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Task
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Task
     {
-        return new Task($this->ctx->updateResource('', $newFields));
+        return new Task($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the task. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -63,9 +64,9 @@ final class TaskClient
      *
      * To publish, the task's Actor must be public and its {@code publicConfig.inputSchemaFields}
      * and {@code publicConfig.datasetView} must be set. An Actor can have up to 10 published
-     * tasks and an account up to 100; contact Apify support to raise these limits. If any of
-     * these conditions are not met, the request fails and nothing is changed (including fields
-     * unrelated to publishing). Publishing an already published task does nothing.
+     * tasks and an account up to 100. If any of these conditions are not met, the request fails
+     * and nothing is changed (including fields unrelated to publishing). Publishing an already
+     * published task does nothing.
      */
     public function publish(): Task
     {
@@ -91,12 +92,21 @@ final class TaskClient
      *
      * @param mixed $input optionally overrides the task's stored input ({@code null} to use it)
      */
-    public function start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun
-    {
+    public function start(
+        mixed $input = null,
+        ?TaskStartOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): ActorRun {
         $params = new QueryParams();
         ($options ?? new TaskStartOptions())->appendTo($params);
         $body = $input === null ? null : Json::encode($input);
-        return new ActorRun($this->ctx->postWithBody('runs', $params, $body, ResourceContext::CONTENT_TYPE_JSON));
+        return new ActorRun($this->ctx->postWithBody(
+            'runs',
+            $params,
+            $body,
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /**
@@ -112,14 +122,19 @@ final class TaskClient
     }
 
     /**
-     * Fetches the task's stored input, or {@code null} if none is set.
+     * Fetches the task's stored input.
+     *
+     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
+     * this fixed sub-path 404s is the task itself being gone (matching the reference client). A
+     * {@code null} return means the task's stored input JSON itself decoded to {@code null} (or the
+     * response body was empty) — not a missing task, which throws.
      *
      * @return mixed
      */
-    public function getInput(): mixed
+    public function getInput(int|float|string|null $timeoutSecs = null): mixed
     {
-        $response = $this->ctx->getRaw('input', new QueryParams());
-        return $response === null ? null : Json::decode((string) $response->getBody());
+        $response = $this->ctx->getRawRequired('input', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
+        return Json::decode((string) $response->getBody());
     }
 
     /**
@@ -128,13 +143,14 @@ final class TaskClient
      * @param mixed $input any JSON-serializable value
      * @return mixed
      */
-    public function updateInput(mixed $input): mixed
+    public function updateInput(mixed $input, int|float|string|null $timeoutSecs = null): mixed
     {
         $response = $this->http->call(
             'PUT',
             $this->ctx->subUrl('input'),
             Json::encode($input),
-            ResourceContext::CONTENT_TYPE_JSON
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
         return Json::decode((string) $response->getBody());
     }

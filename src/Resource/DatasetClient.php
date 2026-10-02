@@ -9,6 +9,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\Signatures;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Dataset;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\DatasetDownloadOptions;
@@ -51,10 +52,15 @@ final class DatasetClient
         return $this;
     }
 
-    /** Fetches the dataset metadata, or {@code null} if it does not exist. */
-    public function get(): ?Dataset
+    /**
+     * Fetches the dataset metadata, or {@code null} if it does not exist.
+     *
+     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::dataset()}),
+     * a 404 is rethrown instead, since it could mean either the parent resource or the dataset is gone.
+     */
+    public function get(int|float|string|null $timeoutSecs = null): ?Dataset
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Dataset($data) : null;
     }
 
@@ -63,15 +69,18 @@ final class DatasetClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Dataset
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Dataset
     {
-        return new Dataset($this->ctx->updateResource('', $newFields));
+        return new Dataset($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /** Deletes the dataset. */
-    public function delete(): void
+    /**
+     * Deletes the dataset. A not-found is a no-op, unless this client was obtained without an ID (e.g.
+     * {@see \Apify\Client\Resource\RunClient::dataset()}), in which case it is rethrown.
+     */
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -82,29 +91,10 @@ final class DatasetClient
      *
      * @return PaginationList<mixed>
      */
-    public function listItems(?DatasetListItemsOptions $options = null): PaginationList
+    public function listItems(?DatasetListItemsOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
-        $options ??= new DatasetListItemsOptions();
-        $params = new QueryParams();
-        $options->appendTo($params);
-        $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url);
-
-        $items = Json::decode((string) $response->getBody());
-        $items = is_array($items) ? array_values($items) : [];
-        $count = count($items);
-
-        return PaginationList::fromItems(
-            $items,
-            $this->headerInt($response, 'X-Apify-Pagination-Total', $count),
-            $this->headerInt($response, 'X-Apify-Pagination-Offset', 0),
-            $this->headerInt($response, 'X-Apify-Pagination-Limit', $count),
-            $count,
-            // Prefer the server-reported X-Apify-Pagination-Desc header (matches the reference JS
-            // client's `_createPaginationList`); fall back to the requested option when the header
-            // is absent, e.g. against an older API version that predates it.
-            $this->headerBool($response, 'X-Apify-Pagination-Desc', $options->desc ?? false),
-        );
+        $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
+        return $this->fetchItemsPage($options ?? new DatasetListItemsOptions(), $resolved)[0];
     }
 
     /**
@@ -116,27 +106,82 @@ final class DatasetClient
      * ({@code null} = the server default). All other {@see DatasetListItemsOptions} fields (field
      * selection, filtering, ordering) are applied to every page.
      *
-     * Note: item-dropping filters ({@code skipEmpty}, and {@code clean} which implies it) are applied
-     * after {@code offset}/{@code limit}, so a page can return fewer items than requested while
-     * {@code X-Apify-Pagination-Total} still reflects the raw total. Because the iterator advances
-     * the offset by the post-filter item count (matching the reference JS client), combining those
-     * filters with multi-page iteration can repeat items across overlapping windows or, if a whole
-     * offset window is filtered out, end iteration early and skip the remaining items. Iterate
-     * without those filters, or page explicitly with {@see listItems()} and filter client-side.
-     * ({@code skipHidden} only strips hidden fields from each item, not whole items, so it does not
-     * affect paging.)
+     * Item-dropping filters ({@code skipEmpty}, and {@code clean} which implies it) and {@code unwind}
+     * are applied after {@code offset}/{@code limit}, so a page's item count can land on either side of
+     * the number of rows the API actually scanned to produce it. The iterator therefore advances and
+     * terminates by the scanned count the API reports in the {@code X-Apify-Pagination-Count} header —
+     * never by the returned item count — matching the reference JS client exactly (including its
+     * fallback to the item count on a response that omits the header, e.g. behind a proxy that strips
+     * it). ({@code skipHidden} only strips hidden fields from each item, not whole items, so it does
+     * not affect paging.)
      *
      * @return Generator<int,mixed>
      */
-    public function iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new DatasetListItemsOptions();
-        return ResourceContext::paginateOffset(
-            $options->offset ?? 0,
-            $options->limit,
-            $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->listItems($options->withPagination($offset, $pageLimit)),
+        $startOffset = $options->offset ?? 0;
+        $limit = $options->limit;
+        $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
+
+        [$page, $scanned] = $this->fetchItemsPage($options->withPagination($startOffset, ResourceContext::minLimit($limit, $chunkSize)), $resolved);
+        foreach ($page->getItems() as $item) {
+            yield $item;
+        }
+
+        $total = $page->getTotal();
+        $cap = ($limit !== null && $limit > 0) ? $limit : $total;
+        $pageScanned = $scanned ?? count($page->getItems());
+        $currentOffset = $startOffset + $pageScanned;
+        $remaining = min($total - $startOffset, $cap) - $pageScanned;
+
+        // Guard on the previous page having scanned something, so an over-reported total terminates
+        // instead of looping forever.
+        while ($pageScanned > 0 && $remaining > 0) {
+            [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, ResourceContext::minLimit($remaining, $chunkSize)), $resolved);
+            foreach ($page->getItems() as $item) {
+                yield $item;
+            }
+            $pageScanned = $scanned ?? count($page->getItems());
+            $currentOffset += $pageScanned;
+            $remaining -= $pageScanned;
+        }
+    }
+
+    /**
+     * Fetches one page of dataset items and parses the pagination headers. Returns the page together
+     * with the {@code X-Apify-Pagination-Count} "scanned rows" count ({@code null} if the response
+     * omits the header), which {@see iterateItems()} uses to advance — see its doc comment.
+     *
+     * @return array{0:PaginationList<mixed>,1:?int}
+     */
+    private function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
+    {
+        $params = new QueryParams();
+        $options->appendTo($params);
+        $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
+        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs);
+
+        $items = Json::decode((string) $response->getBody());
+        $items = is_array($items) ? array_values($items) : [];
+        $count = count($items);
+
+        $page = PaginationList::fromItems(
+            $items,
+            $this->headerInt($response, 'X-Apify-Pagination-Total', $count),
+            $this->headerInt($response, 'X-Apify-Pagination-Offset', 0),
+            $this->headerInt($response, 'X-Apify-Pagination-Limit', $count),
+            $count,
+            // Prefer the server-reported X-Apify-Pagination-Desc header (matches the reference JS
+            // client's `_createPaginationList`); fall back to the requested option when the header
+            // is absent, e.g. against an older API version that predates it.
+            $this->headerBool($response, 'X-Apify-Pagination-Desc', $options->desc ?? false),
         );
+
+        $scannedHeader = $response->getHeaderLine('X-Apify-Pagination-Count');
+        $scanned = $scannedHeader === '' ? null : (int) $scannedHeader;
+
+        return [$page, $scanned];
     }
 
     /**
@@ -144,13 +189,16 @@ final class DatasetClient
      * Unlike {@see listItems()} (parsed items), this returns the items already serialized to JSON,
      * CSV, XLSX, XML, RSS or HTML — useful for exporting.
      */
-    public function downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string
-    {
+    public function downloadItems(
+        DownloadItemsFormat $format,
+        ?DatasetDownloadOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): string {
         $params = new QueryParams();
         $params->addString('format', $format->value);
         ($options ?? new DatasetDownloadOptions())->appendTo($params);
         $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url);
+        $response = $this->http->call('GET', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
         return (string) $response->getBody();
     }
 
@@ -159,28 +207,31 @@ final class DatasetClient
      *
      * @param mixed $items must serialize to a JSON object or an array of objects
      */
-    public function pushItems(mixed $items): void
+    public function pushItems(mixed $items, int|float|string|null $timeoutSecs = null): void
     {
         $url = $this->ctx->mergedParams(new QueryParams())->applyToUrl($this->ctx->subUrl('items'));
         $this->http->call(
             'POST',
             $url,
             Json::encode($items),
-            ResourceContext::CONTENT_TYPE_JSON_CHARSET
+            ResourceContext::CONTENT_TYPE_JSON_CHARSET,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)
         );
     }
 
     /**
-     * Returns statistical information about the dataset, or {@code null} if unavailable.
+     * Returns statistical information about the dataset.
+     *
+     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
+     * this fixed sub-path 404s is the dataset itself being gone (matching the reference client). A
+     * {@code null} return means the response body did not decode to an object — not a missing
+     * dataset, which throws.
      *
      * @return array<string,mixed>|null
      */
-    public function getStatistics(): ?array
+    public function getStatistics(int|float|string|null $timeoutSecs = null): ?array
     {
-        $response = $this->ctx->getRaw('statistics', new QueryParams());
-        if ($response === null) {
-            return null;
-        }
+        $response = $this->ctx->getRawRequired('statistics', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         $decoded = Json::decodeData((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }
@@ -191,13 +242,20 @@ final class DatasetClient
      * It fetches the dataset, and if the dataset exposes a URL-signing secret key (i.e. it is
      * private), appends an HMAC-SHA256 signature so the URL grants access without an API token.
      * {@code $expiresInSecs} optionally bounds the validity of a signed URL ({@code null} for
-     * non-expiring). The URL is built from the configured public base URL.
+     * non-expiring). {@code $format} selects the output format of the items served by the URL
+     * (defaults to {@code json} when omitted). The URL is built from the configured public base URL.
      */
-    public function createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null): string
-    {
+    public function createItemsPublicUrl(
+        ?DatasetListItemsOptions $options = null,
+        ?int $expiresInSecs = null,
+        ?DownloadItemsFormat $format = null,
+    ): string {
         $options ??= new DatasetListItemsOptions();
         $params = new QueryParams();
         $options->appendTo($params);
+        if ($format !== null) {
+            $params->addString('format', $format->value);
+        }
         // Only compute a signature when the caller did not already supply one, otherwise the URL
         // would carry two conflicting `signature` query params (mirrors KeyValueStoreClient::createKeysPublicUrl).
         if ($options->signature === null) {
