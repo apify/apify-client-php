@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Model\Task;
 use Apify\Client\Options\ListOptions;
@@ -28,11 +29,11 @@ final class TaskCollectionClient
      *
      * @return PaginationList<Task>
      */
-    public function list(?ListOptions $options = null): PaginationList
+    public function list(?ListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new ListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new Task($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new Task($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -42,14 +43,14 @@ final class TaskCollectionClient
      *
      * @return Generator<int,Task>
      */
-    public function iterate(?ListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?ListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 
@@ -58,8 +59,8 @@ final class TaskCollectionClient
      *
      * @param mixed $task any JSON-serializable task definition
      */
-    public function create(mixed $task): Task
+    public function create(mixed $task, int|float|string|null $timeoutSecs = null): Task
     {
-        return new Task($this->ctx->createResource(new QueryParams(), $task));
+        return new Task($this->ctx->createResource(new QueryParams(), $task, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 }

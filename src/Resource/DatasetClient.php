@@ -91,9 +91,10 @@ final class DatasetClient
      *
      * @return PaginationList<mixed>
      */
-    public function listItems(?DatasetListItemsOptions $options = null): PaginationList
+    public function listItems(?DatasetListItemsOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
-        return $this->fetchItemsPage($options ?? new DatasetListItemsOptions())[0];
+        $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
+        return $this->fetchItemsPage($options ?? new DatasetListItemsOptions(), $resolved)[0];
     }
 
     /**
@@ -116,13 +117,14 @@ final class DatasetClient
      *
      * @return Generator<int,mixed>
      */
-    public function iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new DatasetListItemsOptions();
         $startOffset = $options->offset ?? 0;
         $limit = $options->limit;
+        $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
 
-        [$page, $scanned] = $this->fetchItemsPage($options->withPagination($startOffset, ResourceContext::minLimit($limit, $chunkSize)));
+        [$page, $scanned] = $this->fetchItemsPage($options->withPagination($startOffset, ResourceContext::minLimit($limit, $chunkSize)), $resolved);
         foreach ($page->getItems() as $item) {
             yield $item;
         }
@@ -136,7 +138,7 @@ final class DatasetClient
         // Guard on the previous page having scanned something, so an over-reported total terminates
         // instead of looping forever.
         while ($pageScanned > 0 && $remaining > 0) {
-            [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, ResourceContext::minLimit($remaining, $chunkSize)));
+            [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, ResourceContext::minLimit($remaining, $chunkSize)), $resolved);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
@@ -153,12 +155,12 @@ final class DatasetClient
      *
      * @return array{0:PaginationList<mixed>,1:?int}
      */
-    private function fetchItemsPage(DatasetListItemsOptions $options): array
+    private function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
     {
         $params = new QueryParams();
         $options->appendTo($params);
         $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url);
+        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs);
 
         $items = Json::decode((string) $response->getBody());
         $items = is_array($items) ? array_values($items) : [];
@@ -187,13 +189,16 @@ final class DatasetClient
      * Unlike {@see listItems()} (parsed items), this returns the items already serialized to JSON,
      * CSV, XLSX, XML, RSS or HTML — useful for exporting.
      */
-    public function downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string
-    {
+    public function downloadItems(
+        DownloadItemsFormat $format,
+        ?DatasetDownloadOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): string {
         $params = new QueryParams();
         $params->addString('format', $format->value);
         ($options ?? new DatasetDownloadOptions())->appendTo($params);
         $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url);
+        $response = $this->http->call('GET', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
         return (string) $response->getBody();
     }
 
@@ -202,28 +207,31 @@ final class DatasetClient
      *
      * @param mixed $items must serialize to a JSON object or an array of objects
      */
-    public function pushItems(mixed $items): void
+    public function pushItems(mixed $items, int|float|string|null $timeoutSecs = null): void
     {
         $url = $this->ctx->mergedParams(new QueryParams())->applyToUrl($this->ctx->subUrl('items'));
         $this->http->call(
             'POST',
             $url,
             Json::encode($items),
-            ResourceContext::CONTENT_TYPE_JSON_CHARSET
+            ResourceContext::CONTENT_TYPE_JSON_CHARSET,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)
         );
     }
 
     /**
      * Returns statistical information about the dataset.
      *
-     * Unlike {@see get()}, a 404 here is not swallowed: it is always rethrown, since the only way this
-     * fixed sub-path 404s is the dataset itself being gone (matching the reference client).
+     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
+     * this fixed sub-path 404s is the dataset itself being gone (matching the reference client). A
+     * {@code null} return means the response body did not decode to an object — not a missing
+     * dataset, which throws.
      *
      * @return array<string,mixed>|null
      */
-    public function getStatistics(): ?array
+    public function getStatistics(int|float|string|null $timeoutSecs = null): ?array
     {
-        $response = $this->ctx->getRawRequired('statistics', new QueryParams());
+        $response = $this->ctx->getRawRequired('statistics', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         $decoded = Json::decodeData((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }

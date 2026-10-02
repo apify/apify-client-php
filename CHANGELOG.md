@@ -31,10 +31,13 @@
   literal `.`/`..` segment can still collapse to a different endpoint even without a `/` in the
   string. Matches the reference client's path-sanitization fix.
 - Added timeout tiers: the `ApifyClient` constructor takes optional `timeoutShortSecs`,
-  `timeoutMediumSecs`, `timeoutLongSecs`, and `timeoutMaxSecs` options, and the `get()`/`update()`/
-  `delete()` methods of every resource client take an optional trailing `$timeoutSecs` (a number of
-  seconds, a tier name, or `'noTimeout'`) that overrides the default for that call. Every tier
-  defaults to the existing `timeoutSecs`, so a client built without the new options is unaffected.
+  `timeoutMediumSecs`, `timeoutLongSecs`, and `timeoutMaxSecs` options, and every method that sends a
+  request takes an optional trailing `$timeoutSecs` (a number of seconds, a tier name, or
+  `'noTimeout'` for no timeout at all) that overrides the tier for that call — metadata reads/writes
+  use `short`, listing/batch/trigger calls use `medium`, downloads/uploads/streaming use `long`. Every
+  tier defaults to the existing `timeoutSecs`, so a client built without the new options sends every
+  request with exactly the timeout it always has. A request-queue client's own `timeoutSecs`
+  (`requestQueue(id, options)`) continues to cap every tier and per-call override for that client.
 - Added a `compression` option to the `ApifyClient` constructor: `'brotli'`, `'gzip'`, or a custom
   `HttpCompressorInterface` (new `BrotliHttpCompressor`/`GzipHttpCompressor` implementations let the
   compression quality be configured too). Left unset, the client keeps its existing best-effort
@@ -47,7 +50,11 @@
   version path without doubling it into `.../v2/v2`, matching the reference client.
 - `RequestQueueClient::batchAddRequests()` now serializes each request to JSON once up front instead
   of re-encoding it for the size check, the chunk split, and the request body, matching the reference
-  client's performance fix. Behavior and chunk boundaries are unchanged.
+  client's performance fix. The per-item size check now accounts for both brackets a single-item
+  batch body needs (matching the reference's exact accounting), so a request that fits only as the
+  sole member of its own batch is no longer rejected by one byte.
+- `ScheduleClient::getLog()` is no longer nullable (`string`, not `?string`): it always throws instead
+  of returning `null` when the schedule itself is gone, and otherwise always returns a string.
 
 ## 0.7.0
 

@@ -39,9 +39,11 @@ final class BuildClient
     }
 
     /** Aborts the build and returns its updated state. */
-    public function abort(): Build
+    public function abort(int|float|string|null $timeoutSecs = null): Build
     {
-        return new Build($this->ctx->postWithBody('abort', new QueryParams(), null, ''));
+        return new Build(
+            $this->ctx->postWithBody('abort', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /** Deletes the build. */
@@ -67,15 +69,17 @@ final class BuildClient
     /**
      * Returns the OpenAPI definition generated for the build.
      *
-     * Like the reference client, a 404 here is not swallowed: it is always rethrown, since the only
+     * Like the reference client, a 404 here is not swallowed: it always throws instead, since the only
      * way this fixed sub-path 404s is the build itself being gone (same rule as {@see
-     * \Apify\Client\Resource\DatasetClient::getStatistics()} and friends).
+     * \Apify\Client\Resource\DatasetClient::getStatistics()} and friends). A {@code null} return means
+     * the response body did not decode to an object — not a missing build, which throws.
      *
      * @return array<string,mixed>|null the raw OpenAPI document
      */
-    public function getOpenApiDefinition(): ?array
+    public function getOpenApiDefinition(int|float|string|null $timeoutSecs = null): ?array
     {
-        $decoded = Json::decode((string) $this->ctx->getRawRequired('openapi.json', new QueryParams())->getBody());
+        $response = $this->ctx->getRawRequired('openapi.json', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        $decoded = Json::decode((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }
 

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Options\LogOptions;
 use Psr\Http\Message\StreamInterface;
 
@@ -47,11 +48,11 @@ final class LogClient
      * {@see \Apify\Client\Resource\BuildClient::log()}), a 404 is rethrown instead, since it could mean
      * either the parent resource or the log is gone.
      */
-    public function get(?LogOptions $options = null): ?string
+    public function get(?LogOptions $options = null, int|float|string|null $timeoutSecs = null): ?string
     {
         $params = new QueryParams();
         ($options ?? new LogOptions())->appendTo($params);
-        $response = $this->ctx->getRaw('', $params);
+        $response = $this->ctx->getRaw('', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
         return $response === null ? null : (string) $response->getBody();
     }
 

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorEnvVar;
 use Apify\Client\Model\PaginationList;
 use Generator;
@@ -30,9 +31,14 @@ final class ActorEnvVarCollectionClient
      *
      * @return PaginationList<ActorEnvVar>
      */
-    public function list(): PaginationList
+    public function list(int|float|string|null $timeoutSecs = null): PaginationList
     {
-        return $this->ctx->listResource('', new QueryParams(), static fn (array $d) => ActorEnvVar::fromArray($d));
+        return $this->ctx->listResource(
+            '',
+            new QueryParams(),
+            static fn (array $d) => ActorEnvVar::fromArray($d),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        );
     }
 
     /**
@@ -42,23 +48,25 @@ final class ActorEnvVarCollectionClient
      *
      * @return Generator<int,ActorEnvVar>
      */
-    public function iterate(?int $chunkSize = null): Generator
+    public function iterate(?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         return ResourceContext::paginateOffset(
             0,
             null,
             $chunkSize,
-            function (int $offset, ?int $pageLimit) {
+            function (int $offset, ?int $pageLimit) use ($timeoutSecs) {
                 $params = new QueryParams();
                 $params->addInt('offset', $offset)->addInt('limit', $pageLimit);
-                return $this->ctx->listResource('', $params, static fn (array $d) => ActorEnvVar::fromArray($d));
+                return $this->ctx->listResource('', $params, static fn (array $d) => ActorEnvVar::fromArray($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
             },
         );
     }
 
     /** Creates a new environment variable. */
-    public function create(ActorEnvVar $envVar): ActorEnvVar
+    public function create(ActorEnvVar $envVar, int|float|string|null $timeoutSecs = null): ActorEnvVar
     {
-        return ActorEnvVar::fromArray($this->ctx->createResource(new QueryParams(), $envVar->toArray()));
+        return ActorEnvVar::fromArray(
+            $this->ctx->createResource(new QueryParams(), $envVar->toArray(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 }

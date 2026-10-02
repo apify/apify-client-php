@@ -92,12 +92,21 @@ final class TaskClient
      *
      * @param mixed $input optionally overrides the task's stored input ({@code null} to use it)
      */
-    public function start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun
-    {
+    public function start(
+        mixed $input = null,
+        ?TaskStartOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): ActorRun {
         $params = new QueryParams();
         ($options ?? new TaskStartOptions())->appendTo($params);
         $body = $input === null ? null : Json::encode($input);
-        return new ActorRun($this->ctx->postWithBody('runs', $params, $body, ResourceContext::CONTENT_TYPE_JSON));
+        return new ActorRun($this->ctx->postWithBody(
+            'runs',
+            $params,
+            $body,
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /**
@@ -115,14 +124,16 @@ final class TaskClient
     /**
      * Fetches the task's stored input.
      *
-     * Unlike {@see get()}, a 404 here is not swallowed: it is always rethrown, since the only way this
-     * fixed sub-path 404s is the task itself being gone (matching the reference client).
+     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
+     * this fixed sub-path 404s is the task itself being gone (matching the reference client). A
+     * {@code null} return means the task's stored input JSON itself decoded to {@code null} (or the
+     * response body was empty) — not a missing task, which throws.
      *
      * @return mixed
      */
-    public function getInput(): mixed
+    public function getInput(int|float|string|null $timeoutSecs = null): mixed
     {
-        $response = $this->ctx->getRawRequired('input', new QueryParams());
+        $response = $this->ctx->getRawRequired('input', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return Json::decode((string) $response->getBody());
     }
 
@@ -132,13 +143,14 @@ final class TaskClient
      * @param mixed $input any JSON-serializable value
      * @return mixed
      */
-    public function updateInput(mixed $input): mixed
+    public function updateInput(mixed $input, int|float|string|null $timeoutSecs = null): mixed
     {
         $response = $this->http->call(
             'PUT',
             $this->ctx->subUrl('input'),
             Json::encode($input),
-            ResourceContext::CONTENT_TYPE_JSON
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
         return Json::decode((string) $response->getBody());
     }

@@ -88,17 +88,20 @@ Every method that sends a request is assigned a timeout tier: `short` (metadata 
 a client constructed without the tier options behaves exactly as before they existed; set
 `timeoutShortSecs`/`timeoutMediumSecs`/`timeoutLongSecs` to give a tier its own duration instead.
 
-The `get()`/`update()`/`delete()` methods of every resource client additionally take an optional
-trailing `$timeoutSecs`, overriding the tier for that one call — a number of seconds, a tier name
-(`'short'`/`'medium'`/`'long'`), or `'noTimeout'` for no request timeout at all:
+Every method that sends a request additionally takes an optional trailing `$timeoutSecs`, overriding
+the tier for that one call — a number of seconds, a tier name (`'short'`/`'medium'`/`'long'`), or
+`'noTimeout'` for no request timeout at all:
 
 ```php
 $client->actor('my-actor')->get(timeoutSecs: 10); // this call only, 10 seconds
-$client->actor('my-actor')->get(timeoutSecs: 'long'); // this call only, the 'long' tier's duration
+$client->dataset('my-dataset')->listItems(timeoutSecs: 'long'); // this call only, the 'long' tier
+$client->requestQueue('my-queue')->unlockRequests(timeoutSecs: 'noTimeout'); // no request timeout at all
 ```
 
 `timeoutMaxSecs` caps every tier and every per-call override alike (defaulting to `timeoutSecs`), so
-raise it whenever a call legitimately needs longer than the default 360 seconds.
+raise it whenever a call legitimately needs longer than the default 360 seconds. A request-queue
+client's own `timeoutSecs` (`requestQueue(id, options)`) caps every tier and per-call override of
+calls made through that client specifically, on top of `timeoutMaxSecs`.
 
 ### HTTP compression
 
@@ -155,9 +158,6 @@ every subclass extends it, so an existing `instanceof ApifyApiException` check k
 them:
 
 ```php
-use Apify\Client\Exception\ApifyApiException;
-use Apify\Client\Exception\NotFoundException;
-
 try {
     $client->actor('does/not-exist')->update(['title' => 'x']);
 } catch (NotFoundException $e) {

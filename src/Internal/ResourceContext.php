@@ -207,11 +207,24 @@ final class ResourceContext
      * configured duration) against the client's configured {@see TimeoutTiers}, matching the reference
      * client's per-method tier assignment. See {@see TimeoutTiers} for the tiers and their defaults.
      *
+     * When this context carries its own timeout ({@see withTimeout()} — e.g. the per-queue {@code
+     * timeoutSecs} of {@code requestQueue(id, options)}), the tier-resolved value is additionally
+     * capped at it, matching the reference client ("caps the default tier of every request that queue
+     * client sends"). {@see TimeoutTiers::INFINITE_SECS} (from an explicit {@code 'noTimeout'}) is
+     * treated as unbounded for that comparison, so a context-level cap still applies to it, rather than
+     * "no timeout" winning outright over a cap the caller configured for a reason.
+     *
      * @param int|float|string|null $timeoutSecs
      */
-    public function resolveTimeout(int|float|string|null $timeoutSecs, string $defaultTier): ?float
+    public function resolveTimeout(int|float|string|null $timeoutSecs, string $defaultTier): float
     {
-        return $this->http->timeoutTiers()->resolve($timeoutSecs, $defaultTier);
+        $resolved = $this->http->timeoutTiers()->resolve($timeoutSecs, $defaultTier);
+        if ($this->requestTimeoutSecs === null) {
+            return $resolved;
+        }
+        $comparable = $resolved === TimeoutTiers::INFINITE_SECS ? INF : $resolved;
+        $capped = min($comparable, $this->requestTimeoutSecs);
+        return $capped === INF ? TimeoutTiers::INFINITE_SECS : $capped;
     }
 
     /**
@@ -221,9 +234,9 @@ final class ResourceContext
      * @param callable(array<string,mixed>):T $hydrate
      * @return PaginationList<T>
      */
-    public function listResource(string $subPath, QueryParams $params, callable $hydrate): PaginationList
+    public function listResource(string $subPath, QueryParams $params, callable $hydrate, ?float $timeoutSecs = null): PaginationList
     {
-        $data = $this->getResourceRequired($subPath, $params);
+        $data = $this->getResourceRequired($subPath, $params, $timeoutSecs);
         return PaginationList::fromData($data, $hydrate);
     }
 
@@ -251,8 +264,10 @@ final class ResourceContext
         }
 
         $total = $page->getTotal();
-        // Effective total cap: the smaller of the requested limit (0/null => all) and what exists.
-        $cap = min(($limit !== null && $limit > 0) ? $limit : $total, $total);
+        // Effective total cap: the requested limit (0/null => all, i.e. capped only by what exists).
+        // The outer bound by $total is redundant here: the next line's min($total - $startOffset, $cap)
+        // already bounds the result by $total (since $startOffset >= 0).
+        $cap = ($limit !== null && $limit > 0) ? $limit : $total;
         $currentOffset = $startOffset + count($items);
         // Items still to yield, bounded both by what remains after the start offset and by the cap.
         $remaining = min($total - $startOffset, $cap) - count($items);
@@ -301,10 +316,10 @@ final class ResourceContext
      *
      * @return array<string,mixed>
      */
-    public function createResource(QueryParams $params, mixed $body): array
+    public function createResource(QueryParams $params, mixed $body, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl(''));
-        $response = $this->http->call('POST', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->requestTimeoutSecs);
+        $response = $this->http->call('POST', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -316,16 +331,17 @@ final class ResourceContext
      * @param array<string,mixed>|null $schema
      * @return array<string,mixed>
      */
-    public function getOrCreateNamed(?string $name, ?array $schema = null): array
+    public function getOrCreateNamed(?string $name, ?array $schema = null, ?float $timeoutSecs = null): array
     {
         $params = new QueryParams();
         if ($name !== null && $name !== '') {
             $params->addString('name', $name);
         }
         $url = $params->applyToUrl($this->subUrl(''));
+        $effectiveTimeout = $this->effectiveTimeout($timeoutSecs);
         $response = $schema !== null
-            ? $this->http->call('POST', $url, Json::encode(['schema' => $schema]), self::CONTENT_TYPE_JSON, timeoutSecs: $this->requestTimeoutSecs)
-            : $this->http->call('POST', $url, timeoutSecs: $this->requestTimeoutSecs);
+            ? $this->http->call('POST', $url, Json::encode(['schema' => $schema]), self::CONTENT_TYPE_JSON, timeoutSecs: $effectiveTimeout)
+            : $this->http->call('POST', $url, timeoutSecs: $effectiveTimeout);
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -334,10 +350,10 @@ final class ResourceContext
      *
      * @return array<string,mixed>
      */
-    public function postWithBody(string $subPath, QueryParams $params, ?string $body, string $contentType): array
+    public function postWithBody(string $subPath, QueryParams $params, ?string $body, string $contentType, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->requestTimeoutSecs);
+        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -347,10 +363,10 @@ final class ResourceContext
      *
      * @return mixed
      */
-    public function postWithBodyNoEnvelope(string $subPath, QueryParams $params, ?string $body, string $contentType): mixed
+    public function postWithBodyNoEnvelope(string $subPath, QueryParams $params, ?string $body, string $contentType, ?float $timeoutSecs = null): mixed
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->requestTimeoutSecs);
+        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return Json::decode((string) $response->getBody());
     }
 
@@ -359,10 +375,10 @@ final class ResourceContext
      *
      * @return array<string,mixed>
      */
-    public function deleteWithBody(string $subPath, QueryParams $params, mixed $body): array
+    public function deleteWithBody(string $subPath, QueryParams $params, mixed $body, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('DELETE', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->requestTimeoutSecs);
+        $response = $this->http->call('DELETE', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -371,10 +387,10 @@ final class ResourceContext
      * this context addresses an ID-less chained resource ({@see $hasId}) and {@code $subPath} is the
      * resource itself ({@code ''}), in which case the 404 is rethrown (see {@see deleteResource()}).
      */
-    public function getRaw(string $subPath, QueryParams $params): ?ResponseInterface
+    public function getRaw(string $subPath, QueryParams $params, ?float $timeoutSecs = null): ?ResponseInterface
     {
         try {
-            return $this->getRawRequired($subPath, $params);
+            return $this->getRawRequired($subPath, $params, $timeoutSecs);
         } catch (ApifyApiException $e) {
             if (HttpClientCore::isNotFound($e) && $this->swallowsNotFound($subPath)) {
                 return null;
@@ -384,10 +400,10 @@ final class ResourceContext
     }
 
     /** GET returning the raw response (no data envelope). Propagates every error, including a 404. */
-    public function getRawRequired(string $subPath, QueryParams $params): ResponseInterface
+    public function getRawRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null): ResponseInterface
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        return $this->http->call('GET', $url, timeoutSecs: $this->requestTimeoutSecs);
+        return $this->http->call('GET', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
     }
 
     /**
@@ -402,11 +418,11 @@ final class ResourceContext
     }
 
     /** HEAD request; returns whether the resource exists. */
-    public function headExists(string $subPath, QueryParams $params): bool
+    public function headExists(string $subPath, QueryParams $params, ?float $timeoutSecs = null): bool
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
         try {
-            $this->http->call('HEAD', $url, timeoutSecs: $this->requestTimeoutSecs);
+            $this->http->call('HEAD', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
             return true;
         } catch (ApifyApiException $e) {
             if (HttpClientCore::isNotFound($e)) {

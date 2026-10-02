@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Resource;
 
 use Apify\Client\Internal\QueryParams;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Webhook;
 
 /**
@@ -19,8 +20,8 @@ final class WebhookCollectionClient extends AbstractWebhookCollectionClient
      *
      * @param mixed $webhook any JSON-serializable webhook definition
      */
-    public function create(mixed $webhook): Webhook
+    public function create(mixed $webhook, int|float|string|null $timeoutSecs = null): Webhook
     {
-        return new Webhook($this->ctx->createResource(new QueryParams(), $webhook));
+        return new Webhook($this->ctx->createResource(new QueryParams(), $webhook, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 }

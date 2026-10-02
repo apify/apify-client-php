@@ -93,11 +93,11 @@ final class RunClient
      * the current request before terminating; {@code false} aborts immediately. {@code null} omits
      * the parameter and lets the server apply its default (immediate abort).
      */
-    public function abort(?bool $gracefully = null): ActorRun
+    public function abort(?bool $gracefully = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
         $params = new QueryParams();
         $params->addBool('gracefully', $gracefully);
-        return new ActorRun($this->ctx->postWithBody('abort', $params, null, ''));
+        return new ActorRun($this->ctx->postWithBody('abort', $params, null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 
     /**
@@ -108,8 +108,12 @@ final class RunClient
      *                               sent exactly as given (pair it with a non-default
      *                               {@code $options->contentType}), or {@code null} for none
      */
-    public function metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun
-    {
+    public function metamorph(
+        string $targetActorId,
+        mixed $input = null,
+        ?MetamorphOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): ActorRun {
         $options ??= new MetamorphOptions();
         $params = new QueryParams();
         // Normalize the target Actor id to the URL-safe `username~actor-name` form (first `/`→`~`),
@@ -119,21 +123,31 @@ final class RunClient
             $params->addString('build', $options->build);
         }
         $body = ResourceContext::encodeInputBody($input);
-        return new ActorRun($this->ctx->postWithBody('metamorph', $params, $body, $options->contentTypeOrDefault()));
+        return new ActorRun($this->ctx->postWithBody(
+            'metamorph',
+            $params,
+            $body,
+            $options->contentTypeOrDefault(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /** Reboots the run (restarts its container while keeping the same run). */
-    public function reboot(): ActorRun
+    public function reboot(int|float|string|null $timeoutSecs = null): ActorRun
     {
-        return new ActorRun($this->ctx->postWithBody('reboot', new QueryParams(), null, ''));
+        return new ActorRun(
+            $this->ctx->postWithBody('reboot', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /** Resurrects a finished run, starting it again from the beginning. */
-    public function resurrect(?RunResurrectOptions $options = null): ActorRun
+    public function resurrect(?RunResurrectOptions $options = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
         $params = new QueryParams();
         ($options ?? new RunResurrectOptions())->appendTo($params);
-        return new ActorRun($this->ctx->postWithBody('resurrect', $params, null, ''));
+        return new ActorRun(
+            $this->ctx->postWithBody('resurrect', $params, null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /**
@@ -143,7 +157,7 @@ final class RunClient
      * An idempotency key is always sent (auto-generated if not provided), so a charge that is retried
      * by the transport is applied at most once, matching the reference client.
      */
-    public function charge(RunChargeOptions $options): void
+    public function charge(RunChargeOptions $options, int|float|string|null $timeoutSecs = null): void
     {
         if ($options->eventName === '') {
             throw new InvalidArgumentException('RunChargeOptions.eventName is required and must not be empty');
@@ -158,7 +172,7 @@ final class RunClient
             $this->ctx->subUrl('charge'),
             Json::encode($body),
             ResourceContext::CONTENT_TYPE_JSON,
-            null,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM),
             false,
             [self::CHARGE_IDEMPOTENCY_HEADER => $idempotencyKey]
         );

@@ -49,14 +49,14 @@ final class UserClient
      *
      * @return array<string,mixed>
      */
-    public function monthlyUsage(?string $date = null): array
+    public function monthlyUsage(?string $date = null, int|float|string|null $timeoutSecs = null): array
     {
         $this->requireMe();
         $params = new QueryParams();
         if ($date !== null && $date !== '') {
             $params->addString('date', $date);
         }
-        $data = $this->ctx->getResourceRequired('usage/monthly', $params);
+        $data = $this->ctx->getResourceRequired('usage/monthly', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? $data : [];
     }
 
@@ -65,10 +65,10 @@ final class UserClient
      *
      * @return array<string,mixed>
      */
-    public function limits(): array
+    public function limits(int|float|string|null $timeoutSecs = null): array
     {
         $this->requireMe();
-        $data = $this->ctx->getResourceRequired('limits', new QueryParams());
+        $data = $this->ctx->getResourceRequired('limits', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? $data : [];
     }
 
@@ -77,14 +77,15 @@ final class UserClient
      *
      * @param mixed $newLimits any JSON-serializable limits object
      */
-    public function updateLimits(mixed $newLimits): void
+    public function updateLimits(mixed $newLimits, int|float|string|null $timeoutSecs = null): void
     {
         $this->requireMe();
         $this->http->call(
             'PUT',
             $this->ctx->subUrl('limits'),
             Json::encode($newLimits),
-            ResourceContext::CONTENT_TYPE_JSON
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
     }
 

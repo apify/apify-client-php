@@ -6,6 +6,7 @@ namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\Json;
+use Apify\Client\Options\RequestQueueClientOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -90,6 +91,39 @@ final class TimeoutTiersTest extends TestCase
         $client->actor('a1')->get(timeoutSecs: 'long');
 
         self::assertSame([60.0], $transport->timeouts);
+    }
+
+    public function testNoTimeoutSendsZeroAsTheRequestTimeout(): void
+    {
+        // Guzzle (and the cURL option it sets) treats a 0.0 request timeout as "wait indefinitely",
+        // so 'noTimeout' must reach the transport as 0.0, not be silently coalesced back to a default.
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'a1']]));
+        $client = new ApifyClient(token: 't', timeoutSecs: 300, httpClient: $transport);
+
+        $client->actor('a1')->get(timeoutSecs: 'noTimeout');
+
+        self::assertSame([0.0], $transport->timeouts);
+    }
+
+    public function testPerQueueTimeoutCapsEvenAnExplicitNoTimeoutOverride(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['items' => []]]));
+        $client = new ApifyClient(token: 't', timeoutSecs: 300, httpClient: $transport);
+
+        $client->requestQueue('q1', new RequestQueueClientOptions(timeoutSecs: 5.0))->get(timeoutSecs: 'noTimeout');
+
+        self::assertSame([5.0], $transport->timeouts);
+    }
+
+    public function testPerQueueTimeoutCapsTheResolvedTierButDoesNotOverrideASmallerPerCallValue(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['items' => []]]));
+        $client = new ApifyClient(token: 't', timeoutSecs: 300, httpClient: $transport);
+
+        // The per-queue cap (5s) is above the explicit per-call override (2s), so the smaller value wins.
+        $client->requestQueue('q1', new RequestQueueClientOptions(timeoutSecs: 5.0))->get(timeoutSecs: 2);
+
+        self::assertSame([2.0], $transport->timeouts);
     }
 
     public function testUpdateAndDeleteAcceptThePerCallOverrideToo(): void

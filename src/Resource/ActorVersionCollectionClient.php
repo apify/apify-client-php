@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorVersion;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\ListOptions;
@@ -28,11 +29,11 @@ final class ActorVersionCollectionClient
      *
      * @return PaginationList<ActorVersion>
      */
-    public function list(?ListOptions $options = null): PaginationList
+    public function list(?ListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new ListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorVersion($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorVersion($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -42,14 +43,14 @@ final class ActorVersionCollectionClient
      *
      * @return Generator<int,ActorVersion>
      */
-    public function iterate(?ListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?ListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 
@@ -58,8 +59,8 @@ final class ActorVersionCollectionClient
      *
      * @param mixed $version any JSON-serializable version definition
      */
-    public function create(mixed $version): ActorVersion
+    public function create(mixed $version, int|float|string|null $timeoutSecs = null): ActorVersion
     {
-        return new ActorVersion($this->ctx->createResource(new QueryParams(), $version));
+        return new ActorVersion($this->ctx->createResource(new QueryParams(), $version, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 }

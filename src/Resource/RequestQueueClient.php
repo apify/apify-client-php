@@ -50,11 +50,16 @@ final class RequestQueueClient
         private HttpClientCore $http,
         private ResourceContext $ctx,
         private ?string $clientKey,
-        private ?float $timeoutSecs = null,
     ) {
     }
 
-    /** @internal */
+    /**
+     * @internal
+     *
+     * The per-queue {@code $options->timeoutSecs}, if given, is recorded on {@code $ctx} ({@see
+     * ResourceContext::withTimeout()}): every call this client makes resolves its timeout tier through
+     * {@see ResourceContext::resolveTimeout()}, which additionally caps the resolved value at it.
+     */
     public static function forId(
         HttpClientCore $http,
         string $baseUrl,
@@ -62,9 +67,8 @@ final class RequestQueueClient
         ?RequestQueueClientOptions $options = null
     ): self {
         $ctx = ResourceContext::single($http, $baseUrl, 'request-queues', $id);
-        $timeoutSecs = $options?->timeoutSecs;
-        $ctx->withTimeout($timeoutSecs);
-        return new self($http, $ctx, $options?->clientKey, $timeoutSecs);
+        $ctx->withTimeout($options?->timeoutSecs);
+        return new self($http, $ctx, $options?->clientKey);
     }
 
     /**
@@ -88,7 +92,7 @@ final class RequestQueueClient
      */
     public function withClientKey(string $clientKey): self
     {
-        return new self($this->http, $this->ctx, $clientKey, $this->timeoutSecs);
+        return new self($this->http, $this->ctx, $clientKey);
     }
 
     private function applyClientKey(QueryParams $params): QueryParams
@@ -134,28 +138,40 @@ final class RequestQueueClient
      * Returns the requests at the head (front) of the queue, up to {@code $limit} ({@code null} for
      * the server default).
      */
-    public function listHead(?int $limit = null): RequestQueueHead
+    public function listHead(?int $limit = null, int|float|string|null $timeoutSecs = null): RequestQueueHead
     {
         $params = new QueryParams();
         $params->addInt('limit', $limit);
         $this->applyClientKey($params);
-        return RequestQueueHead::fromData($this->ctx->getResourceRequired('head', $params));
+        return RequestQueueHead::fromData(
+            $this->ctx->getResourceRequired('head', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /** Adds a request to the queue. If {@code $forefront} is true, it is added to the front. */
-    public function addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo
+    public function addRequest(RequestQueueRequest $request, bool $forefront = false, int|float|string|null $timeoutSecs = null): RequestQueueOperationInfo
     {
         $params = new QueryParams();
         $params->addBool('forefront', $forefront);
         $this->applyClientKey($params);
-        $data = $this->ctx->postWithBody('requests', $params, Json::encode($request->toArray()), ResourceContext::CONTENT_TYPE_JSON);
+        $data = $this->ctx->postWithBody(
+            'requests',
+            $params,
+            Json::encode($request->toArray()),
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        );
         return new RequestQueueOperationInfo($data);
     }
 
     /** Fetches a request by ID, or {@code null} if it does not exist. */
-    public function getRequest(string $id): ?RequestQueueRequest
+    public function getRequest(string $id, int|float|string|null $timeoutSecs = null): ?RequestQueueRequest
     {
-        $data = $this->ctx->getResource('requests/' . ResourceContext::encodePathSegment($id), new QueryParams());
+        $data = $this->ctx->getResource(
+            'requests/' . ResourceContext::encodePathSegment($id),
+            new QueryParams(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
+        );
         return is_array($data) ? RequestQueueRequest::fromArray($data) : null;
     }
 
@@ -163,26 +179,32 @@ final class RequestQueueClient
      * Updates an existing request (identified by its ID field) and returns the operation info. If
      * {@code $forefront} is true, the request is moved to the front of the queue.
      */
-    public function updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo
+    public function updateRequest(RequestQueueRequest $request, bool $forefront = false, int|float|string|null $timeoutSecs = null): RequestQueueOperationInfo
     {
         $params = new QueryParams();
         $params->addBool('forefront', $forefront);
         $this->applyClientKey($params);
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment((string) $request->getId())));
-        $response = $this->http->call('PUT', $url, Json::encode($request->toArray()), ResourceContext::CONTENT_TYPE_JSON, timeoutSecs: $this->timeoutSecs);
+        $response = $this->http->call(
+            'PUT',
+            $url,
+            Json::encode($request->toArray()),
+            ResourceContext::CONTENT_TYPE_JSON,
+            timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        );
         $data = Json::decodeData((string) $response->getBody());
         return new RequestQueueOperationInfo(is_array($data) ? $data : []);
     }
 
     /** Deletes a request by ID. */
-    public function deleteRequest(string $id): void
+    public function deleteRequest(string $id, int|float|string|null $timeoutSecs = null): void
     {
         $params = $this->applyClientKey(new QueryParams());
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment($id)));
         try {
-            $this->http->call('DELETE', $url, timeoutSecs: $this->timeoutSecs);
+            $this->http->call('DELETE', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         } catch (ApifyApiException $e) {
             if (!HttpClientCore::isNotFound($e)) {
                 throw $e;
@@ -194,12 +216,14 @@ final class RequestQueueClient
      * Atomically returns and locks up to {@code $limit} requests from the head of the queue for
      * {@code $lockSecs} seconds.
      */
-    public function listAndLockHead(int $lockSecs, ?int $limit = null): LockedRequestQueueHead
+    public function listAndLockHead(int $lockSecs, ?int $limit = null, int|float|string|null $timeoutSecs = null): LockedRequestQueueHead
     {
         $params = new QueryParams();
         $params->addInt('lockSecs', $lockSecs)->addInt('limit', $limit);
         $this->applyClientKey($params);
-        return LockedRequestQueueHead::fromData($this->ctx->postWithBody('head/lock', $params, null, ''));
+        return LockedRequestQueueHead::fromData(
+            $this->ctx->postWithBody('head/lock', $params, null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /**
@@ -224,10 +248,12 @@ final class RequestQueueClient
     public function batchAddRequests(
         array $requests,
         bool $forefront = false,
-        ?BatchAddRequestsOptions $options = null
+        ?BatchAddRequestsOptions $options = null,
+        int|float|string|null $timeoutSecs = null
     ): BatchAddResult {
         $options ??= new BatchAddRequestsOptions();
         $requests = array_values($requests);
+        $resolvedTimeoutSecs = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM);
 
         $payloadSizeLimitBytes = self::MAX_PAYLOAD_SIZE_BYTES
             - (int) ceil(self::MAX_PAYLOAD_SIZE_BYTES * self::PAYLOAD_SAFETY_BUFFER_PERCENT);
@@ -249,21 +275,24 @@ final class RequestQueueClient
                 );
             }
             $json = Json::encode($request->toArray());
-            // +1 for the comma or closing bracket that follows this item in the batch body.
-            $bytes = strlen($json) + 1;
-            if ($bytes > $payloadSizeLimitBytes) {
+            // +2 for the opening and closing brackets a batch of this one request alone would need
+            // (`[` + json + `]`), matching the reference client's exact accounting: an item that only
+            // just fits as the sole member of its own batch must still be accepted.
+            if (strlen($json) + 2 > $payloadSizeLimitBytes) {
                 throw new InvalidArgumentException(sprintf(
                     'batchAddRequests: the request at index %d exceeds the maximum payload size (%d bytes)',
                     $i,
                     $payloadSizeLimitBytes
                 ));
             }
-            $serialized[] = ['request' => $request, 'json' => $json, 'bytes' => $bytes];
+            // +1 for the comma or closing bracket that follows this item once it sits inside a batch
+            // body alongside others (used by splitIntoBatches() below to size a multi-item batch).
+            $serialized[] = ['request' => $request, 'json' => $json, 'bytes' => strlen($json) + 1];
         }
 
         $merged = new BatchAddResult();
         foreach (self::splitIntoBatches($serialized, self::MAX_REQUESTS_PER_BATCH, $payloadSizeLimitBytes) as $chunk) {
-            $merged->merge($this->batchAddChunkWithRetries($chunk, $forefront, $options));
+            $merged->merge($this->batchAddChunkWithRetries($chunk, $forefront, $options, $resolvedTimeoutSecs));
         }
         return $merged;
     }
@@ -273,9 +302,11 @@ final class RequestQueueClient
      * fitting a JSON array body (items joined by commas between brackets) of at most
      * {@code $maxByteLength} bytes. Ports the reference client's {@code splitIntoJsonArrayBatches}.
      *
-     * Every item's {@code bytes} (pre-validated in {@see batchAddRequests()} to fit under
-     * {@code $maxByteLength} on its own) already includes the one extra byte it costs as either a
-     * separating comma or the batch's closing bracket, so only the opening bracket's byte is added here.
+     * Every item's {@code bytes} already includes the one extra byte it costs as either a separating
+     * comma or the batch's closing bracket, so only the opening bracket's byte is added here.
+     * {@see batchAddRequests()} pre-validates each item against a two-byte-larger bound (both the
+     * opening and closing bracket a lone-item batch would need), so an item that fits only as the sole
+     * member of its own batch is still accepted here, not rejected by this narrower one-byte margin.
      *
      * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $items
      * @return list<list<array{request: RequestQueueRequest, json: string, bytes: int}>>
@@ -303,7 +334,7 @@ final class RequestQueueClient
     /**
      * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $chunk
      */
-    private function batchAddChunkWithRetries(array $chunk, bool $forefront, BatchAddRequestsOptions $options): BatchAddResult
+    private function batchAddChunkWithRetries(array $chunk, bool $forefront, BatchAddRequestsOptions $options, ?float $timeoutSecs): BatchAddResult
     {
         $maxRetries = $options->maxUnprocessedRequestsRetries;
         $minDelayMillis = $options->minDelayBetweenUnprocessedRequestsRetriesMillis;
@@ -316,7 +347,7 @@ final class RequestQueueClient
 
         for ($attempt = 0; $attempt <= $maxRetries; $attempt++) {
             try {
-                $response = $this->batchAddChunk($remaining, $forefront);
+                $response = $this->batchAddChunk($remaining, $forefront, $timeoutSecs);
             } catch (ApifyApiException) {
                 // Matches the JS reference (which mandates consistent error handling): when the HTTP
                 // call fails and the transport did not (or was told not to) retry, the requests not yet
@@ -351,13 +382,13 @@ final class RequestQueueClient
      *
      * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $chunk
      */
-    private function batchAddChunk(array $chunk, bool $forefront): BatchAddResult
+    private function batchAddChunk(array $chunk, bool $forefront, ?float $timeoutSecs): BatchAddResult
     {
         $params = new QueryParams();
         $params->addBool('forefront', $forefront);
         $this->applyClientKey($params);
         $body = '[' . implode(',', array_column($chunk, 'json')) . ']';
-        $data = $this->ctx->postWithBody('requests/batch', $params, $body, ResourceContext::CONTENT_TYPE_JSON);
+        $data = $this->ctx->postWithBody('requests/batch', $params, $body, ResourceContext::CONTENT_TYPE_JSON, $timeoutSecs);
 
         $rawProcessed = (isset($data['processedRequests']) && is_array($data['processedRequests'])) ? $data['processedRequests'] : [];
         $processed = array_map(
@@ -424,7 +455,7 @@ final class RequestQueueClient
      * @throws InvalidArgumentException if {@code $requests} is empty, exceeds the per-call limit, or
      *         any entry is missing a non-empty id or uniqueKey
      */
-    public function batchDeleteRequests(array $requests): BatchDeleteResult
+    public function batchDeleteRequests(array $requests, int|float|string|null $timeoutSecs = null): BatchDeleteResult
     {
         $requests = array_values($requests);
         if ($requests === []) {
@@ -450,34 +481,42 @@ final class RequestQueueClient
 
         $params = $this->applyClientKey(new QueryParams());
         $payload = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), $requests);
-        return BatchDeleteResult::fromData($this->ctx->deleteWithBody('requests/batch', $params, $payload));
+        return BatchDeleteResult::fromData(
+            $this->ctx->deleteWithBody('requests/batch', $params, $payload, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /**
      * Lists the queue's requests with pagination.
      */
-    public function listRequests(?ListRequestsOptions $options = null): RequestQueueRequestsPage
+    public function listRequests(?ListRequestsOptions $options = null, int|float|string|null $timeoutSecs = null): RequestQueueRequestsPage
     {
         $options ??= new ListRequestsOptions();
         $options->validate();
         $params = new QueryParams();
         $options->appendTo($params);
         $this->applyClientKey($params);
-        return RequestQueueRequestsPage::fromData($this->ctx->getResourceRequired('requests', $params));
+        return RequestQueueRequestsPage::fromData(
+            $this->ctx->getResourceRequired('requests', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /**
      * Extends the lock on a request by {@code $lockSecs} seconds. If {@code $forefront} is true, the
      * request is moved to the front when its lock expires.
      */
-    public function prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): RequestLockInfo
-    {
+    public function prolongRequestLock(
+        string $id,
+        int $lockSecs,
+        bool $forefront = false,
+        int|float|string|null $timeoutSecs = null
+    ): RequestLockInfo {
         $params = new QueryParams();
         $params->addInt('lockSecs', $lockSecs)->addBool('forefront', $forefront);
         $this->applyClientKey($params);
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment($id) . '/lock'));
-        $response = $this->http->call('PUT', $url, null, '', timeoutSecs: $this->timeoutSecs);
+        $response = $this->http->call('PUT', $url, null, '', timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
         return RequestLockInfo::fromData(Json::decodeData((string) $response->getBody()));
     }
 
@@ -485,7 +524,7 @@ final class RequestQueueClient
      * Releases the lock on a request. If {@code $forefront} is true, the request is moved to the
      * front of the queue.
      */
-    public function deleteRequestLock(string $id, bool $forefront = false): void
+    public function deleteRequestLock(string $id, bool $forefront = false, int|float|string|null $timeoutSecs = null): void
     {
         $params = new QueryParams();
         $params->addBool('forefront', $forefront);
@@ -493,7 +532,7 @@ final class RequestQueueClient
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment($id) . '/lock'));
         try {
-            $this->http->call('DELETE', $url, timeoutSecs: $this->timeoutSecs);
+            $this->http->call('DELETE', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
         } catch (ApifyApiException $e) {
             if (!HttpClientCore::isNotFound($e)) {
                 throw $e;
@@ -502,10 +541,12 @@ final class RequestQueueClient
     }
 
     /** Releases all locks the client holds on this queue's requests. */
-    public function unlockRequests(): UnlockRequestsResult
+    public function unlockRequests(int|float|string|null $timeoutSecs = null): UnlockRequestsResult
     {
         $params = $this->applyClientKey(new QueryParams());
-        return UnlockRequestsResult::fromData($this->ctx->postWithBody('requests/unlock', $params, null, ''));
+        return UnlockRequestsResult::fromData(
+            $this->ctx->postWithBody('requests/unlock', $params, null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG))
+        );
     }
 
     /**
@@ -519,7 +560,7 @@ final class RequestQueueClient
      *
      * @return Generator<int,RequestQueueRequest>
      */
-    public function paginateRequests(?PaginateRequestsOptions $options = null): Generator
+    public function paginateRequests(?PaginateRequestsOptions $options = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new PaginateRequestsOptions();
         $options->validate();
@@ -541,7 +582,7 @@ final class RequestQueueClient
                 exclusiveStartId: $nextExclusiveStartId,
                 cursor: $nextCursor,
                 filter: $options->filter,
-            ));
+            ), $timeoutSecs);
 
             $items = $page->getItems();
             if ($items === []) {

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorStoreListItem;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\StoreListOptions;
@@ -28,11 +29,11 @@ final class StoreCollectionClient
      *
      * @return PaginationList<ActorStoreListItem>
      */
-    public function list(?StoreListOptions $options = null): PaginationList
+    public function list(?StoreListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new StoreListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorStoreListItem($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorStoreListItem($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -43,14 +44,14 @@ final class StoreCollectionClient
      *
      * @return Generator<int,ActorStoreListItem>
      */
-    public function iterate(?StoreListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?StoreListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new StoreListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 }

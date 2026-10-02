@@ -45,13 +45,14 @@ final class ScheduleClient
     }
 
     /**
-     * Fetches the schedule's invocation log as text.
+     * Fetches the schedule's invocation log as text (an empty string if there is no log yet).
      *
-     * Unlike {@see get()}, a 404 here is not swallowed: it is always rethrown, since the only way this
-     * fixed sub-path 404s is the schedule itself being gone (matching the reference client).
+     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
+     * this fixed sub-path 404s is the schedule itself being gone (matching the reference client). The
+     * return type is therefore never {@code null}.
      */
-    public function getLog(): ?string
+    public function getLog(int|float|string|null $timeoutSecs = null): string
     {
-        return (string) $this->ctx->getRawRequired('log', new QueryParams())->getBody();
+        return (string) $this->ctx->getRawRequired('log', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG))->getBody();
     }
 }

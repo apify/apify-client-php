@@ -155,12 +155,16 @@ final class HttpClientCore
         if ($body === null
             || self::hasHeader($extraHeaders, 'Content-Encoding')
             || !Compression::isCompressibleContentType($contentType)
-            || strlen($body) < Compression::MIN_COMPRESS_BYTES
         ) {
             return [$body, $extraHeaders];
         }
 
         if ($this->compressor !== null) {
+            // A configured compressor has no built-in size gate of its own (unlike
+            // Compression::maybeCompress() below), so it is applied here.
+            if (strlen($body) < Compression::MIN_COMPRESS_BYTES) {
+                return [$body, $extraHeaders];
+            }
             $compressedBody = $this->compressor->compress($body);
             if ($compressedBody === null) {
                 return [$body, $extraHeaders];

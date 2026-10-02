@@ -46,9 +46,11 @@ final class WebhookClient
     }
 
     /** Dispatches the webhook immediately and returns the resulting dispatch. */
-    public function test(): WebhookDispatch
+    public function test(int|float|string|null $timeoutSecs = null): WebhookDispatch
     {
-        return new WebhookDispatch($this->ctx->postWithBody('test', new QueryParams(), null, ''));
+        return new WebhookDispatch(
+            $this->ctx->postWithBody('test', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /** A client for this webhook's dispatch collection. */

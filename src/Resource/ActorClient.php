@@ -74,13 +74,22 @@ final class ActorClient
      *                      of bytes sent exactly as given — pair it with a non-default
      *                      {@code $options->contentType}
      */
-    public function start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun
-    {
+    public function start(
+        mixed $input = null,
+        ?ActorStartOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): ActorRun {
         $options ??= new ActorStartOptions();
         $params = new QueryParams();
         $options->appendTo($params);
         $body = ResourceContext::encodeInputBody($input);
-        return new ActorRun($this->ctx->postWithBody('runs', $params, $body, $options->contentTypeOrDefault()));
+        return new ActorRun($this->ctx->postWithBody(
+            'runs',
+            $params,
+            $body,
+            $options->contentTypeOrDefault(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /**
@@ -102,15 +111,24 @@ final class ActorClient
      * @param mixed $input a JSON-serializable array (or {@code null}), or a raw string of bytes sent
      *                      exactly as given — see {@see start()}
      */
-    public function validateInput(mixed $input = null, ?ValidateInputOptions $options = null): bool
-    {
+    public function validateInput(
+        mixed $input = null,
+        ?ValidateInputOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): bool {
         $options ??= new ValidateInputOptions();
         $params = new QueryParams();
         $options->appendTo($params);
         $body = ResourceContext::encodeInputBody($input);
         // The validate-input endpoint returns a bare {"valid": <bool>} object, not the standard
         // {"data": ...} envelope, so parse it without unwrapping.
-        $result = $this->ctx->postWithBodyNoEnvelope('validate-input', $params, $body, $options->contentTypeOrDefault());
+        $result = $this->ctx->postWithBodyNoEnvelope(
+            'validate-input',
+            $params,
+            $body,
+            $options->contentTypeOrDefault(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        );
         return is_array($result) && ($result['valid'] ?? false) === true;
     }
 
@@ -119,27 +137,36 @@ final class ActorClient
      *
      * @throws InvalidArgumentException if {@code $versionNumber} is empty
      */
-    public function build(string $versionNumber, ?ActorBuildOptions $options = null): Build
-    {
+    public function build(
+        string $versionNumber,
+        ?ActorBuildOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): Build {
         if ($versionNumber === '') {
             throw new InvalidArgumentException('ActorClient::build: $versionNumber must not be empty');
         }
         $params = new QueryParams();
         $params->addString('version', $versionNumber);
         ($options ?? new ActorBuildOptions())->appendTo($params);
-        return new Build($this->ctx->postWithBody('builds', $params, null, ResourceContext::CONTENT_TYPE_JSON));
+        return new Build($this->ctx->postWithBody(
+            'builds',
+            $params,
+            null,
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /**
      * Resolves the Actor's default build and returns a client for it. {@code $waitForFinish}
      * optionally bounds how long (seconds) the API waits for the build to finish before responding.
      */
-    public function defaultBuild(?int $waitForFinish = null): BuildClient
+    public function defaultBuild(?int $waitForFinish = null, int|float|string|null $timeoutSecs = null): BuildClient
     {
         $params = new QueryParams();
         // Clamp the server-side wait below the per-request timeout, consistent with run/build get().
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinish));
-        $data = $this->ctx->getResourceRequired('builds/default', $params);
+        $data = $this->ctx->getResourceRequired('builds/default', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         $build = new Build(is_array($data) ? $data : []);
         return new BuildClient($this->http, $this->baseUrl, (string) $build->getId());
     }

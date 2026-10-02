@@ -177,6 +177,48 @@ final class BatchAddRequestsTest extends TestCase
         self::assertCount(2, $firstBody); // byte limit, not the count limit, governed here
     }
 
+    /**
+     * A request whose JSON is exactly 2 bytes under the payload limit must be accepted: as the sole
+     * member of its own single-item batch body ("[" + json + "]"), it exactly fills the limit. Matches
+     * the reference client's exact `byteLength + 2 > limit` accounting (ported from `#1051`); a
+     * stricter `+1` margin would reject this request even though it fits.
+     */
+    public function testRequestExactlyAtThePerItemSizeBoundaryIsAccepted(): void
+    {
+        $limitBytes = 9 * 1024 * 1024 - (int) ceil(9 * 1024 * 1024 * 0.0001);
+
+        $probe = new RequestQueueRequest('https://x/boundary', 'boundary');
+        $baseLen = strlen(Json::encode($probe->toArray()));
+        // Grow `userData.pad` until the request's JSON is exactly 2 bytes under the limit.
+        $probe->setUserData(['pad' => '']);
+        $overhead = strlen(Json::encode($probe->toArray())) - $baseLen;
+        $padLen = $limitBytes - 2 - $baseLen - $overhead;
+        $probe->setUserData(['pad' => str_repeat('x', $padLen)]);
+        self::assertSame($limitBytes - 2, strlen(Json::encode($probe->toArray())), 'test setup: probe must land exactly 2 bytes under the limit');
+
+        $transport = (new MockTransport())->queueResponse(200, $this->batchResponse(['boundary']));
+        $result = $this->client($transport)->requestQueue('q1')->batchAddRequests([$probe]);
+
+        self::assertCount(1, $result->getProcessedRequests());
+    }
+
+    /** One byte over the boundary above, the same request must be rejected. */
+    public function testRequestOneByteOverThePerItemSizeBoundaryThrows(): void
+    {
+        $limitBytes = 9 * 1024 * 1024 - (int) ceil(9 * 1024 * 1024 * 0.0001);
+
+        $probe = new RequestQueueRequest('https://x/boundary', 'boundary');
+        $baseLen = strlen(Json::encode($probe->toArray()));
+        $probe->setUserData(['pad' => '']);
+        $overhead = strlen(Json::encode($probe->toArray())) - $baseLen;
+        $padLen = $limitBytes - 1 - $baseLen - $overhead;
+        $probe->setUserData(['pad' => str_repeat('x', $padLen)]);
+        self::assertSame($limitBytes - 1, strlen(Json::encode($probe->toArray())), 'test setup: probe must land exactly 1 byte under the limit');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->client(new MockTransport())->requestQueue('q1')->batchAddRequests([$probe]);
+    }
+
     public function testOversizedSingleRequestThrows(): void
     {
         $huge = str_repeat('x', 10 * 1024 * 1024); // > 9 MiB on its own
