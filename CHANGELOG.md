@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0
+
+- Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-10-01T153946Z`.
+- Added `Build::getImageDigest()`, exposing the built Docker image's manifest digest (`null` if
+  unavailable), per the spec's new `imageDigest` field.
+- Removed the stale "contact Apify support to raise these limits" sentence from
+  `TaskClient::publish()`'s doc comment and `docs/tasks.md`, matching the spec's updated
+  description. Behavior is unchanged.
+- `ActorClient::start()`/`call()`/`validateInput()` and `RunClient::metamorph()` now send a `string`
+  `$input` as raw bytes instead of JSON-encoding it, so it can be paired with a non-default
+  `$options->contentType` (matching the reference client's raw-bytes Actor input support). A
+  JSON-serializable array continues to be encoded to JSON as before.
+- Added an optional `?DownloadItemsFormat $format` parameter to `DatasetClient::createItemsPublicUrl()`,
+  selecting the output format served by the generated URL (defaults to `json`), matching the reference
+  client's `createItemsPublicUrl({ format })`.
+- Fixed `DatasetClient::iterateItems()` to advance and terminate by the number of rows the API
+  scanned (the `X-Apify-Pagination-Count` response header), not by the number of items a page
+  returns, falling back to the item count when a response omits the header. This matches the
+  reference client exactly: `skipEmpty`/`clean`/`unwind` can make a page's item count land on
+  either side of the scanned count, so the previous item-count-based advancement could repeat or
+  skip items across pages.
+
 ## 0.6.2
 
 - Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-09-28T115051Z`. No public

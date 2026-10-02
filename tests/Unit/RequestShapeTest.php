@@ -6,11 +6,14 @@ namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\Json;
+use Apify\Client\Options\ActorStartOptions;
 use Apify\Client\Options\DatasetListItemsOptions;
+use Apify\Client\Options\DownloadItemsFormat;
 use Apify\Client\Options\MetamorphOptions;
 use Apify\Client\Options\RequestQueueClientOptions;
 use Apify\Client\Options\RunChargeOptions;
 use Apify\Client\Options\RunResurrectOptions;
+use Apify\Client\Options\ValidateInputOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -55,6 +58,19 @@ final class RequestShapeTest extends TestCase
         self::assertStringContainsString('targetActorId=apify~other', $uri);
         self::assertStringContainsString('build=latest', $uri);
         self::assertSame(['x' => 1], Json::decode((string) $request->getBody()));
+    }
+
+    public function testMetamorphSendsRawStringInputAsIs(): void
+    {
+        // A string $input is sent exactly as given (raw bytes), not JSON-encoded, so it can be
+        // paired with a non-default contentType — matching the reference client's raw-bytes Actor
+        // input support (ActorClient::start() is covered the same way below).
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'r']]));
+        $this->client($transport)->run('run1')->metamorph('apify/other', 'col_a,col_b\n1,2', new MetamorphOptions(contentType: 'text/csv'));
+
+        $request = $transport->lastRequest();
+        self::assertSame('text/csv', $request->getHeaderLine('Content-Type'));
+        self::assertSame('col_a,col_b\n1,2', (string) $request->getBody());
     }
 
     public function testMetamorphNormalizesSlashFormTargetActorId(): void
@@ -142,6 +158,46 @@ final class RequestShapeTest extends TestCase
         self::assertSame(2.0, $transport->timeouts[0]);
     }
 
+    public function testActorStartSendsRawStringInputAsIs(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'r']]));
+        $this->client($transport)->actor('me~a')->start('https://a.com\nhttps://b.com', new ActorStartOptions(contentType: 'text/plain'));
+
+        $request = $transport->lastRequest();
+        self::assertSame('text/plain', $request->getHeaderLine('Content-Type'));
+        self::assertSame('https://a.com\nhttps://b.com', (string) $request->getBody());
+    }
+
+    public function testActorStartJsonEncodesArrayInput(): void
+    {
+        // The normal case (an associative array) still goes through Json::encode(), unaffected by
+        // the raw-string passthrough added for raw-bytes input.
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'r']]));
+        $this->client($transport)->actor('me~a')->start(['url' => 'https://a.com']);
+
+        self::assertSame(['url' => 'https://a.com'], Json::decode((string) $transport->lastRequest()->getBody()));
+    }
+
+    public function testValidateInputSendsRawStringInputAsIs(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['valid' => true]));
+        $this->client($transport)->actor('me~a')->validateInput('raw-body', new ValidateInputOptions(contentType: 'text/plain'));
+
+        $request = $transport->lastRequest();
+        self::assertSame('text/plain', $request->getHeaderLine('Content-Type'));
+        self::assertSame('raw-body', (string) $request->getBody());
+    }
+
+    public function testCreateItemsPublicUrlIncludesFormat(): void
+    {
+        $transport = new MockTransport();
+        $url = $this->client($transport)
+            ->dataset('ds1')
+            ->createItemsPublicUrl(new DatasetListItemsOptions(signature: 'caller-sig'), format: DownloadItemsFormat::CSV);
+
+        self::assertStringContainsString('format=csv', $url);
+    }
+
     public function testCreateItemsPublicUrlDoesNotDuplicateCallerSignature(): void
     {
         // When the caller already supplies a signature, the client must not fetch the dataset to
@@ -166,6 +222,25 @@ final class RequestShapeTest extends TestCase
         $url = $this->client($transport)->dataset('ds1')->createItemsPublicUrl();
 
         self::assertSame(1, substr_count($url, 'signature='));
+    }
+
+    public function testBuildGetExposesImageDigest(): void
+    {
+        $transport = (new MockTransport())->queueResponse(
+            200,
+            Json::encode(['data' => ['id' => 'b1', 'imageDigest' => 'abc123']])
+        );
+        $build = $this->client($transport)->build('b1')->get();
+
+        self::assertSame('abc123', $build?->getImageDigest());
+    }
+
+    public function testBuildGetImageDigestIsNullWhenAbsent(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'b1']]));
+        $build = $this->client($transport)->build('b1')->get();
+
+        self::assertNull($build?->getImageDigest());
     }
 
     public function testUpdateLimitsPutsToMeLimits(): void

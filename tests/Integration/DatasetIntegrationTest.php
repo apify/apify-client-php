@@ -114,6 +114,9 @@ final class DatasetIntegrationTest extends IntegrationTestCase
             $url = $dataset->createItemsPublicUrl(new DatasetListItemsOptions());
             self::assertNotSame('', $url);
 
+            $csvUrl = $dataset->createItemsPublicUrl(new DatasetListItemsOptions(), format: DownloadItemsFormat::CSV);
+            self::assertStringContainsString('format=csv', $csvUrl);
+
             $dataset->getStatistics();
 
             $updated = $dataset->update(['name' => self::uniqueName('ds-renamed')]);

@@ -235,8 +235,11 @@ final class ResourceContext
     /**
      * Returns the smaller of two optional positive bounds, treating {@code null} or {@code 0} as
      * "unbounded" (the API treats {@code limit=0} as unset). Mirrors the reference minForLimitParam.
+     *
+     * Public so {@see \Apify\Client\Resource\DatasetClient::iterateItems()} can reuse it for its own
+     * scanned-count-aware pagination loop. @internal
      */
-    private static function minLimit(?int $a, ?int $b): ?int
+    public static function minLimit(?int $a, ?int $b): ?int
     {
         if ($a === 0) {
             $a = null;
@@ -459,6 +462,25 @@ final class ResourceContext
     private static function asArray(mixed $value): array
     {
         return is_array($value) ? $value : [];
+    }
+
+    /**
+     * Encodes an Actor run input body for {@code ActorClient::start()/validateInput()} and
+     * {@code RunClient::metamorph()}: {@code null} stays {@code null}, a {@code string} is sent as
+     * raw bytes exactly as given (pair it with a non-default {@code contentType}), and anything else
+     * — the normal case, an associative array — is JSON-encoded.
+     *
+     * Mirrors the reference client's {@code ActorInput}, which accepts a plain object/array of them
+     * (serialized to JSON) or raw bytes such as a {@code Buffer} (sent as they are). A PHP string is
+     * this client's idiomatic stand-in for the reference client's raw-bytes case, since PHP strings
+     * are already byte sequences and the language has no separate binary-buffer type.
+     */
+    public static function encodeInputBody(mixed $input): ?string
+    {
+        if ($input === null) {
+            return null;
+        }
+        return is_string($input) ? $input : Json::encode($input);
     }
 
     // ---- URL / id helpers -----------------------------------------------------

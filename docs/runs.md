@@ -23,7 +23,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `update(mixed $newFields): ActorRun`
 - `delete(): void`
 - `abort(?bool $gracefully = null): ActorRun` — aborts the run; with `$gracefully` `true` the run is signalled so it can finish its current request before terminating, `false` aborts immediately, and `null` (the default) lets the server apply its default (immediate abort).
-- `metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun`
+- `metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun` — `$input` accepts the same shapes as `ActorClient::start()`'s (a JSON-serializable array, or a raw string of bytes with a matching `$options->contentType`).
 - `reboot(): ActorRun`
 - `resurrect(?RunResurrectOptions $options = null): ActorRun`
 - `charge(RunChargeOptions $options): void` — for pay-per-event Actors.

@@ -63,9 +63,9 @@ final class TaskClient
      *
      * To publish, the task's Actor must be public and its {@code publicConfig.inputSchemaFields}
      * and {@code publicConfig.datasetView} must be set. An Actor can have up to 10 published
-     * tasks and an account up to 100; contact Apify support to raise these limits. If any of
-     * these conditions are not met, the request fails and nothing is changed (including fields
-     * unrelated to publishing). Publishing an already published task does nothing.
+     * tasks and an account up to 100. If any of these conditions are not met, the request fails
+     * and nothing is changed (including fields unrelated to publishing). Publishing an already
+     * published task does nothing.
      */
     public function publish(): Task
     {

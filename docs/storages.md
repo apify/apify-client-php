@@ -19,11 +19,11 @@ Single — `$client->dataset($id)`:
 
 - `get(): ?Dataset`, `update(mixed $newFields): Dataset`, `delete(): void`
 - `listItems(?DatasetListItemsOptions $options = null): PaginationList` — one page of items decoded to PHP values.
-- `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. Note: item-dropping filters (`skipEmpty`, and `clean` which implies it) are applied after `offset`/`limit`, so combining them with multi-page iteration can repeat or skip items (the iterator advances the offset by the post-filter count, matching the reference JS client). Iterate without those filters, or page explicitly with `listItems()` and filter client-side. (`skipHidden` only strips hidden fields from each item, not whole items, so it does not affect paging.)
+- `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. The iterator advances and terminates by the number of rows the API scanned (the `X-Apify-Pagination-Count` response header), not by the number of items a page returns, matching the reference JS client exactly — see the method's doc comment for why that matters with `skipEmpty`/`clean`/`unwind`.
 - `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string` — raw export bytes.
 - `pushItems(mixed $items): void`
 - `getStatistics(): ?array`
-- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`.
+- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null, ?DownloadItemsFormat $format = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`. `$format` selects the served output format (defaults to `json`).
 
 ```php
 $dataset = $client->datasets()->getOrCreate('my-dataset');

@@ -48,6 +48,10 @@ final class BuildIntegrationTest extends IntegrationTestCase
             $build = $client->actor((string) $created->getId())->build('0.0', new ActorBuildOptions());
             $finished = $client->build((string) $build->getId())->waitForFinish(300);
             self::assertTrue($finished->isTerminal(), 'build did not finish: ' . $finished->getStatus());
+            // The field is nullable even for a finished build (e.g. `imageSizeBytes` is also null on
+            // this test environment's build backend), so only exercise the getter's type, not its
+            // presence — RequestShapeTest covers the populated case against a scripted response.
+            self::assertTrue($finished->getImageDigest() === null || is_string($finished->getImageDigest()));
 
             self::assertNotNull($client->build((string) $build->getId())->get());
             $client->build((string) $build->getId())->log()->get();

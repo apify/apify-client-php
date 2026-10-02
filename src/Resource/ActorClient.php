@@ -6,7 +6,6 @@ namespace Apify\Client\Resource;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\HttpClientCore;
-use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Model\Actor;
@@ -69,21 +68,24 @@ final class ActorClient
     /**
      * Starts the Actor and returns immediately with the created run.
      *
-     * @param mixed $input any JSON-serializable value (or {@code null} for no input)
+     * @param mixed $input a JSON-serializable array (or {@code null} for no input), or a raw string
+     *                      of bytes sent exactly as given — pair it with a non-default
+     *                      {@code $options->contentType}
      */
     public function start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun
     {
         $options ??= new ActorStartOptions();
         $params = new QueryParams();
         $options->appendTo($params);
-        $body = $input === null ? null : Json::encode($input);
+        $body = ResourceContext::encodeInputBody($input);
         return new ActorRun($this->ctx->postWithBody('runs', $params, $body, $options->contentTypeOrDefault()));
     }
 
     /**
      * Starts the Actor and waits (client-side polling) for it to finish.
      *
-     * @param mixed    $input    any JSON-serializable value (or {@code null} for no input)
+     * @param mixed    $input    a JSON-serializable array (or {@code null} for no input), or a raw
+     *                           string of bytes sent exactly as given — see {@see start()}
      * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely
      */
     public function call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null): ActorRun
@@ -95,14 +97,15 @@ final class ActorClient
     /**
      * Validates {@code input} against the Actor's input schema and returns whether it is valid.
      *
-     * @param mixed $input any JSON-serializable value (or {@code null})
+     * @param mixed $input a JSON-serializable array (or {@code null}), or a raw string of bytes sent
+     *                      exactly as given — see {@see start()}
      */
     public function validateInput(mixed $input = null, ?ValidateInputOptions $options = null): bool
     {
         $options ??= new ValidateInputOptions();
         $params = new QueryParams();
         $options->appendTo($params);
-        $body = $input === null ? null : Json::encode($input);
+        $body = ResourceContext::encodeInputBody($input);
         // The validate-input endpoint returns a bare {"valid": <bool>} object, not the standard
         // {"data": ...} envelope, so parse it without unwrapping.
         $result = $this->ctx->postWithBodyNoEnvelope('validate-input', $params, $body, $options->contentTypeOrDefault());

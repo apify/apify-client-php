@@ -103,7 +103,9 @@ final class RunClient
      * Transforms the run into a run of another Actor with a new input.
      *
      * @param string $targetActorId the Actor to metamorph into
-     * @param mixed  $input         the new input ({@code null} for none)
+     * @param mixed  $input         the new input: a JSON-serializable array, a raw string of bytes
+     *                               sent exactly as given (pair it with a non-default
+     *                               {@code $options->contentType}), or {@code null} for none
      */
     public function metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun
     {
@@ -115,7 +117,7 @@ final class RunClient
         if ($options->build !== null && $options->build !== '') {
             $params->addString('build', $options->build);
         }
-        $body = $input === null ? null : Json::encode($input);
+        $body = ResourceContext::encodeInputBody($input);
         return new ActorRun($this->ctx->postWithBody('metamorph', $params, $body, $options->contentTypeOrDefault()));
     }
 
