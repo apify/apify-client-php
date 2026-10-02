@@ -21,6 +21,7 @@ final class CompressionConfigTest extends TestCase
 {
     private const LARGE_BODY_FIELD = 'blob'; // forces the JSON body above the compression threshold
 
+    /** @return array<string,string> */
     private function largeBody(): array
     {
         return [self::LARGE_BODY_FIELD => str_repeat('payload-', 500)];

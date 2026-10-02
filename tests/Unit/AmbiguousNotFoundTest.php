@@ -42,15 +42,17 @@ final class AmbiguousNotFoundTest extends TestCase
     /** @return array<string,array{0:int,1:class-string<ApifyApiException>}> */
     public static function statusClassProvider(): array
     {
+        // Non-numeric keys: a plain '400' etc. would be auto-cast to an int array key by PHP,
+        // which would make this a list<...> rather than the declared array<string, ...>.
         return [
-            '400' => [400, InvalidRequestException::class],
-            '401' => [401, UnauthorizedException::class],
-            '403' => [403, ForbiddenException::class],
-            '404' => [404, NotFoundException::class],
-            '409' => [409, ConflictException::class],
-            '429' => [429, RateLimitException::class],
-            '500' => [500, ServerException::class],
-            '502' => [502, ServerException::class],
+            'status 400' => [400, InvalidRequestException::class],
+            'status 401' => [401, UnauthorizedException::class],
+            'status 403' => [403, ForbiddenException::class],
+            'status 404' => [404, NotFoundException::class],
+            'status 409' => [409, ConflictException::class],
+            'status 429' => [429, RateLimitException::class],
+            'status 500' => [500, ServerException::class],
+            'status 502' => [502, ServerException::class],
         ];
     }
 
