@@ -1,5 +1,83 @@
 # Changelog
 
+## 0.8.0
+
+- Added `InvalidRequestException` (400), `UnauthorizedException` (401), `ForbiddenException` (403),
+  `NotFoundException` (404), `ConflictException` (409) and `RateLimitException` (429), plus
+  `ServerException` for any 5xx, all extending the existing `ApifyApiException`. The client now
+  throws the subclass matching the response's HTTP status, so a `catch` can branch on `instanceof`
+  instead of comparing status codes; any other status still throws a plain `ApifyApiException`,
+  matching the reference client's `ApifyApiError` subclasses.
+- A 404 is now swallowed (resolving to `null`/no-op) regardless of its machine-readable `type`,
+  matching the reference client. Previously only `record-not-found`, `record-or-token-not-found`,
+  and every HEAD request were swallowed; a 404 with any other `type` incorrectly propagated as an
+  error.
+- `get()`/`delete()` on a resource client obtained without an ID — `RunClient::dataset()`,
+  `keyValueStore()`, `requestQueue()`, `log()`, and `BuildClient::log()` — now throw instead of
+  resolving to `null`/no-op on a 404, since the response cannot tell a missing parent (run/build)
+  apart from a missing sub-resource. `DatasetClient::getStatistics()`, `TaskClient::getInput()`,
+  `ScheduleClient::getLog()`, and `BuildClient::getOpenApiDefinition()` likewise now always throw on
+  a 404 instead of returning `null`, since these fixed sub-paths can only 404 because the parent
+  resource is gone. `getRecord()`, `getRequest()`, `recordExists()`, and `lastRun()` are unaffected.
+- `ActorClient::version()`, `ActorClient::build()`, and `ActorVersionClient::envVar()` now reject an
+  empty-string identifier with an `InvalidArgumentException` instead of silently addressing the whole
+  collection.
+- Fixed `ResourceContext::toSafeId()` (used to build a resource's URL from its id) to replace every
+  `/` in the id, not just the first — an id with more than one `/` could previously leave a literal
+  `/` in the built URL path.
+- Resource ids and URL path segments built from caller input (record keys, request ids) are now
+  rejected up front with an `InvalidArgumentException` when empty or `.`/`..`, instead of being
+  percent-encoded and sent as-is: a URL parser resolves such dot-segments from the decoded path, so a
+  literal `.`/`..` segment can still collapse to a different endpoint even without a `/` in the
+  string. Matches the reference client's path-sanitization fix.
+- Added timeout tiers: the `ApifyClient` constructor takes optional `timeoutShortSecs`,
+  `timeoutMediumSecs`, `timeoutLongSecs`, and `timeoutMaxSecs` options, and every method that sends a
+  request takes an optional trailing `$timeoutSecs` (a number of seconds, a tier name, or
+  `'noTimeout'` for no timeout at all) that overrides the tier for that call — metadata reads/writes
+  use `short`, listing/batch/trigger calls use `medium`, downloads/uploads/streaming use `long`. Every
+  tier defaults to the existing `timeoutSecs`, so a client built without the new options sends every
+  request with exactly the timeout it always has. A request-queue client's own `timeoutSecs`
+  (`requestQueue(id, options)`) continues to cap every tier and per-call override for that client.
+- Added a `compression` option to the `ApifyClient` constructor: `'brotli'`, `'gzip'`, or a custom
+  `HttpCompressorInterface` (new `BrotliHttpCompressor`/`GzipHttpCompressor` implementations let the
+  compression quality be configured too). Left unset, the client keeps its existing best-effort
+  choice (brotli when available, falling back to gzip).
+- Request-body compression is now skipped for a `Content-Type` that already carries its own
+  compression (`image/*`, `audio/*`, `video/*`, common archive/office/package formats, web fonts),
+  while raw formats under those prefixes (e.g. `image/bmp`, `audio/wav`) and `+json`/`+xml` structured
+  suffixes are still compressed, matching the reference client.
+- `ApifyClient`'s `$baseUrl`/`$publicBaseUrl` now accept a URL that already ends with the `/v2` API
+  version path without doubling it into `.../v2/v2`, matching the reference client.
+- `RequestQueueClient::batchAddRequests()` now serializes each request to JSON once up front instead
+  of re-encoding it for the size check, the chunk split, and the request body, matching the reference
+  client's performance fix. The per-item size check now accounts for both brackets a single-item
+  batch body needs (matching the reference's exact accounting), so a request that fits only as the
+  sole member of its own batch is no longer rejected by one byte.
+- `ScheduleClient::getLog()` is no longer nullable (`string`, not `?string`): it always throws instead
+  of returning `null` when the schedule itself is gone, and otherwise always returns a string.
+
+## 0.7.0
+
+- Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-10-01T153946Z`.
+- Added `Build::getImageDigest()`, exposing the built Docker image's manifest digest (`null` if
+  unavailable), per the spec's new `imageDigest` field.
+- Removed the stale "contact Apify support to raise these limits" sentence from
+  `TaskClient::publish()`'s doc comment and `docs/tasks.md`, matching the spec's updated
+  description. Behavior is unchanged.
+- `ActorClient::start()`/`call()`/`validateInput()` and `RunClient::metamorph()` now send a `string`
+  `$input` as raw bytes instead of JSON-encoding it, so it can be paired with a non-default
+  `$options->contentType` (matching the reference client's raw-bytes Actor input support). A
+  JSON-serializable array continues to be encoded to JSON as before.
+- Added an optional `?DownloadItemsFormat $format` parameter to `DatasetClient::createItemsPublicUrl()`,
+  selecting the output format served by the generated URL (defaults to `json`), matching the reference
+  client's `createItemsPublicUrl({ format })`.
+- Fixed `DatasetClient::iterateItems()` to advance and terminate by the number of rows the API
+  scanned (the `X-Apify-Pagination-Count` response header), not by the number of items a page
+  returns, falling back to the item count when a response omits the header. This matches the
+  reference client exactly: `skipEmpty`/`clean`/`unwind` can make a page's item count land on
+  either side of the scanned count, so the previous item-count-based advancement could repeat or
+  skip items across pages.
+
 ## 0.6.2
 
 - Bumped `Version::API_SPEC_VERSION` to the Apify OpenAPI spec `v2-2026-09-28T115051Z`. No public

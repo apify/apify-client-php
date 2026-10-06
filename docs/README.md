@@ -20,8 +20,8 @@ Every class is under the `Apify\Client\` PSR-4 root. Use these when writing `use
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
 | `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
-| `Apify\Client\Http\` | The replaceable transport and its adapters. | `HttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient` |
-| `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException`, `TransportException` |
+| `Apify\Client\Http\` | The replaceable transport, its adapters, and compressors. | `HttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor` |
+| `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException` and its status-specific subclasses (`NotFoundException`, `RateLimitException`, ...), `TransportException` |
 
 For example, to add requests to a queue you would import the model and (optionally) the batch options:
 
@@ -35,8 +35,10 @@ The streaming-log accessors (`LogClient::stream()` and `RunClient::getStreamedLo
 PSR-7 `Psr\Http\Message\StreamInterface` (from the `psr/http-message` package), not an
 `Apify\Client\` type — import it as `use Psr\Http\Message\StreamInterface;`.
 
-Methods that fetch a single resource return `null` when the resource does not exist, rather than
-throwing. API failures are thrown as `ApifyApiException` (see [error handling](../README.md#error-handling)).
+Methods that fetch a single resource by ID return `null` when the resource does not exist, rather
+than throwing. A resource client obtained without an ID (e.g. `RunClient::dataset()`) throws instead,
+since a 404 there cannot be pinned to the parent or the sub-resource. API failures are thrown as
+`ApifyApiException` or a status-specific subclass (see [error handling](../README.md#error-handling)).
 
 ## ApifyClient methods
 

@@ -139,6 +139,36 @@ final class IterationTest extends TestCase
         self::assertStringContainsString('offset=2', (string) $transport->received[1]->getUri());
     }
 
+    public function testDatasetIterateItemsAdvancesByScannedCountNotItemCount(): void
+    {
+        // With skipEmpty active, the API can scan more rows than it returns as items. The iterator
+        // must advance (and terminate) by the scanned count (`X-Apify-Pagination-Count`), not by the
+        // item count — otherwise it would re-request offset=2 (items returned so far) instead of
+        // offset=3 (rows actually scanned), re-scanning row 2 and duplicating item 'n'=2.
+        $transport = (new MockTransport())
+            // Page 1 scans rows 0-2 (3 rows) but one is empty and skipped, so only 2 items come back.
+            ->queueResponse(200, Json::encode([['n' => 0], ['n' => 1]]), [
+                'X-Apify-Pagination-Total' => '6',
+                'X-Apify-Pagination-Offset' => '0',
+                'X-Apify-Pagination-Limit' => '3',
+                'X-Apify-Pagination-Count' => '3',
+            ])
+            // Page 2 scans rows 3-5 (3 rows), none filtered.
+            ->queueResponse(200, Json::encode([['n' => 3], ['n' => 4], ['n' => 5]]), [
+                'X-Apify-Pagination-Total' => '6',
+                'X-Apify-Pagination-Offset' => '3',
+                'X-Apify-Pagination-Limit' => '3',
+                'X-Apify-Pagination-Count' => '3',
+            ]);
+        $values = [];
+        foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(skipEmpty: true), 3) as $item) {
+            $values[] = $item['n'];
+        }
+        self::assertSame([0, 1, 3, 4, 5], $values);
+        self::assertSame(2, $transport->callCount());
+        self::assertStringContainsString('offset=3', (string) $transport->received[1]->getUri());
+    }
+
     public function testDatasetIterateItemsPreservesFilters(): void
     {
         $transport = (new MockTransport())

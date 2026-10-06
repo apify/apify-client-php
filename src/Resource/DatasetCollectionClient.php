@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Dataset;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\StorageListOptions;
@@ -28,11 +29,11 @@ final class DatasetCollectionClient
      *
      * @return PaginationList<Dataset>
      */
-    public function list(?StorageListOptions $options = null): PaginationList
+    public function list(?StorageListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new StorageListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new Dataset($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new Dataset($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -42,14 +43,14 @@ final class DatasetCollectionClient
      *
      * @return Generator<int,Dataset>
      */
-    public function iterate(?StorageListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?StorageListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new StorageListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 
@@ -60,8 +61,8 @@ final class DatasetCollectionClient
      *
      * @param array<string,mixed>|null $schema
      */
-    public function getOrCreate(?string $name = null, ?array $schema = null): Dataset
+    public function getOrCreate(?string $name = null, ?array $schema = null, int|float|string|null $timeoutSecs = null): Dataset
     {
-        return new Dataset($this->ctx->getOrCreateNamed($name, $schema));
+        return new Dataset($this->ctx->getOrCreateNamed($name, $schema, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 }

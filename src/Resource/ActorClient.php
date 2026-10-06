@@ -6,9 +6,9 @@ namespace Apify\Client\Resource;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\HttpClientCore;
-use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Actor;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\Build;
@@ -16,6 +16,7 @@ use Apify\Client\Options\ActorBuildOptions;
 use Apify\Client\Options\ActorStartOptions;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ValidateInputOptions;
+use InvalidArgumentException;
 
 /**
  * A client for a specific Actor.
@@ -44,9 +45,9 @@ final class ActorClient
     }
 
     /** Fetches the Actor object, or {@code null} if it does not exist. */
-    public function get(): ?Actor
+    public function get(int|float|string|null $timeoutSecs = null): ?Actor
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new Actor($data) : null;
     }
 
@@ -55,35 +56,47 @@ final class ActorClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): Actor
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Actor
     {
-        return new Actor($this->ctx->updateResource('', $newFields));
+        return new Actor($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the Actor. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
      * Starts the Actor and returns immediately with the created run.
      *
-     * @param mixed $input any JSON-serializable value (or {@code null} for no input)
+     * @param mixed $input a JSON-serializable array (or {@code null} for no input), or a raw string
+     *                      of bytes sent exactly as given — pair it with a non-default
+     *                      {@code $options->contentType}
      */
-    public function start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun
-    {
+    public function start(
+        mixed $input = null,
+        ?ActorStartOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): ActorRun {
         $options ??= new ActorStartOptions();
         $params = new QueryParams();
         $options->appendTo($params);
-        $body = $input === null ? null : Json::encode($input);
-        return new ActorRun($this->ctx->postWithBody('runs', $params, $body, $options->contentTypeOrDefault()));
+        $body = ResourceContext::encodeInputBody($input);
+        return new ActorRun($this->ctx->postWithBody(
+            'runs',
+            $params,
+            $body,
+            $options->contentTypeOrDefault(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /**
      * Starts the Actor and waits (client-side polling) for it to finish.
      *
-     * @param mixed    $input    any JSON-serializable value (or {@code null} for no input)
+     * @param mixed    $input    a JSON-serializable array (or {@code null} for no input), or a raw
+     *                           string of bytes sent exactly as given — see {@see start()}
      * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely
      */
     public function call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null): ActorRun
@@ -95,39 +108,65 @@ final class ActorClient
     /**
      * Validates {@code input} against the Actor's input schema and returns whether it is valid.
      *
-     * @param mixed $input any JSON-serializable value (or {@code null})
+     * @param mixed $input a JSON-serializable array (or {@code null}), or a raw string of bytes sent
+     *                      exactly as given — see {@see start()}
      */
-    public function validateInput(mixed $input = null, ?ValidateInputOptions $options = null): bool
-    {
+    public function validateInput(
+        mixed $input = null,
+        ?ValidateInputOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): bool {
         $options ??= new ValidateInputOptions();
         $params = new QueryParams();
         $options->appendTo($params);
-        $body = $input === null ? null : Json::encode($input);
+        $body = ResourceContext::encodeInputBody($input);
         // The validate-input endpoint returns a bare {"valid": <bool>} object, not the standard
         // {"data": ...} envelope, so parse it without unwrapping.
-        $result = $this->ctx->postWithBodyNoEnvelope('validate-input', $params, $body, $options->contentTypeOrDefault());
+        $result = $this->ctx->postWithBodyNoEnvelope(
+            'validate-input',
+            $params,
+            $body,
+            $options->contentTypeOrDefault(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        );
         return is_array($result) && ($result['valid'] ?? false) === true;
     }
 
-    /** Builds the given version of the Actor and returns the created build. */
-    public function build(string $versionNumber, ?ActorBuildOptions $options = null): Build
-    {
+    /**
+     * Builds the given version of the Actor and returns the created build.
+     *
+     * @throws InvalidArgumentException if {@code $versionNumber} is empty
+     */
+    public function build(
+        string $versionNumber,
+        ?ActorBuildOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): Build {
+        if ($versionNumber === '') {
+            throw new InvalidArgumentException('ActorClient::build: $versionNumber must not be empty');
+        }
         $params = new QueryParams();
         $params->addString('version', $versionNumber);
         ($options ?? new ActorBuildOptions())->appendTo($params);
-        return new Build($this->ctx->postWithBody('builds', $params, null, ResourceContext::CONTENT_TYPE_JSON));
+        return new Build($this->ctx->postWithBody(
+            'builds',
+            $params,
+            null,
+            ResourceContext::CONTENT_TYPE_JSON,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /**
      * Resolves the Actor's default build and returns a client for it. {@code $waitForFinish}
      * optionally bounds how long (seconds) the API waits for the build to finish before responding.
      */
-    public function defaultBuild(?int $waitForFinish = null): BuildClient
+    public function defaultBuild(?int $waitForFinish = null, int|float|string|null $timeoutSecs = null): BuildClient
     {
         $params = new QueryParams();
         // Clamp the server-side wait below the per-request timeout, consistent with run/build get().
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinish));
-        $data = $this->ctx->getResourceRequired('builds/default', $params);
+        $data = $this->ctx->getResourceRequired('builds/default', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         $build = new Build(is_array($data) ? $data : []);
         return new BuildClient($this->http, $this->baseUrl, (string) $build->getId());
     }

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\WebhookDispatch;
 
 /** A client for a specific webhook dispatch ({@code /v2/webhook-dispatches/{dispatchId}}). */
@@ -21,9 +22,9 @@ final class WebhookDispatchClient
     }
 
     /** Fetches the dispatch, or {@code null} if it does not exist. */
-    public function get(): ?WebhookDispatch
+    public function get(int|float|string|null $timeoutSecs = null): ?WebhookDispatch
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new WebhookDispatch($data) : null;
     }
 }

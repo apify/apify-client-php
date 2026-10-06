@@ -8,6 +8,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\LogOptions;
@@ -63,11 +64,11 @@ final class RunClient
      * longer than the client will wait; the server additionally caps the wait at 60s. Returns
      * {@code null} if it does not exist.
      */
-    public function get(?int $waitForFinishSecs = null): ?ActorRun
+    public function get(?int $waitForFinishSecs = null, int|float|string|null $timeoutSecs = null): ?ActorRun
     {
         $params = new QueryParams();
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinishSecs));
-        $data = $this->ctx->getResource('', $params);
+        $data = $this->ctx->getResource('', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new ActorRun($data) : null;
     }
 
@@ -76,15 +77,15 @@ final class RunClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): ActorRun
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        return new ActorRun($this->ctx->updateResource('', $newFields));
+        return new ActorRun($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the run. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -92,21 +93,27 @@ final class RunClient
      * the current request before terminating; {@code false} aborts immediately. {@code null} omits
      * the parameter and lets the server apply its default (immediate abort).
      */
-    public function abort(?bool $gracefully = null): ActorRun
+    public function abort(?bool $gracefully = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
         $params = new QueryParams();
         $params->addBool('gracefully', $gracefully);
-        return new ActorRun($this->ctx->postWithBody('abort', $params, null, ''));
+        return new ActorRun($this->ctx->postWithBody('abort', $params, null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 
     /**
      * Transforms the run into a run of another Actor with a new input.
      *
      * @param string $targetActorId the Actor to metamorph into
-     * @param mixed  $input         the new input ({@code null} for none)
+     * @param mixed  $input         the new input: a JSON-serializable array, a raw string of bytes
+     *                               sent exactly as given (pair it with a non-default
+     *                               {@code $options->contentType}), or {@code null} for none
      */
-    public function metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun
-    {
+    public function metamorph(
+        string $targetActorId,
+        mixed $input = null,
+        ?MetamorphOptions $options = null,
+        int|float|string|null $timeoutSecs = null,
+    ): ActorRun {
         $options ??= new MetamorphOptions();
         $params = new QueryParams();
         // Normalize the target Actor id to the URL-safe `username~actor-name` form (first `/`→`~`),
@@ -115,22 +122,32 @@ final class RunClient
         if ($options->build !== null && $options->build !== '') {
             $params->addString('build', $options->build);
         }
-        $body = $input === null ? null : Json::encode($input);
-        return new ActorRun($this->ctx->postWithBody('metamorph', $params, $body, $options->contentTypeOrDefault()));
+        $body = ResourceContext::encodeInputBody($input);
+        return new ActorRun($this->ctx->postWithBody(
+            'metamorph',
+            $params,
+            $body,
+            $options->contentTypeOrDefault(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+        ));
     }
 
     /** Reboots the run (restarts its container while keeping the same run). */
-    public function reboot(): ActorRun
+    public function reboot(int|float|string|null $timeoutSecs = null): ActorRun
     {
-        return new ActorRun($this->ctx->postWithBody('reboot', new QueryParams(), null, ''));
+        return new ActorRun(
+            $this->ctx->postWithBody('reboot', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /** Resurrects a finished run, starting it again from the beginning. */
-    public function resurrect(?RunResurrectOptions $options = null): ActorRun
+    public function resurrect(?RunResurrectOptions $options = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
         $params = new QueryParams();
         ($options ?? new RunResurrectOptions())->appendTo($params);
-        return new ActorRun($this->ctx->postWithBody('resurrect', $params, null, ''));
+        return new ActorRun(
+            $this->ctx->postWithBody('resurrect', $params, null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /**
@@ -140,7 +157,7 @@ final class RunClient
      * An idempotency key is always sent (auto-generated if not provided), so a charge that is retried
      * by the transport is applied at most once, matching the reference client.
      */
-    public function charge(RunChargeOptions $options): void
+    public function charge(RunChargeOptions $options, int|float|string|null $timeoutSecs = null): void
     {
         if ($options->eventName === '') {
             throw new InvalidArgumentException('RunChargeOptions.eventName is required and must not be empty');
@@ -155,7 +172,7 @@ final class RunClient
             $this->ctx->subUrl('charge'),
             Json::encode($body),
             ResourceContext::CONTENT_TYPE_JSON,
-            null,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM),
             false,
             [self::CHARGE_IDEMPOTENCY_HEADER => $idempotencyKey]
         );
@@ -187,6 +204,11 @@ final class RunClient
     /**
      * A client for this run's default dataset. Any {@code status}/{@code origin} filters pinned by a
      * last-run accessor are inherited so the correct run's dataset is resolved.
+     *
+     * This client has no ID of its own, so {@code get()}/{@code delete()} throw an {@see
+     * \Apify\Client\Exception\ApifyApiException} on a 404 instead of resolving to {@code null}/no-op:
+     * the response cannot tell a missing run apart from a missing dataset (matches the reference
+     * client's {@code catchNotFoundForResourceOrThrow}).
      */
     public function dataset(): DatasetClient
     {
@@ -196,6 +218,12 @@ final class RunClient
     /**
      * A client for this run's default key-value store. Any {@code status}/{@code origin} filters
      * pinned by a last-run accessor are inherited so the correct run's store is resolved.
+     *
+     * {@code get()}/{@code delete()} throw an {@see \Apify\Client\Exception\ApifyApiException} on a 404
+     * instead of resolving to {@code null}/no-op, since this client has no ID of its own and the 404
+     * could mean either the run or its store is gone. Record lookups such as {@see
+     * \Apify\Client\Resource\KeyValueStoreClient::getRecord()} are unaffected and still resolve to
+     * {@code null} for a missing record.
      */
     public function keyValueStore(): KeyValueStoreClient
     {
@@ -205,6 +233,12 @@ final class RunClient
     /**
      * A client for this run's default request queue. Any {@code status}/{@code origin} filters pinned
      * by a last-run accessor are inherited so the correct run's queue is resolved.
+     *
+     * {@code get()}/{@code delete()} throw an {@see \Apify\Client\Exception\ApifyApiException} on a 404
+     * instead of resolving to {@code null}/no-op, since this client has no ID of its own and the 404
+     * could mean either the run or its queue is gone. {@see
+     * \Apify\Client\Resource\RequestQueueClient::getRequest()} is unaffected and still resolves to
+     * {@code null} for a missing request.
      */
     public function requestQueue(): RequestQueueClient
     {
@@ -214,6 +248,10 @@ final class RunClient
     /**
      * A client for accessing this run's log. Any {@code status}/{@code origin} filters pinned by a
      * last-run accessor are inherited so the correct run's log is resolved.
+     *
+     * {@code get()} throws an {@see \Apify\Client\Exception\ApifyApiException} on a 404 instead of
+     * resolving to {@code null}, since this client has no ID of its own and the 404 could mean either
+     * the run or its log is gone (matches the reference client's {@code catchNotFoundForResourceOrThrow}).
      */
     public function log(): LogClient
     {

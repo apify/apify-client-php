@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Apify\Client;
 
+use Apify\Client\Http\BrotliHttpCompressor;
 use Apify\Client\Http\GuzzleHttpClient;
+use Apify\Client\Http\GzipHttpCompressor;
 use Apify\Client\Http\HttpClientInterface;
+use Apify\Client\Http\HttpCompressorInterface;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Platform;
 use Apify\Client\Internal\RetryConfig;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Options\RequestQueueClientOptions;
 use Apify\Client\Resource\ActorClient;
@@ -60,6 +64,9 @@ final class ApifyClient
     public const DEFAULT_MIN_DELAY_MILLIS = 500;
     public const DEFAULT_TIMEOUT_SECS = 360;
 
+    /** The API version path this client targets; appended to {@code $baseUrl}/{@code $publicBaseUrl} when absent. */
+    private const API_VERSION_PATH = '/v2';
+
     /** Environment variable that signals the client is running on the Apify platform. */
     private const ENV_IS_AT_HOME = 'APIFY_IS_AT_HOME';
 
@@ -72,14 +79,31 @@ final class ApifyClient
 
     /**
      * @param string|null              $token                        API token, sent as a Bearer token
-     * @param string                   $baseUrl                      API base URL; {@code /v2} is appended automatically
+     * @param string                   $baseUrl                      API base URL, with or without the trailing
+     *                                                               {@code /v2} version path — appended automatically
+     *                                                               when not already present
      * @param string|null              $publicBaseUrl                base URL for building public, shareable resource
-     *                                                               URLs (defaults to {@code $baseUrl}); {@code /v2} appended
+     *                                                               URLs (defaults to {@code $baseUrl}); like
+     *                                                               {@code $baseUrl}, {@code /v2} is appended when absent
      * @param int                      $maxRetries                   maximum retries for failed requests (default 8)
      * @param int                      $minDelayBetweenRetriesMillis minimum delay between retries in ms (default 500)
      * @param int|null                 $maxDelayBetweenRetriesMillis upper bound for the growing inter-retry delay
      *                                                               (defaults to the request timeout)
-     * @param int                      $timeoutSecs                  overall per-request timeout in seconds (default 360)
+     * @param int                      $timeoutSecs                  overall per-request timeout in seconds (default
+     *                                                               360); also the default duration of every timeout
+     *                                                               tier below that is left unset
+     * @param int|null                 $timeoutShortSecs             duration (seconds) of the {@code short} timeout
+     *                                                               tier (metadata reads/writes); defaults to
+     *                                                               {@code $timeoutSecs}
+     * @param int|null                 $timeoutMediumSecs            duration (seconds) of the {@code medium} timeout
+     *                                                               tier (listing/batch/trigger calls); defaults to
+     *                                                               {@code $timeoutSecs}
+     * @param int|null                 $timeoutLongSecs              duration (seconds) of the {@code long} timeout
+     *                                                               tier (downloads/uploads/streaming); defaults to
+     *                                                               {@code $timeoutSecs}
+     * @param int|null                 $timeoutMaxSecs               upper bound on any single request's timeout,
+     *                                                               including a per-call override; defaults to
+     *                                                               {@code $timeoutSecs}
      * @param string|null              $userAgentSuffix              custom suffix appended to the User-Agent header
      * @param HttpClientInterface|null $httpClient                   replaces the default transport (Guzzle)
      * @param RequestFactoryInterface|null $requestFactory           PSR-17 request factory (defaults to Guzzle's)
@@ -94,31 +118,52 @@ final class ApifyClient
         int $minDelayBetweenRetriesMillis = self::DEFAULT_MIN_DELAY_MILLIS,
         ?int $maxDelayBetweenRetriesMillis = null,
         int $timeoutSecs = self::DEFAULT_TIMEOUT_SECS,
+        ?int $timeoutShortSecs = null,
+        ?int $timeoutMediumSecs = null,
+        ?int $timeoutLongSecs = null,
+        ?int $timeoutMaxSecs = null,
         ?string $userAgentSuffix = null,
         ?HttpClientInterface $httpClient = null,
         ?RequestFactoryInterface $requestFactory = null,
         ?StreamFactoryInterface $streamFactory = null,
         ?callable $isAtHomeFn = null,
+        /**
+         * Overrides request-body compression: {@code 'brotli'}, {@code 'gzip'}, or a custom {@see
+         * HttpCompressorInterface}. {@code null} (the default) keeps the client's existing best-effort
+         * choice (brotli when the optional PECL extension is loaded, falling back to gzip), unchanged
+         * from before this option existed, so a client constructed without it sends the same requests
+         * as always. Pass an explicit {@see BrotliHttpCompressor}/{@see GzipHttpCompressor} instance to
+         * also choose the compression quality.
+         */
+        string|HttpCompressorInterface|null $compression = null,
     ) {
         $transport = $httpClient ?? new GuzzleHttpClient();
         $factory = new HttpFactory();
         $requestFactory ??= $factory;
         $streamFactory ??= $factory;
+        $compressor = self::resolveCompressor($compression);
 
         $maxDelayMillis = $maxDelayBetweenRetriesMillis ?? $timeoutSecs * 1000;
+        $tiers = TimeoutTiers::create(
+            (float) $timeoutSecs,
+            $timeoutShortSecs !== null ? (float) $timeoutShortSecs : null,
+            $timeoutMediumSecs !== null ? (float) $timeoutMediumSecs : null,
+            $timeoutLongSecs !== null ? (float) $timeoutLongSecs : null,
+            $timeoutMaxSecs !== null ? (float) $timeoutMaxSecs : null,
+        );
         $retry = new RetryConfig(
             $maxRetries,
             (float) $minDelayBetweenRetriesMillis,
             (float) $maxDelayMillis,
             (float) $timeoutSecs,
+            $tiers,
         );
 
         $userAgent = self::buildUserAgent($userAgentSuffix, $isAtHomeFn ?? self::defaultIsAtHome(...));
-        $this->http = new HttpClientCore($transport, $requestFactory, $streamFactory, $token, $userAgent, $retry);
+        $this->http = new HttpClientCore($transport, $requestFactory, $streamFactory, $token, $userAgent, $retry, $compressor);
 
-        $this->baseUrl = self::trimTrailingSlash($baseUrl) . '/v2';
-        $publicSource = $publicBaseUrl ?? $baseUrl;
-        $this->publicBaseUrl = self::trimTrailingSlash($publicSource) . '/v2';
+        $this->baseUrl = self::toApiBaseUrl($baseUrl);
+        $this->publicBaseUrl = self::toApiBaseUrl($publicBaseUrl ?? $baseUrl);
     }
 
     /** Returns the {@code User-Agent} header value this client sends. */
@@ -324,6 +369,36 @@ final class ApifyClient
     private static function trimTrailingSlash(string $value): string
     {
         return rtrim($value, '/');
+    }
+
+    /**
+     * Resolves the {@code compression} constructor option to a concrete compressor, or {@code null} to
+     * keep the client's own default best-effort choice.
+     */
+    private static function resolveCompressor(string|HttpCompressorInterface|null $compression): ?HttpCompressorInterface
+    {
+        return match (true) {
+            $compression === null => null,
+            $compression instanceof HttpCompressorInterface => $compression,
+            $compression === 'brotli' => new BrotliHttpCompressor(),
+            $compression === 'gzip' => new GzipHttpCompressor(),
+            default => throw new RuntimeException(
+                sprintf('ApifyClient: unknown compression "%s"; expected "brotli", "gzip", or a HttpCompressorInterface', $compression)
+            ),
+        };
+    }
+
+    /**
+     * Appends the {@code /v2} API version path to {@code $url}, unless it already ends with one, so
+     * passing a URL that already includes it (e.g. {@code https://api.apify.com/v2}) does not produce
+     * {@code .../v2/v2}. A trailing slash is stripped first, matching the reference client's
+     * {@code toApiBaseUrl}. Only an exact {@code /v2} suffix counts; another {@code /vN} is left alone,
+     * since every endpoint this client calls exists only under {@code v2}.
+     */
+    private static function toApiBaseUrl(string $url): string
+    {
+        $path = self::trimTrailingSlash($url);
+        return str_ends_with($path, self::API_VERSION_PATH) ? $path : $path . self::API_VERSION_PATH;
     }
 
     /**

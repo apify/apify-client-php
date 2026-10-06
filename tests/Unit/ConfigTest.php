@@ -46,6 +46,30 @@ final class ConfigTest extends TestCase
         self::assertSame('https://api.example.com/v2', $client->getApiBaseUrl());
     }
 
+    /**
+     * A $baseUrl that already ends with the /v2 version path is accepted as-is instead of becoming
+     * .../v2/v2, matching the reference client's toApiBaseUrl.
+     */
+    public function testApiBaseUrlAlreadyEndingInV2IsNotDoubled(): void
+    {
+        $client = new ApifyClient(token: 't', baseUrl: 'https://api.example.com/v2', httpClient: new MockTransport());
+        self::assertSame('https://api.example.com/v2', $client->getApiBaseUrl());
+    }
+
+    /** A trailing slash after an existing /v2 is stripped before the idempotency check, not after. */
+    public function testApiBaseUrlAlreadyEndingInV2WithTrailingSlashIsNotDoubled(): void
+    {
+        $client = new ApifyClient(token: 't', baseUrl: 'https://api.example.com/v2/', httpClient: new MockTransport());
+        self::assertSame('https://api.example.com/v2', $client->getApiBaseUrl());
+    }
+
+    /** Another /vN suffix is not mistaken for the version path and still gets /v2 appended. */
+    public function testApiBaseUrlOtherVersionSuffixIsNotTreatedAsVersionPath(): void
+    {
+        $client = new ApifyClient(token: 't', baseUrl: 'https://api.example.com/v3', httpClient: new MockTransport());
+        self::assertSame('https://api.example.com/v3/v2', $client->getApiBaseUrl());
+    }
+
     public function testVersionConstants(): void
     {
         self::assertMatchesRegularExpression('/^\d+\.\d+\.\d+$/', Version::CLIENT_VERSION);

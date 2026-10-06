@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Model\RequestQueue;
 use Apify\Client\Options\StorageListOptions;
@@ -28,11 +29,11 @@ final class RequestQueueCollectionClient
      *
      * @return PaginationList<RequestQueue>
      */
-    public function list(?StorageListOptions $options = null): PaginationList
+    public function list(?StorageListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new StorageListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new RequestQueue($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new RequestQueue($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -42,14 +43,14 @@ final class RequestQueueCollectionClient
      *
      * @return Generator<int,RequestQueue>
      */
-    public function iterate(?StorageListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?StorageListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new StorageListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 
@@ -57,8 +58,8 @@ final class RequestQueueCollectionClient
      * Gets the queue with the given name, creating it if it does not exist. An empty/{@code null}
      * name creates a new unnamed queue.
      */
-    public function getOrCreate(?string $name = null): RequestQueue
+    public function getOrCreate(?string $name = null, int|float|string|null $timeoutSecs = null): RequestQueue
     {
-        return new RequestQueue($this->ctx->getOrCreateNamed($name));
+        return new RequestQueue($this->ctx->getOrCreateNamed($name, null, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
     }
 }

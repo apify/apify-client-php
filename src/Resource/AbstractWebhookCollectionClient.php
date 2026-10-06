@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\PaginationList;
 use Apify\Client\Model\Webhook;
 use Apify\Client\Options\ListOptions;
@@ -35,11 +36,11 @@ abstract class AbstractWebhookCollectionClient
      *
      * @return PaginationList<Webhook>
      */
-    public function list(?ListOptions $options = null): PaginationList
+    public function list(?ListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $params = new QueryParams();
         ($options ?? new ListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new Webhook($d));
+        return $this->ctx->listResource('', $params, static fn (array $d) => new Webhook($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
@@ -49,14 +50,14 @@ abstract class AbstractWebhookCollectionClient
      *
      * @return Generator<int,Webhook>
      */
-    public function iterate(?ListOptions $options = null, ?int $chunkSize = null): Generator
+    public function iterate(?ListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListOptions();
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit)),
+            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
     }
 }

@@ -37,6 +37,95 @@ final class Compression
      */
     private const BROTLI_QUALITY = 6;
 
+    /** Media type prefixes whose payloads already carry their own compression. */
+    private const ALREADY_COMPRESSED_PREFIXES = ['audio/', 'image/', 'video/'];
+
+    /** Exact media types whose payloads already carry their own compression. */
+    private const ALREADY_COMPRESSED_TYPES = [
+        'application/epub+zip',
+        'application/gzip',
+        'application/java-archive',
+        'application/vnd.android.package-archive',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.rar',
+        'application/x-7z-compressed',
+        'application/x-bzip',
+        'application/x-bzip2',
+        'application/x-gzip',
+        'application/x-rar-compressed',
+        'application/x-xz',
+        'application/x-zip-compressed',
+        'application/zip',
+        'application/zstd',
+        'font/woff',
+        'font/woff2',
+    ];
+
+    /** Uncompressed media types that sit under an already-compressed prefix, so compressing them still pays off. */
+    private const COMPRESSIBLE_TYPES = [
+        'audio/aiff',
+        'audio/basic',
+        'audio/l16',
+        'audio/l24',
+        'audio/midi',
+        'audio/vnd.wave',
+        'audio/wav',
+        'audio/wave',
+        'audio/x-aiff',
+        'audio/x-wav',
+        'image/bmp',
+        'image/tiff',
+        'image/vnd.adobe.photoshop',
+        'image/vnd.microsoft.icon',
+        'image/x-icon',
+        'image/x-ms-bmp',
+    ];
+
+    /** Structured syntax suffixes marking a media type as text even under an already-compressed prefix. */
+    private const COMPRESSIBLE_SUFFIXES = ['+json', '+xml'];
+
+    /**
+     * Decides whether a request body with the given {@code Content-Type} is worth compressing, matching
+     * the reference client's {@code isCompressibleContentType}.
+     *
+     * Images, audio, video and archives already carry their own compression; running them through
+     * brotli or gzip burns CPU, holds a second full copy of the body in memory, and usually produces
+     * output slightly larger than the input. Formats that are raw despite such a media type (e.g.
+     * {@code image/bmp}, {@code audio/wav}) are still compressed, as are structured-syntax subtypes
+     * such as {@code image/svg+xml}. A body with no content type, or {@code application/octet-stream}
+     * (the catch-all for unknown binary data and {@code setRecord()}'s fallback), is assumed compressible.
+     */
+    public static function isCompressibleContentType(?string $contentType): bool
+    {
+        if ($contentType === null || $contentType === '') {
+            return true;
+        }
+
+        // Content-Type is case-insensitive and may carry parameters, e.g. "text/plain; charset=utf-8".
+        $mediaType = strtolower(trim(explode(';', $contentType, 2)[0]));
+
+        if (in_array($mediaType, self::COMPRESSIBLE_TYPES, true)) {
+            return true;
+        }
+        foreach (self::COMPRESSIBLE_SUFFIXES as $suffix) {
+            if (str_ends_with($mediaType, $suffix)) {
+                return true;
+            }
+        }
+
+        if (in_array($mediaType, self::ALREADY_COMPRESSED_TYPES, true)) {
+            return false;
+        }
+        foreach (self::ALREADY_COMPRESSED_PREFIXES as $prefix) {
+            if (str_starts_with($mediaType, $prefix)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
      * Returns {@code [encoding, compressedBody]} when {@code $body} should be sent compressed, or
      * {@code null} to send it unchanged. {@code $encoding} is the value for the

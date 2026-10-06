@@ -17,13 +17,13 @@ final class Version
      * The semantic version of this client library (see https://semver.org/).
      * Changes to the public interface other than additive ones are considered breaking changes.
      */
-    public const CLIENT_VERSION = '0.6.2';
+    public const CLIENT_VERSION = '0.8.0';
 
     /**
      * The version of the Apify OpenAPI specification this client was generated and verified
      * against. Corresponds to the {@code info.version} field of the Apify OpenAPI document.
      */
-    public const API_SPEC_VERSION = 'v2-2026-09-28T115051Z';
+    public const API_SPEC_VERSION = 'v2-2026-10-01T153946Z';
 
     private function __construct()
     {

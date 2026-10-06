@@ -9,6 +9,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\Signatures;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\KeyValueStore;
 use Apify\Client\Model\KeyValueStoreKey;
 use Apify\Client\Model\KeyValueStoreKeysPage;
@@ -52,10 +53,15 @@ final class KeyValueStoreClient
         return $this;
     }
 
-    /** Fetches the store metadata, or {@code null} if it does not exist. */
-    public function get(): ?KeyValueStore
+    /**
+     * Fetches the store metadata, or {@code null} if it does not exist.
+     *
+     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::keyValueStore()}),
+     * a 404 is rethrown instead, since it could mean either the parent resource or the store is gone.
+     */
+    public function get(int|float|string|null $timeoutSecs = null): ?KeyValueStore
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new KeyValueStore($data) : null;
     }
 
@@ -64,23 +70,28 @@ final class KeyValueStoreClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): KeyValueStore
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): KeyValueStore
     {
-        return new KeyValueStore($this->ctx->updateResource('', $newFields));
+        return new KeyValueStore($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /** Deletes the store. */
-    public function delete(): void
+    /**
+     * Deletes the store. A not-found is a no-op, unless this client was obtained without an ID (e.g.
+     * {@see \Apify\Client\Resource\RunClient::keyValueStore()}), in which case it is rethrown.
+     */
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /** Lists the keys stored in this key-value store. */
-    public function listKeys(?ListKeysOptions $options = null): KeyValueStoreKeysPage
+    public function listKeys(?ListKeysOptions $options = null, int|float|string|null $timeoutSecs = null): KeyValueStoreKeysPage
     {
         $params = new QueryParams();
         ($options ?? new ListKeysOptions())->appendTo($params);
-        return KeyValueStoreKeysPage::fromData($this->ctx->getResourceRequired('keys', $params));
+        return KeyValueStoreKeysPage::fromData(
+            $this->ctx->getResourceRequired('keys', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+        );
     }
 
     /**
@@ -96,7 +107,7 @@ final class KeyValueStoreClient
      *
      * @return Generator<int,KeyValueStoreKey>
      */
-    public function iterateKeys(?ListKeysOptions $options = null): Generator
+    public function iterateKeys(?ListKeysOptions $options = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListKeysOptions();
         // Total cap across all pages. null or 0 means "iterate the whole store" (the API treats
@@ -116,7 +127,7 @@ final class KeyValueStoreClient
                 prefix: $options->prefix,
                 collection: $options->collection,
                 signature: $options->signature,
-            ));
+            ), $timeoutSecs);
 
             $items = $page->getItems();
             if ($items === []) {
@@ -136,23 +147,31 @@ final class KeyValueStoreClient
     }
 
     /** Reports whether a record with the given key exists. */
-    public function recordExists(string $key): bool
+    public function recordExists(string $key, int|float|string|null $timeoutSecs = null): bool
     {
-        return $this->ctx->headExists('records/' . ResourceContext::encodePathSegment($key), new QueryParams());
+        return $this->ctx->headExists(
+            'records/' . ResourceContext::encodePathSegment($key),
+            new QueryParams(),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
+        );
     }
 
     /**
      * Fetches a record by key, or {@code null} if it does not exist. Like the reference client, it
      * requests the record as an attachment so the API returns the raw bytes directly.
      */
-    public function getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord
+    public function getRecord(string $key, ?GetRecordOptions $options = null, int|float|string|null $timeoutSecs = null): ?KeyValueStoreRecord
     {
         // GetRecordOptions defaults attachment=true (matching the reference client), so a caller-
         // supplied options object requests the record as an attachment unless it opts out explicitly.
         $options ??= new GetRecordOptions();
         $params = new QueryParams();
         $options->appendTo($params);
-        $response = $this->ctx->getRaw('records/' . ResourceContext::encodePathSegment($key), $params);
+        $response = $this->ctx->getRaw(
+            'records/' . ResourceContext::encodePathSegment($key),
+            $params,
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)
+        );
         if ($response === null) {
             return null;
         }
@@ -167,7 +186,7 @@ final class KeyValueStoreClient
     public function setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null): void
     {
         $options ??= new SetRecordOptions();
-        $timeoutSecs = $options->timeoutSecs !== null ? (float) $options->timeoutSecs : null;
+        $timeoutSecs = $this->ctx->resolveTimeout($options->timeoutSecs, TimeoutTiers::TIER_LONG);
         $this->ctx->putRaw(
             'records/' . ResourceContext::encodePathSegment($key),
             new QueryParams(),
@@ -189,9 +208,12 @@ final class KeyValueStoreClient
     }
 
     /** Deletes a record by key. */
-    public function deleteRecord(string $key): void
+    public function deleteRecord(string $key, int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('records/' . ResourceContext::encodePathSegment($key));
+        $this->ctx->deleteResource(
+            'records/' . ResourceContext::encodePathSegment($key),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
+        );
     }
 
     /**

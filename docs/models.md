@@ -54,6 +54,7 @@ model is also used as an input object and therefore additionally exposes setters
 | `getStartedAt(): ?string` | ISO-8601 start timestamp. |
 | `getFinishedAt(): ?string` | ISO-8601 finish timestamp (`null` while building). |
 | `getBuildNumber(): ?string` | The resulting build number. |
+| `getImageDigest(): ?string` | Digest of the built Docker image manifest (no `sha256:` prefix), or `null` if unavailable. Compare two builds' digests to tell whether their image contents differ. |
 | `isTerminal(): bool` | Whether the build has reached a terminal status. |
 
 ### `ActorVersion`

@@ -7,6 +7,7 @@ namespace Apify\Client\Resource;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
+use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorVersion;
 
 /**
@@ -26,9 +27,9 @@ final class ActorVersionClient
     }
 
     /** Fetches the version, or {@code null} if it does not exist. */
-    public function get(): ?ActorVersion
+    public function get(int|float|string|null $timeoutSecs = null): ?ActorVersion
     {
-        $data = $this->ctx->getResource('', new QueryParams());
+        $data = $this->ctx->getResource('', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? new ActorVersion($data) : null;
     }
 
@@ -37,15 +38,15 @@ final class ActorVersionClient
      *
      * @param mixed $newFields any JSON-serializable set of fields to update
      */
-    public function update(mixed $newFields): ActorVersion
+    public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): ActorVersion
     {
-        return new ActorVersion($this->ctx->updateResource('', $newFields));
+        return new ActorVersion($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
     /** Deletes the version. */
-    public function delete(): void
+    public function delete(int|float|string|null $timeoutSecs = null): void
     {
-        $this->ctx->deleteResource('');
+        $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /** A client for a specific environment variable of this version. */

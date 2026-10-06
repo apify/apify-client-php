@@ -20,6 +20,8 @@ final class RetryConfig
         public readonly float $maxDelayMillis,
         /** Overall per-request timeout budget, in seconds. Each attempt's timeout grows but is capped here. */
         public readonly float $timeoutSecs,
+        /** The configured timeout tiers (short/medium/long/max), used as the default when a call has no per-call override. */
+        public readonly TimeoutTiers $timeoutTiers,
     ) {
     }
 }
