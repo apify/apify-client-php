@@ -280,8 +280,8 @@ final class ResourceContext
         // Items still to yield, or null for "unbounded" (no $limit given).
         $remaining = ($limit !== null && $limit > 0) ? $limit - $pageCount : null;
 
-        // Continue only while the last page returned something; a page that returns nothing ends the
-        // iteration, whether because the listing is exhausted or $remaining has been reached.
+        // Two distinct ways to stop: a page that returns nothing (the listing is exhausted), or
+        // $remaining having already reached 0 (the caller's $limit is satisfied) — either ends the loop.
         while ($pageCount > 0 && ($remaining === null || $remaining > 0)) {
             $pageLimit = self::minLimit($remaining, $chunkSize);
             $page = $fetchPage($currentOffset, $pageLimit);

@@ -142,8 +142,8 @@ final class DatasetClient
         // Items still to yield, or null for "unbounded" (no $limit given).
         $remaining = ($limit !== null && $limit > 0) ? $limit - $pageScanned : null;
 
-        // Continue only while the last page scanned something; a page that scans nothing ends the
-        // iteration, whether because the dataset is exhausted or $remaining has been reached.
+        // Two distinct ways to stop: a page that scans nothing (the dataset is exhausted), or
+        // $remaining having already reached 0 (the caller's $limit is satisfied) — either ends the loop.
         while ($pageScanned > 0 && ($remaining === null || $remaining > 0)) {
             $pageLimit = ResourceContext::minLimit($remaining, $chunkSize);
             [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, $pageLimit), $resolved);
