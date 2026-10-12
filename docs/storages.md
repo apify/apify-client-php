@@ -50,7 +50,7 @@ Single — `$client->keyValueStore($id)`:
 
 - `get(): ?KeyValueStore`, `update(mixed $newFields): KeyValueStore`, `delete(): void`
 - `listKeys(?ListKeysOptions $options = null): KeyValueStoreKeysPage`
-- `iterateKeys(?ListKeysOptions $options = null): iterable` — lazily iterate all keys, following cursor pagination (`exclusiveStartKey`/`nextExclusiveStartKey`). The options' `limit` caps the total number of keys yielded across all pages (unset = all); there is no separate page-size argument (the per-page size follows the remaining cap, like the reference client).
+- `iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all keys, following cursor pagination (`exclusiveStartKey`/`nextExclusiveStartKey`). The options' `limit` caps the total number of keys yielded across all pages (unset = all); `$chunkSize` is the per-page size (unset = the remaining total cap, or the server default when unbounded).
 - `recordExists(string $key): bool` — reports whether a record with the given key exists, without downloading its value (a `HEAD` request).
 - `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord`
 - `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null): void`

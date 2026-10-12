@@ -42,24 +42,18 @@ final class ActorEnvVarCollectionClient
     }
 
     /**
-     * Lazily iterates over the version's environment variables, fetching pages on demand.
-     * {@code $chunkSize} caps the per-page size ({@code null} = the server default). This endpoint is
-     * not filtered, so iteration mirrors the reference client's parameterless {@code list()} iterator.
+     * Lazily iterates over the version's environment variables.
+     *
+     * This endpoint ignores {@code offset}/{@code limit} and always returns every environment
+     * variable in one response, so iteration makes exactly one request — unlike the offset/limit
+     * collection iterators, there is no per-page {@code chunkSize} to request fewer at a time, and a
+     * generic paginating loop would re-request (and re-yield) the same full list forever.
      *
      * @return Generator<int,ActorEnvVar>
      */
-    public function iterate(?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
+    public function iterate(int|float|string|null $timeoutSecs = null): Generator
     {
-        return ResourceContext::paginateOffset(
-            0,
-            null,
-            $chunkSize,
-            function (int $offset, ?int $pageLimit) use ($timeoutSecs) {
-                $params = new QueryParams();
-                $params->addInt('offset', $offset)->addInt('limit', $pageLimit);
-                return $this->ctx->listResource('', $params, static fn (array $d) => ActorEnvVar::fromArray($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
-            },
-        );
+        yield from $this->list($timeoutSecs)->getItems();
     }
 
     /** Creates a new environment variable. */

@@ -101,13 +101,13 @@ final class KeyValueStoreClient
      *
      * The options' {@code limit} caps the total number of keys yielded across all pages ({@code null}
      * or {@code 0} = all); {@code exclusiveStartKey} starts the listing after a given key; {@code prefix} and
-     * {@code collection} restrict which keys are listed. Unlike the offset/limit collection iterators,
-     * there is no separate page-size argument: the per-page size follows the remaining total cap (or
-     * the server default when unbounded), exactly as the reference client does.
+     * {@code collection} restrict which keys are listed. {@code $chunkSize} caps how many keys are
+     * requested per page ({@code null} = the remaining total cap, or the server default when
+     * unbounded) — the two are independent, matching the offset/limit collection iterators.
      *
      * @return Generator<int,KeyValueStoreKey>
      */
-    public function iterateKeys(?ListKeysOptions $options = null, int|float|string|null $timeoutSecs = null): Generator
+    public function iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListKeysOptions();
         // Total cap across all pages. null or 0 means "iterate the whole store" (the API treats
@@ -119,10 +119,11 @@ final class KeyValueStoreClient
         $iterated = 0;
 
         while (true) {
-            // Ask for only as many keys as remain under the total cap (null = server default).
+            // Ask for only as many keys as remain under the total cap (null = server default),
+            // further capped by $chunkSize.
             $remaining = $limit !== null ? $limit - $iterated : null;
             $page = $this->listKeys(new ListKeysOptions(
-                limit: $remaining,
+                limit: ResourceContext::minLimit($remaining, $chunkSize),
                 exclusiveStartKey: $exclusiveStartKey,
                 prefix: $options->prefix,
                 collection: $options->collection,
