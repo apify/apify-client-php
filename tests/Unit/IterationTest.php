@@ -208,6 +208,44 @@ final class IterationTest extends TestCase
         self::assertStringContainsString('offset=6', (string) $transport->received[2]->getUri());
     }
 
+    public function testDatasetIterateItemsCapsScannedCountWhenUnwindInflatesItemsPastTheRequestedLimit(): void
+    {
+        // With unwind active, a page can return MORE items than rows it scanned (the opposite of
+        // skipEmpty). Here the scanned-count header is also missing (e.g. stripped by a proxy), so the
+        // iterator falls back to the (unwind-inflated) item count — which must be capped at the
+        // requested per-page limit (2), since the server never scans more rows per page than that.
+        // Without the cap, the iterator would advance by the raw item count (6) instead of the real row
+        // count (2), overshooting to offset=6 and skipping rows 2-3's items entirely.
+        $transport = (new MockTransport())
+            // Page 1: rows 0-1 (2 rows, matching the requested limit), each unwound into 3 items.
+            ->queueResponse(200, Json::encode([['n' => 0], ['n' => 1], ['n' => 2], ['n' => 3], ['n' => 4], ['n' => 5]]), [
+                'X-Apify-Pagination-Total' => '4',
+                'X-Apify-Pagination-Offset' => '0',
+                'X-Apify-Pagination-Limit' => '2',
+                // No X-Apify-Pagination-Count header.
+            ])
+            // Page 2 (must be requested at offset=2, not offset=6): rows 2-3, likewise unwound.
+            ->queueResponse(200, Json::encode([['n' => 6], ['n' => 7], ['n' => 8], ['n' => 9], ['n' => 10], ['n' => 11]]), [
+                'X-Apify-Pagination-Total' => '4',
+                'X-Apify-Pagination-Offset' => '2',
+                'X-Apify-Pagination-Limit' => '2',
+            ])
+            // Trailing page confirms the dataset (4 real rows) is exhausted.
+            ->queueResponse(200, Json::encode([]), [
+                'X-Apify-Pagination-Total' => '4',
+                'X-Apify-Pagination-Offset' => '4',
+                'X-Apify-Pagination-Limit' => '2',
+            ]);
+        $values = [];
+        foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(unwind: ['parts']), 2) as $item) {
+            $values[] = $item['n'];
+        }
+        self::assertSame(range(0, 11), $values);
+        self::assertSame(3, $transport->callCount());
+        self::assertStringContainsString('offset=2', (string) $transport->received[1]->getUri());
+        self::assertStringContainsString('offset=4', (string) $transport->received[2]->getUri());
+    }
+
     public function testDatasetIterateItemsPreservesFilters(): void
     {
         $transport = (new MockTransport())

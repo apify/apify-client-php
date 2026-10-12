@@ -7,15 +7,22 @@ namespace Apify\Client\Tests\Unit;
 use Apify\Client\ApifyClient;
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Internal\Json;
+use Apify\Client\Internal\WaitForResources;
 use Apify\Client\Options\ActorStartOptions;
 use Apify\Client\Options\TaskStartOptions;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Hermetic tests for the {@code waitForResources} option of {@see \Apify\Client\Resource\ActorClient}
- * and {@see \Apify\Client\Resource\TaskClient}'s {@code start()}/{@code call()}, driven by a scripted
- * transport. Mirrors the reference client's {@code startWaitingForResources} behavior.
+ * Tests for the {@code waitForResources} option of {@see \Apify\Client\Resource\ActorClient} and
+ * {@see \Apify\Client\Resource\TaskClient}'s {@code start()}/{@code call()}. Mirrors the reference
+ * client's {@code startWaitingForResources} behavior.
+ *
+ * The retry/backoff mechanism itself is exercised directly against {@see WaitForResources::start()}
+ * with a near-zero {@code $cooldownSecs} override (a parameter that exists solely for this), so the
+ * suite does not sleep through real 10-second cooldowns. That {@code $cooldownSecs} is never passed by
+ * {@see \Apify\Client\Resource\ActorClient}/{@see \Apify\Client\Resource\TaskClient} themselves, so the
+ * real cooldown is exercised only by the integration suite.
  */
 final class WaitForResourcesTest extends TestCase
 {
@@ -34,29 +41,64 @@ final class WaitForResourcesTest extends TestCase
         return Json::encode(['data' => ['id' => 'run1', 'status' => $status]]);
     }
 
-    public function testActorStartRetriesOnResourceLimitUntilItSucceeds(): void
+    private static function rejectionError(string $type): ApifyApiException
     {
-        $transport = (new MockTransport())
-            ->queueResponse(402, self::rejection('actor-memory-limit-exceeded'))
-            ->queueResponse(402, self::rejection('concurrent-runs-limit-exceeded'))
-            ->queueResponse(201, self::runBody());
-
-        $run = $this->client($transport)->actor('a1')->start(null, new ActorStartOptions(waitForResources: true));
-
-        self::assertSame('run1', $run->getId());
-        self::assertSame(3, $transport->callCount());
+        return new ApifyApiException(402, $type, "rejected: $type", 1, 'POST', '/v2/actor-runs');
     }
 
-    public function testTaskStartRetriesOnResourceLimitUntilItSucceeds(): void
+    public function testRetriesEveryCooldownUntilItSucceeds(): void
     {
-        $transport = (new MockTransport())
-            ->queueResponse(402, self::rejection('actor-memory-limit-exceeded'))
-            ->queueResponse(201, self::runBody());
+        $attempts = 0;
+        $start = static function () use (&$attempts) {
+            $attempts++;
+            if ($attempts < 3) {
+                throw self::rejectionError($attempts === 1 ? 'actor-memory-limit-exceeded' : 'concurrent-runs-limit-exceeded');
+            }
+            return 'started';
+        };
 
-        $run = $this->client($transport)->task('t1')->start(null, new TaskStartOptions(waitForResources: true));
+        $result = WaitForResources::start($start, true, cooldownSecs: 0.001);
 
+        self::assertSame('started', $result);
+        self::assertSame(3, $attempts);
+    }
+
+    public function testNumberOfSecondsBoundsTheRetryingAndThrowsTheLastRejection(): void
+    {
+        $attempts = 0;
+        $start = static function () use (&$attempts) {
+            $attempts++;
+            throw self::rejectionError('actor-memory-limit-exceeded');
+        };
+
+        try {
+            WaitForResources::start($start, 1, cooldownSecs: 0.001);
+            self::fail('expected an ApifyApiException');
+        } catch (ApifyApiException $e) {
+            self::assertSame('actor-memory-limit-exceeded', $e->getType());
+        }
+        // Roughly 1 / 0.001 attempts before the 1-second budget runs out; a wide range keeps this
+        // robust to scheduling jitter while still proving it bounds the retrying rather than retrying
+        // forever. $waitForResources only accepts a whole number of seconds, so 1 is the smallest
+        // nonzero budget this can exercise without hitting the (already separately tested) "0 makes a
+        // single attempt" case.
+        self::assertGreaterThan(10, $attempts);
+        self::assertLessThan(10000, $attempts);
+    }
+
+    public function testActorStartAndTaskStartWireTheOptionIntoWaitForResources(): void
+    {
+        // Succeeding on the very first attempt needs no cooldown at all, so this confirms
+        // ActorClient/TaskClient actually construct the WaitForResources::start() call (rather than,
+        // say, silently dropping the option) without the suite paying for even one real sleep; the
+        // retry/cooldown mechanism itself is exercised above, directly against WaitForResources.
+        $actorTransport = (new MockTransport())->queueResponse(201, self::runBody());
+        $run = $this->client($actorTransport)->actor('a1')->start(null, new ActorStartOptions(waitForResources: true));
         self::assertSame('run1', $run->getId());
-        self::assertSame(2, $transport->callCount());
+
+        $taskTransport = (new MockTransport())->queueResponse(201, self::runBody());
+        $run = $this->client($taskTransport)->task('t1')->start(null, new TaskStartOptions(waitForResources: true));
+        self::assertSame('run1', $run->getId());
     }
 
     public function testThrowsFirstRejectionWithoutTheOption(): void
@@ -91,29 +133,6 @@ final class WaitForResourcesTest extends TestCase
             self::assertSame('invalid-input', $e->getType());
         }
         self::assertSame(1, $transport->callCount());
-    }
-
-    public function testNumberOfSecondsBoundsTheRetryingAndThrowsTheLastRejection(): void
-    {
-        $transport = new MockTransport();
-        for ($i = 0; $i < 5; $i++) {
-            $transport->queueResponse(402, self::rejection('actor-memory-limit-exceeded'));
-        }
-
-        $start = microtime(true);
-        try {
-            $this->client($transport)->actor('a1')->start(null, new ActorStartOptions(waitForResources: 1));
-            self::fail('expected an ApifyApiException');
-        } catch (ApifyApiException $e) {
-            self::assertSame('actor-memory-limit-exceeded', $e->getType());
-        }
-        $elapsedSecs = microtime(true) - $start;
-
-        // Attempts 10 seconds apart with only a 1-second budget mean a single retry at most, well
-        // under the 10s cooldown — asserting this (rather than an exact attempt count) keeps the test
-        // robust to scheduling jitter around the 1-second bound.
-        self::assertLessThan(5.0, $elapsedSecs);
-        self::assertLessThanOrEqual(3, $transport->callCount());
     }
 
     public function testZeroSecondsMakesASingleAttempt(): void

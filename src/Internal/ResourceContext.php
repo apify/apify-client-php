@@ -275,7 +275,7 @@ final class ResourceContext
             yield $item;
         }
 
-        $pageCount = self::advancedBy($page, $firstPageLimit);
+        $pageCount = self::advancedBy($page);
         $currentOffset = $startOffset + $pageCount;
         // Items still to yield, or null for "unbounded" (no $limit given).
         $remaining = ($limit !== null && $limit > 0) ? $limit - $pageCount : null;
@@ -288,7 +288,7 @@ final class ResourceContext
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
-            $pageCount = self::advancedBy($page, $pageLimit);
+            $pageCount = self::advancedBy($page);
             $currentOffset += $pageCount;
             if ($remaining !== null) {
                 $remaining -= $pageCount;
@@ -297,18 +297,16 @@ final class ResourceContext
     }
 
     /**
-     * How far a page advances the offset: the number of items it returned, capped at the limit that
-     * was requested for it (a {@code null} request limit means "uncapped"). The cap matters for an
-     * endpoint that ignores {@code offset}/{@code limit} and always returns everything (see {@see
-     * \Apify\Client\Resource\ActorEnvVarCollectionClient} and {@see
-     * \Apify\Client\Resource\ActorVersionCollectionClient}, which avoid this generic loop entirely for
-     * that reason) — without the cap a short requested page that comes back oversized would advance
-     * past items the next, correctly-sized request would then never read.
+     * How far a page advances the offset: the number of items it returned. Every endpoint still using
+     * this generic loop honors the {@code limit} it was sent — unlike the dataset-items endpoint (see
+     * {@see \Apify\Client\Resource\DatasetClient::scannedRows()}), none of them has an {@code unwind}-
+     * like transform that can make a page return more items than its requested limit, and an endpoint
+     * that ignores {@code offset}/{@code limit} entirely (env vars, Actor versions) bypasses this loop
+     * rather than going through it — so the returned count never needs capping to the requested limit.
      */
-    private static function advancedBy(PaginationList $page, ?int $requestedLimit): int
+    private static function advancedBy(PaginationList $page): int
     {
-        $count = count($page->getItems());
-        return $requestedLimit !== null ? min($count, $requestedLimit) : $count;
+        return count($page->getItems());
     }
 
     /**

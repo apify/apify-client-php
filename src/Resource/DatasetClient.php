@@ -116,11 +116,14 @@ final class DatasetClient
      * ({@code skipHidden} only strips hidden fields from each item, not whole items, so it does not
      * affect paging.)
      *
-     * The scanned count is also capped at what the page's request asked for, and — like {@see
-     * \Apify\Client\Internal\ResourceContext::paginateOffset()} — the listing's reported {@code total}
-     * is never consulted for the stop condition: it can grow while the iteration runs (e.g. a run still
-     * pushing to the dataset being read), so with no {@code $limit} the loop always ends with one
-     * request that scans nothing, rather than stopping at the size the dataset had when it started.
+     * The scanned count is also capped at what the page's request asked for — see {@see scannedRows()}
+     * for why {@code unwind} specifically makes that cap necessary here (unlike the offset/limit
+     * collection iterators in {@see \Apify\Client\Internal\ResourceContext::paginateOffset()}, which
+     * have no such cap because none of their endpoints has an item-multiplying transform). The
+     * listing's reported {@code total} is never consulted for the stop condition, there or here: it can
+     * grow while the iteration runs (e.g. a run still pushing to the dataset being read), so with no
+     * {@code $limit} the loop always ends with one request that scans nothing, rather than stopping at
+     * the size the dataset had when it started.
      *
      * @return Generator<int,mixed>
      */
@@ -161,8 +164,18 @@ final class DatasetClient
     /**
      * The number of rows a page advances the offset by: the larger of its scanned-count header (if
      * present) and its returned item count, capped at the limit requested for it ({@code null} =
-     * uncapped). Mirrors {@see \Apify\Client\Internal\ResourceContext}'s private {@code advancedBy()}
-     * with the dataset-items endpoint's extra scanned-count header folded in.
+     * uncapped).
+     *
+     * Unlike {@see \Apify\Client\Internal\ResourceContext}'s plain {@code advancedBy()} (which has no
+     * such cap — see its docblock), this one is load-bearing whenever {@code unwind} is set:
+     * {@code unwind} turns each scanned row into one item per unwound array element, so the returned
+     * item count can legitimately exceed the number of rows the API scanned to produce it (the reverse
+     * of {@code skipEmpty}/{@code clean}, which only ever drop rows). The server never scans more rows
+     * for a page than that page's requested limit, so the true row advance can never exceed it either;
+     * capping the {@code max()} above at the requested limit keeps an unwound page's inflated item count
+     * (or, if the scanned-count header is also missing, its unwind-inflated fallback) from overstating
+     * the real advance, which would otherwise skip whatever rows lie between the true (smaller) advance
+     * and the inflated one.
      */
     private static function scannedRows(PaginationList $page, ?int $scannedHeader, ?int $requestedLimit): int
     {
