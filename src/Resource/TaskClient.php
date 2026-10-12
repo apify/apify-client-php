@@ -10,6 +10,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
+use Apify\Client\Internal\WaitForResources;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\Task;
 use Apify\Client\Options\LastRunOptions;
@@ -97,23 +98,28 @@ final class TaskClient
         ?TaskStartOptions $options = null,
         int|float|string|null $timeoutSecs = null,
     ): ActorRun {
+        $options ??= new TaskStartOptions();
         $params = new QueryParams();
-        ($options ?? new TaskStartOptions())->appendTo($params);
+        $options->appendTo($params);
         $body = $input === null ? null : Json::encode($input);
-        return new ActorRun($this->ctx->postWithBody(
-            'runs',
-            $params,
-            $body,
-            ResourceContext::CONTENT_TYPE_JSON,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
-        ));
+        return WaitForResources::start(
+            fn () => new ActorRun($this->ctx->postWithBody(
+                'runs',
+                $params,
+                $body,
+                ResourceContext::CONTENT_TYPE_JSON,
+                $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            )),
+            $options->waitForResources,
+        );
     }
 
     /**
      * Starts the task and waits (client-side polling) for it to finish.
      *
      * @param mixed    $input    optionally overrides the task's stored input
-     * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely
+     * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
+     *                           {@code $options->waitForResources} start does not count toward it.
      */
     public function call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun
     {

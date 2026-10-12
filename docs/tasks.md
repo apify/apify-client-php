@@ -30,7 +30,9 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
   `publicConfig.inputSchemaFields`/`publicConfig.datasetView` to be set. An Actor can have up to 10
   published tasks and an account up to 100; if the conditions aren't met, the request fails and
   nothing is changed.
-- `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun`
+- `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun` — `$options->waitForResources`
+  retries a start the API rejects for lack of account resources; see the Actor docs' `start()` for the
+  full behavior.
 - `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun`
 - `getInput(): mixed` (throws if the task itself does not exist — a 404 here cannot mean anything
   else), `updateInput(mixed $input): mixed`

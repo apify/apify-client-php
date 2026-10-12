@@ -40,6 +40,22 @@ final class ActorStartOptions
          */
         public readonly ?string $forcePermissionLevel = null,
         public readonly ?array $webhooks = null,
+        /**
+         * Retry the start while the account lacks the resources for the run, that is while the API
+         * rejects it with an {@see \Apify\Client\Exception\ApifyApiException} of type
+         * {@code actor-memory-limit-exceeded} or {@code concurrent-runs-limit-exceeded}. Both clear as
+         * other runs or builds finish. The start is retried every 10 seconds, and any other error is
+         * thrown right away.
+         *
+         * {@code true} retries until the run starts. An {@code int} number of seconds stops retrying
+         * after that many seconds and throws the last error. {@code null} (the default) makes a single
+         * attempt.
+         *
+         * A run that requests more memory than the whole memory limit of the account is rejected with
+         * {@code actor-memory-limit-exceeded} as well and never starts, so {@code true} retries it
+         * forever.
+         */
+        public readonly bool|int|null $waitForResources = null,
     ) {
     }
 

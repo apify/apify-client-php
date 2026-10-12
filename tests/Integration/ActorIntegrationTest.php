@@ -42,7 +42,7 @@ final class ActorIntegrationTest extends IntegrationTestCase
             $updated = $actor->update(['title' => 'Updated Title']);
             self::assertSame('Updated Title', $updated->getTitle());
             $actor->builds()->list(new ListOptions());
-            $actor->versions()->list(new ListOptions());
+            $actor->versions()->list();
         } finally {
             $client->actor((string) $created->getId())->delete();
         }
@@ -62,7 +62,7 @@ final class ActorIntegrationTest extends IntegrationTestCase
             ]);
             self::assertSame('0.1', $version->getVersionNumber());
             self::assertNotNull($actor->version('0.1')->get());
-            $actor->versions()->list(new ListOptions());
+            $actor->versions()->list();
             $actor->version('0.1')->update([
                 'buildTag' => 'beta',
                 'sourceType' => 'SOURCE_FILES',
@@ -110,9 +110,11 @@ final class ActorIntegrationTest extends IntegrationTestCase
                 'buildTag' => 'latest',
                 'sourceFiles' => [],
             ]);
+            // This endpoint ignores pagination and always returns every version in one response, so
+            // iterate() makes a single request; the retry wrapper only rides out eventual consistency.
             self::assertEventuallyIterated(['0.0', '0.1'], static function () use ($actor): array {
                 $seen = [];
-                foreach ($actor->versions()->iterate(null, 1) as $version) {
+                foreach ($actor->versions()->iterate() as $version) {
                     $seen[(string) $version->getVersionNumber()] = true;
                 }
                 return $seen;
@@ -130,9 +132,11 @@ final class ActorIntegrationTest extends IntegrationTestCase
             $version = $client->actor((string) $created->getId())->version('0.0');
             $version->envVars()->create(new ActorEnvVar('ITER_VAR_1', 'v1'));
             $version->envVars()->create(new ActorEnvVar('ITER_VAR_2', 'v2'));
+            // This endpoint ignores pagination and always returns every env var in one response, so
+            // iterate() makes a single request; the retry wrapper only rides out eventual consistency.
             self::assertEventuallyIterated(['ITER_VAR_1', 'ITER_VAR_2'], static function () use ($version): array {
                 $seen = [];
-                foreach ($version->envVars()->iterate(1) as $envVar) {
+                foreach ($version->envVars()->iterate() as $envVar) {
                     $seen[(string) $envVar->getName()] = true;
                 }
                 return $seen;

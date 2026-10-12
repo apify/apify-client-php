@@ -115,11 +115,12 @@ For `actor()->start()` / `actor()->call()`.
 | `restartOnError` | `?bool` | Restart the run if it fails. |
 | `forcePermissionLevel` | `?string` | Override the Actor's permission level (`LIMITED_PERMISSIONS`/`FULL_PERMISSIONS`). |
 | `webhooks` | `array\|null` | Ad-hoc webhooks to attach to the run (base64-encoded before sending). |
+| `waitForResources` | `bool\|int\|null` | Retry the start every 10s while the account lacks resources for the run (`true` = retry until it starts, `int` = stop after that many seconds). |
 
 ### `TaskStartOptions`
 For `task()->start()` / `task()->call()`. Same fields as `ActorStartOptions` except it has no
 `contentType` or `forcePermissionLevel`: `build`, `memoryMbytes`, `timeoutSecs`, `waitForFinish`,
-`maxItems`, `maxTotalChargeUsd`, `restartOnError`, `webhooks`.
+`maxItems`, `maxTotalChargeUsd`, `restartOnError`, `webhooks`, `waitForResources`.
 
 ### `ValidateInputOptions`
 For `actor()->validateInput()`.

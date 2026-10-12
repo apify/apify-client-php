@@ -9,6 +9,7 @@ use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
+use Apify\Client\Internal\WaitForResources;
 use Apify\Client\Model\Actor;
 use Apify\Client\Model\ActorRun;
 use Apify\Client\Model\Build;
@@ -83,13 +84,16 @@ final class ActorClient
         $params = new QueryParams();
         $options->appendTo($params);
         $body = ResourceContext::encodeInputBody($input);
-        return new ActorRun($this->ctx->postWithBody(
-            'runs',
-            $params,
-            $body,
-            $options->contentTypeOrDefault(),
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
-        ));
+        return WaitForResources::start(
+            fn () => new ActorRun($this->ctx->postWithBody(
+                'runs',
+                $params,
+                $body,
+                $options->contentTypeOrDefault(),
+                $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            )),
+            $options->waitForResources,
+        );
     }
 
     /**
@@ -97,7 +101,8 @@ final class ActorClient
      *
      * @param mixed    $input    a JSON-serializable array (or {@code null} for no input), or a raw
      *                           string of bytes sent exactly as given — see {@see start()}
-     * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely
+     * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
+     *                           {@code $options->waitForResources} start does not count toward it.
      */
     public function call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null): ActorRun
     {

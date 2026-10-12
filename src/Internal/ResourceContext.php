@@ -41,6 +41,12 @@ final class ResourceContext
      */
     private const MAX_WAIT_FOR_FINISH_SECS = 999999;
 
+    /**
+     * How long {@see waitForFinish()} keeps polling a job that returns 404, to ride out replica lag,
+     * before it gives up and throws. A successful poll in between resets this window.
+     */
+    private const MAX_WAIT_WHEN_JOB_NOT_FOUND_MILLIS = 3000;
+
     public QueryParams $baseParams;
 
     private string $apiOrigin;
@@ -249,6 +255,12 @@ final class ResourceContext
      * ({@code null} = the server default). The two are independent — {@code $limit} is never reused
      * as the page size. {@code $startOffset} is the offset of the first page.
      *
+     * The next offset and the stop condition follow the number of items a page returned (capped at
+     * what that page's request asked for) — never the listing's reported {@code total}, which can grow
+     * while the iteration runs (e.g. a resource collection gaining entries). With no {@code $limit},
+     * the loop therefore always ends with one request that finds no more items, matching the
+     * reference client exactly.
+     *
      * @template T
      * @param callable(int,?int):PaginationList<T> $fetchPage receives (offset, pageLimit) and returns that page
      * @return Generator<int,T>
@@ -257,32 +269,46 @@ final class ResourceContext
     {
         // First page: request min(limit, chunkSize) items. A null/0 on either side means "unbounded",
         // so the other bound wins (mirrors the reference client's minForLimitParam).
-        $page = $fetchPage($startOffset, self::minLimit($limit, $chunkSize));
-        $items = $page->getItems();
-        foreach ($items as $item) {
+        $firstPageLimit = self::minLimit($limit, $chunkSize);
+        $page = $fetchPage($startOffset, $firstPageLimit);
+        foreach ($page->getItems() as $item) {
             yield $item;
         }
 
-        $total = $page->getTotal();
-        // Effective total cap: the requested limit (0/null => all, i.e. capped only by what exists).
-        // The outer bound by $total is redundant here: the next line's min($total - $startOffset, $cap)
-        // already bounds the result by $total (since $startOffset >= 0).
-        $cap = ($limit !== null && $limit > 0) ? $limit : $total;
-        $currentOffset = $startOffset + count($items);
-        // Items still to yield, bounded both by what remains after the start offset and by the cap.
-        $remaining = min($total - $startOffset, $cap) - count($items);
+        $pageCount = self::advancedBy($page, $firstPageLimit);
+        $currentOffset = $startOffset + $pageCount;
+        // Items still to yield, or null for "unbounded" (no $limit given).
+        $remaining = ($limit !== null && $limit > 0) ? $limit - $pageCount : null;
 
-        // Guard on the previous page being non-empty so an over-reported total (a page shorter than
-        // its claimed total) terminates instead of looping forever.
-        while (count($items) > 0 && $remaining > 0) {
-            $page = $fetchPage($currentOffset, self::minLimit($remaining, $chunkSize));
-            $items = $page->getItems();
-            foreach ($items as $item) {
+        // Continue only while the last page returned something; a page that returns nothing ends the
+        // iteration, whether because the listing is exhausted or $remaining has been reached.
+        while ($pageCount > 0 && ($remaining === null || $remaining > 0)) {
+            $pageLimit = self::minLimit($remaining, $chunkSize);
+            $page = $fetchPage($currentOffset, $pageLimit);
+            foreach ($page->getItems() as $item) {
                 yield $item;
             }
-            $currentOffset += count($items);
-            $remaining -= count($items);
+            $pageCount = self::advancedBy($page, $pageLimit);
+            $currentOffset += $pageCount;
+            if ($remaining !== null) {
+                $remaining -= $pageCount;
+            }
         }
+    }
+
+    /**
+     * How far a page advances the offset: the number of items it returned, capped at the limit that
+     * was requested for it (a {@code null} request limit means "uncapped"). The cap matters for an
+     * endpoint that ignores {@code offset}/{@code limit} and always returns everything (see {@see
+     * \Apify\Client\Resource\ActorEnvVarCollectionClient} and {@see
+     * \Apify\Client\Resource\ActorVersionCollectionClient}, which avoid this generic loop entirely for
+     * that reason) — without the cap a short requested page that comes back oversized would advance
+     * past items the next, correctly-sized request would then never read.
+     */
+    private static function advancedBy(PaginationList $page, ?int $requestedLimit): int
+    {
+        $count = count($page->getItems());
+        return $requestedLimit !== null ? min($count, $requestedLimit) : $count;
     }
 
     /**
@@ -475,8 +501,12 @@ final class ResourceContext
     /**
      * Polls a GET endpoint with {@code waitForFinish} until the resource reaches a terminal state or
      * the wait budget elapses. {@code waitSecs === null} means "wait indefinitely", implemented as a
-     * finite but very large bound so the loop always terminates. A transient 404 (replica lag) is
-     * treated as "not yet available".
+     * finite but very large bound so the loop always terminates.
+     *
+     * A 404 is treated as "not yet available" (replica lag) rather than failing immediately, but only
+     * for {@see MAX_WAIT_WHEN_JOB_NOT_FOUND_MILLIS}: if the resource keeps 404ing for that long, the
+     * wait gives up and rethrows that 404 instead of polling for the rest of {@code $waitSecs} (which
+     * defaults to effectively indefinite). A successful poll in between resets this grace window.
      *
      * @param callable(array<string,mixed>):bool $isTerminal
      * @return array<string,mixed>
@@ -492,6 +522,8 @@ final class ResourceContext
 
         $resource = null;
         $present = false;
+        $notFoundSinceMillis = null;
+        $notFoundException = null;
 
         while (true) {
             $elapsed = self::nowMillis() - $start;
@@ -501,16 +533,28 @@ final class ResourceContext
             $params = new QueryParams();
             $params->addInt('waitForFinish', $requestSecs);
 
-            $data = $this->getResource('', $params);
-            if (is_array($data)) {
-                $resource = $data;
-                $present = true;
-                if ($isTerminal($resource)) {
-                    return $resource;
+            try {
+                $data = $this->getResourceRequired('', $params);
+                if (is_array($data)) {
+                    $resource = $data;
+                    $present = true;
+                    $notFoundSinceMillis = null;
+                    if ($isTerminal($resource)) {
+                        return $resource;
+                    }
                 }
+            } catch (ApifyApiException $e) {
+                if (!HttpClientCore::isNotFound($e)) {
+                    throw $e;
+                }
+                $notFoundSinceMillis ??= self::nowMillis();
+                $notFoundException = $e;
             }
 
             if (self::nowMillis() - $start >= $budgetMillis) {
+                break;
+            }
+            if ($notFoundSinceMillis !== null && self::nowMillis() - $notFoundSinceMillis >= self::MAX_WAIT_WHEN_JOB_NOT_FOUND_MILLIS) {
                 break;
             }
             usleep((int) (self::WAIT_POLL_INTERVAL_SECS * 1_000_000));
@@ -518,6 +562,9 @@ final class ResourceContext
 
         if ($present && $resource !== null) {
             return $resource;
+        }
+        if ($notFoundException !== null) {
+            throw $notFoundException;
         }
         throw new RuntimeException(
             sprintf('waiting for %s to finish failed: cannot fetch %s details from the server', $resourceName, $resourceName)

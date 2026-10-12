@@ -15,8 +15,10 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Hermetic tests for the lazy-iteration helpers, driven entirely by a scripted transport. They
- * exercise the paging/termination logic — single short page, over-reported total, total-cap vs.
- * page-size split, and cursor threading — without touching the network.
+ * exercise the paging/termination logic — over-reported total, total-cap vs. page-size split, cursor
+ * threading, and (matching the reference client) that the stop condition never consults a listing's
+ * reported {@code total}: with no explicit {@code limit}, the loop always ends only once a page scans
+ * no rows, so a resource that keeps growing during the iteration is not cut off at its starting size.
  */
 final class IterationTest extends TestCase
 {
@@ -51,21 +53,27 @@ final class IterationTest extends TestCase
         return array_map(static fn (int $id): array => ['id' => "a$id", 'name' => "actor$id"], $ids);
     }
 
-    public function testSinglePageStopsAfterOneRequest(): void
+    public function testSinglePageThenEmptyPageEndsIteration(): void
     {
-        // total equals the number of returned items => no second request.
-        $transport = (new MockTransport())->queueResponse(200, self::page(self::actors(1, 2, 3), 3, 0));
+        // With no explicit limit, the iterator never trusts a page's reported total: it always
+        // confirms the end with one more request, which here comes back empty.
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::page(self::actors(1, 2, 3), 3, 0))
+            ->queueResponse(200, self::page([], 3, 3));
         $ids = [];
         foreach ($this->client($transport)->actors()->iterate() as $actor) {
             $ids[] = $actor->getId();
         }
         self::assertSame(['a1', 'a2', 'a3'], $ids);
-        self::assertSame(1, $transport->callCount());
+        self::assertSame(2, $transport->callCount());
+        self::assertStringContainsString('offset=3', (string) $transport->received[1]->getUri());
     }
 
     public function testOverReportedTotalTerminates(): void
     {
-        // The API claims 10 items but only 3 exist; the iterator must stop, not loop forever.
+        // The API claims 10 items but only 3 exist; the iterator must stop, not loop forever. The
+        // reported total is irrelevant either way: termination follows only from the empty follow-up
+        // page.
         $transport = (new MockTransport())
             ->queueResponse(200, self::page(self::actors(1, 2, 3), 10, 0))
             ->queueResponse(200, self::page([], 10, 3)); // the follow-up page comes back empty
@@ -74,8 +82,24 @@ final class IterationTest extends TestCase
             $ids[] = $actor->getId();
         }
         self::assertSame(['a1', 'a2', 'a3'], $ids);
-        // One extra fetch is made (remaining > 0) before the empty page stops iteration.
         self::assertSame(2, $transport->callCount());
+    }
+
+    public function testGrowingCollectionIsNotCutOffAtItsStartingSize(): void
+    {
+        // The collection holds 2 items when the first page is read and a 3rd is added before the
+        // follow-up page is fetched. With no explicit limit the iterator must pick it up instead of
+        // stopping at the total the first page reported.
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::page(self::actors(1, 2), 2, 0))
+            ->queueResponse(200, self::page(self::actors(3), 3, 2))
+            ->queueResponse(200, self::page([], 3, 3));
+        $ids = [];
+        foreach ($this->client($transport)->actors()->iterate() as $actor) {
+            $ids[] = $actor->getId();
+        }
+        self::assertSame(['a1', 'a2', 'a3'], $ids);
+        self::assertSame(3, $transport->callCount());
     }
 
     public function testLimitIsTotalCapAndChunkSizeIsPageSize(): void
@@ -118,7 +142,8 @@ final class IterationTest extends TestCase
 
     public function testDatasetIterateItemsPagesViaHeaders(): void
     {
-        // The dataset-items endpoint returns a bare array and reports pagination via headers.
+        // The dataset-items endpoint returns a bare array and reports pagination via headers. With no
+        // explicit limit, a trailing empty page confirms the end instead of trusting the total header.
         $transport = (new MockTransport())
             ->queueResponse(200, Json::encode([['n' => 1], ['n' => 2]]), [
                 'X-Apify-Pagination-Total' => '3',
@@ -129,14 +154,20 @@ final class IterationTest extends TestCase
                 'X-Apify-Pagination-Total' => '3',
                 'X-Apify-Pagination-Offset' => '2',
                 'X-Apify-Pagination-Limit' => '2',
+            ])
+            ->queueResponse(200, Json::encode([]), [
+                'X-Apify-Pagination-Total' => '3',
+                'X-Apify-Pagination-Offset' => '3',
+                'X-Apify-Pagination-Limit' => '2',
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(null, 2) as $item) {
             $values[] = $item['n'];
         }
         self::assertSame([1, 2, 3], $values);
-        self::assertSame(2, $transport->callCount());
+        self::assertSame(3, $transport->callCount());
         self::assertStringContainsString('offset=2', (string) $transport->received[1]->getUri());
+        self::assertStringContainsString('offset=3', (string) $transport->received[2]->getUri());
     }
 
     public function testDatasetIterateItemsAdvancesByScannedCountNotItemCount(): void
@@ -159,14 +190,22 @@ final class IterationTest extends TestCase
                 'X-Apify-Pagination-Offset' => '3',
                 'X-Apify-Pagination-Limit' => '3',
                 'X-Apify-Pagination-Count' => '3',
+            ])
+            // Trailing page confirms there is nothing left to scan.
+            ->queueResponse(200, Json::encode([]), [
+                'X-Apify-Pagination-Total' => '6',
+                'X-Apify-Pagination-Offset' => '6',
+                'X-Apify-Pagination-Limit' => '3',
+                'X-Apify-Pagination-Count' => '0',
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(skipEmpty: true), 3) as $item) {
             $values[] = $item['n'];
         }
         self::assertSame([0, 1, 3, 4, 5], $values);
-        self::assertSame(2, $transport->callCount());
+        self::assertSame(3, $transport->callCount());
         self::assertStringContainsString('offset=3', (string) $transport->received[1]->getUri());
+        self::assertStringContainsString('offset=6', (string) $transport->received[2]->getUri());
     }
 
     public function testDatasetIterateItemsPreservesFilters(): void
@@ -175,6 +214,11 @@ final class IterationTest extends TestCase
             ->queueResponse(200, Json::encode([['n' => 1]]), [
                 'X-Apify-Pagination-Total' => '1',
                 'X-Apify-Pagination-Offset' => '0',
+                'X-Apify-Pagination-Limit' => '1',
+            ])
+            ->queueResponse(200, Json::encode([]), [
+                'X-Apify-Pagination-Total' => '1',
+                'X-Apify-Pagination-Offset' => '1',
                 'X-Apify-Pagination-Limit' => '1',
             ]);
         $it = $this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(fields: ['n'], clean: true));
@@ -279,5 +323,72 @@ final class IterationTest extends TestCase
         self::assertSame(2, $transport->callCount());
         self::assertStringNotContainsString('limit=0', (string) $transport->received[0]->getUri());
         self::assertStringNotContainsString('limit=', (string) $transport->received[0]->getUri());
+    }
+
+    public function testIterateKeysChunkSizeCapsPageSizeIndependentlyOfLimit(): void
+    {
+        // chunkSize bounds each request independently of the total cap: limit=5, chunkSize=2 pages
+        // through 2, 2, then the remaining 1.
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::keysPage(true, 'k2', 'k1', 'k2'))
+            ->queueResponse(200, self::keysPage(true, 'k4', 'k3', 'k4'))
+            ->queueResponse(200, self::keysPage(true, 'k5', 'k5'));
+        $keys = [];
+        foreach ($this->client($transport)->keyValueStore('kvs')->iterateKeys(new ListKeysOptions(limit: 5), 2) as $key) {
+            $keys[] = $key->getKey();
+        }
+        self::assertSame(['k1', 'k2', 'k3', 'k4', 'k5'], $keys);
+        self::assertSame(3, $transport->callCount());
+        self::assertStringContainsString('limit=2', (string) $transport->received[0]->getUri());
+        self::assertStringContainsString('limit=2', (string) $transport->received[1]->getUri());
+        // The last page is capped by the remaining total (1), not chunkSize (2).
+        self::assertStringContainsString('limit=1', (string) $transport->received[2]->getUri());
+    }
+
+    public function testIterateKeysChunkSizeWithoutLimitBoundsEveryPage(): void
+    {
+        // With no total limit, chunkSize alone still caps each page's requested size.
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::keysPage(true, 'k2', 'k1', 'k2'))
+            ->queueResponse(200, self::keysPage(false, null, 'k3'));
+        $keys = [];
+        foreach ($this->client($transport)->keyValueStore('kvs')->iterateKeys(null, 2) as $key) {
+            $keys[] = $key->getKey();
+        }
+        self::assertSame(['k1', 'k2', 'k3'], $keys);
+        self::assertStringContainsString('limit=2', (string) $transport->received[0]->getUri());
+        self::assertStringContainsString('limit=2', (string) $transport->received[1]->getUri());
+    }
+
+    public function testActorEnvVarsIterateMakesExactlyOneRequest(): void
+    {
+        // The env-vars endpoint ignores offset/limit and always returns every item in one response.
+        // The mock only has one response queued, so a regression that re-pages would fail outright
+        // instead of looping or duplicating items.
+        $transport = (new MockTransport())->queueResponse(200, self::page([
+            ['name' => 'A', 'value' => '1'],
+            ['name' => 'B', 'value' => '2'],
+        ], 2, 0));
+        $names = [];
+        foreach ($this->client($transport)->actor('a1')->version('0.0')->envVars()->iterate() as $envVar) {
+            $names[] = $envVar->getName();
+        }
+        self::assertSame(['A', 'B'], $names);
+        self::assertSame(1, $transport->callCount());
+    }
+
+    public function testActorVersionsIterateMakesExactlyOneRequest(): void
+    {
+        // The versions endpoint likewise ignores pagination and returns everything in one response.
+        $transport = (new MockTransport())->queueResponse(200, self::page([
+            ['versionNumber' => '0.0'],
+            ['versionNumber' => '0.1'],
+        ], 2, 0));
+        $numbers = [];
+        foreach ($this->client($transport)->actor('a1')->versions()->iterate() as $version) {
+            $numbers[] = $version->getVersionNumber();
+        }
+        self::assertSame(['0.0', '0.1'], $numbers);
+        self::assertSame(1, $transport->callCount());
     }
 }

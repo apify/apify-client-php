@@ -33,6 +33,11 @@ final class TaskStartOptions
         /** If {@code true}, restart the run if it fails. */
         public readonly ?bool $restartOnError = null,
         public readonly ?array $webhooks = null,
+        /**
+         * Retry the start while the account lacks the resources for the run. See {@see
+         * \Apify\Client\Options\ActorStartOptions::$waitForResources} for the full behavior.
+         */
+        public readonly bool|int|null $waitForResources = null,
     ) {
     }
 

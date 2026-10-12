@@ -10,7 +10,6 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorVersion;
 use Apify\Client\Model\PaginationList;
-use Apify\Client\Options\ListOptions;
 use Generator;
 
 /** A client for an Actor's version collection ({@code GET/POST /v2/actors/{actorId}/versions}). */
@@ -25,33 +24,29 @@ final class ActorVersionCollectionClient
     }
 
     /**
-     * Lists the Actor's versions.
+     * Lists the Actor's versions. The endpoint takes no filtering or pagination parameters: it always
+     * returns every version in one response.
      *
      * @return PaginationList<ActorVersion>
      */
-    public function list(?ListOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
+    public function list(int|float|string|null $timeoutSecs = null): PaginationList
     {
-        $params = new QueryParams();
-        ($options ?? new ListOptions())->appendTo($params);
-        return $this->ctx->listResource('', $params, static fn (array $d) => new ActorVersion($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        return $this->ctx->listResource('', new QueryParams(), static fn (array $d) => new ActorVersion($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
     }
 
     /**
-     * Lazily iterates over the Actor's versions, fetching pages on demand. The options' {@code limit}
-     * caps the total number of versions yielded across all pages ({@code null} = all);
-     * {@code $chunkSize} is the per-page size ({@code null} = the server default).
+     * Lazily iterates over the Actor's versions.
+     *
+     * This endpoint ignores {@code offset}/{@code limit} and always returns every version in one
+     * response, so iteration makes exactly one request — unlike the offset/limit collection iterators,
+     * there is no per-page {@code chunkSize} to request fewer at a time, and a generic paginating loop
+     * would re-request (and re-yield) the same full list forever.
      *
      * @return Generator<int,ActorVersion>
      */
-    public function iterate(?ListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
+    public function iterate(int|float|string|null $timeoutSecs = null): Generator
     {
-        $options ??= new ListOptions();
-        return ResourceContext::paginateOffset(
-            $options->offset ?? 0,
-            $options->limit,
-            $chunkSize,
-            fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
-        );
+        yield from $this->list($timeoutSecs)->getItems();
     }
 
     /**

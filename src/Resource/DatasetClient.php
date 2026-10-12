@@ -112,8 +112,15 @@ final class DatasetClient
      * terminates by the scanned count the API reports in the {@code X-Apify-Pagination-Count} header —
      * never by the returned item count — matching the reference JS client exactly (including its
      * fallback to the item count on a response that omits the header, e.g. behind a proxy that strips
-     * it). ({@code skipHidden} only strips hidden fields from each item, not whole items, so it does
-     * not affect paging.)
+     * it, and its use of whichever of the two is larger, since the header can lag a fresh push).
+     * ({@code skipHidden} only strips hidden fields from each item, not whole items, so it does not
+     * affect paging.)
+     *
+     * The scanned count is also capped at what the page's request asked for, and — like {@see
+     * \Apify\Client\Internal\ResourceContext::paginateOffset()} — the listing's reported {@code total}
+     * is never consulted for the stop condition: it can grow while the iteration runs (e.g. a run still
+     * pushing to the dataset being read), so with no {@code $limit} the loop always ends with one
+     * request that scans nothing, rather than stopping at the size the dataset had when it started.
      *
      * @return Generator<int,mixed>
      */
@@ -124,28 +131,43 @@ final class DatasetClient
         $limit = $options->limit;
         $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
 
-        [$page, $scanned] = $this->fetchItemsPage($options->withPagination($startOffset, ResourceContext::minLimit($limit, $chunkSize)), $resolved);
+        $firstPageLimit = ResourceContext::minLimit($limit, $chunkSize);
+        [$page, $scanned] = $this->fetchItemsPage($options->withPagination($startOffset, $firstPageLimit), $resolved);
         foreach ($page->getItems() as $item) {
             yield $item;
         }
 
-        $total = $page->getTotal();
-        $cap = ($limit !== null && $limit > 0) ? $limit : $total;
-        $pageScanned = $scanned ?? count($page->getItems());
+        $pageScanned = self::scannedRows($page, $scanned, $firstPageLimit);
         $currentOffset = $startOffset + $pageScanned;
-        $remaining = min($total - $startOffset, $cap) - $pageScanned;
+        // Items still to yield, or null for "unbounded" (no $limit given).
+        $remaining = ($limit !== null && $limit > 0) ? $limit - $pageScanned : null;
 
-        // Guard on the previous page having scanned something, so an over-reported total terminates
-        // instead of looping forever.
-        while ($pageScanned > 0 && $remaining > 0) {
-            [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, ResourceContext::minLimit($remaining, $chunkSize)), $resolved);
+        // Continue only while the last page scanned something; a page that scans nothing ends the
+        // iteration, whether because the dataset is exhausted or $remaining has been reached.
+        while ($pageScanned > 0 && ($remaining === null || $remaining > 0)) {
+            $pageLimit = ResourceContext::minLimit($remaining, $chunkSize);
+            [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, $pageLimit), $resolved);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
-            $pageScanned = $scanned ?? count($page->getItems());
+            $pageScanned = self::scannedRows($page, $scanned, $pageLimit);
             $currentOffset += $pageScanned;
-            $remaining -= $pageScanned;
+            if ($remaining !== null) {
+                $remaining -= $pageScanned;
+            }
         }
+    }
+
+    /**
+     * The number of rows a page advances the offset by: the larger of its scanned-count header (if
+     * present) and its returned item count, capped at the limit requested for it ({@code null} =
+     * uncapped). Mirrors {@see \Apify\Client\Internal\ResourceContext}'s private {@code advancedBy()}
+     * with the dataset-items endpoint's extra scanned-count header folded in.
+     */
+    private static function scannedRows(PaginationList $page, ?int $scannedHeader, ?int $requestedLimit): int
+    {
+        $scanned = max($scannedHeader ?? 0, count($page->getItems()));
+        return $requestedLimit !== null ? min($scanned, $requestedLimit) : $scanned;
     }
 
     /**

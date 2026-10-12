@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.9.0
+
+- Synced with Apify OpenAPI spec `v2-2026-10-08T073338Z`.
+- Added a `waitForResources` option to `ActorStartOptions`/`TaskStartOptions` (`ActorClient`/
+  `TaskClient` `start()`/`call()`): retries a run start the API rejects for lack of account memory or a
+  concurrent-run slot (`actor-memory-limit-exceeded`/`concurrent-runs-limit-exceeded`) every 10
+  seconds. `true` retries until the run starts; an `int` bounds the retrying in seconds and then throws
+  the last error. In `call()`, time spent retrying does not count toward `$waitSecs`.
+- Fixed the offset/limit lazy iterators (`iterate()` on the Actor/build/run/task/schedule/webhook/store
+  collections, and `DatasetClient::iterateItems()`) to stop only once a page returns nothing, instead of
+  capping at the `total` the first page reported. A collection that grows while being iterated (e.g. a
+  dataset a run keeps writing to) is no longer cut off at its starting size; with no explicit `limit`,
+  iteration now always ends with one extra request that finds nothing left.
+  **Breaking:** this costs one extra request per unbounded iteration that previously ended exactly on a
+  full last page.
+  `ActorEnvVarCollectionClient`/`ActorVersionCollectionClient::iterate()` no longer accept
+  a `$chunkSize`, and `ActorVersionCollectionClient::list()`/`iterate()` no longer accept a `ListOptions`
+  argument: both endpoints ignore pagination and always return everything in one response, so paging
+  them generically could duplicate items after the fix above; `iterate()` on both now makes exactly one
+  request instead, matching the reference client.
+- `RunClient::waitForFinish()`/`BuildClient::waitForFinish()` now give up and throw a
+  `NotFoundException` after the run/build keeps 404ing for 3 seconds, instead of polling 404s for the
+  rest of the (by default effectively indefinite) wait budget. A successful poll in between resets this
+  grace window.
+- Added a `$chunkSize` parameter to `KeyValueStoreClient::iterateKeys()`, capping how many keys are
+  requested per page independently of the total `limit`, matching the offset/limit collection
+  iterators.
+
 ## 0.8.0
 
 - Added `InvalidRequestException` (400), `UnauthorizedException` (401), `ForbiddenException` (403),

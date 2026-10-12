@@ -46,7 +46,9 @@ $items = $client->run('RUN_ID')->dataset()->listItems();
 - **`waitForFinish(?int $waitSecs = null)`** — the client-side helper method (on runs and builds). It
   polls until the run/build reaches a terminal state, transparently issuing repeated server-side
   waits. `$waitSecs` is the total budget in seconds and is **not** capped; `null` waits indefinitely.
-  For instance, `waitForFinish(300)` waits up to five minutes.
+  For instance, `waitForFinish(300)` waits up to five minutes. A 404 (replica lag right after the run
+  or build is created) is tolerated for up to 3 seconds; if it keeps 404ing past that, the wait gives
+  up and throws a `NotFoundException` instead of polling for the rest of `$waitSecs`.
 - **The server-side `waitForFinish` parameter** — `get(?int $waitForFinishSecs = null)` (and
   `defaultBuild()`) and the `waitForFinish` field on `*Options` (e.g. `ActorStartOptions`). This is a
   single API-side wait and the server caps it at 60 seconds, so the client clamps larger values.
