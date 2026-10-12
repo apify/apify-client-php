@@ -176,6 +176,8 @@ final class DatasetClient
      * (or, if the scanned-count header is also missing, its unwind-inflated fallback) from overstating
      * the real advance, which would otherwise skip whatever rows lie between the true (smaller) advance
      * and the inflated one.
+     *
+     * @param PaginationList<mixed> $page
      */
     private static function scannedRows(PaginationList $page, ?int $scannedHeader, ?int $requestedLimit): int
     {

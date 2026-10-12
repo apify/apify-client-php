@@ -44,6 +44,8 @@ final class WaitForResources
      * @template T
      * @param callable():T $start
      * @throws InvalidArgumentException if {@code $waitForResources} is a negative number
+     * @throws ApifyApiException the last rejection, once the retry budget is bounded and exhausted, or
+     *         immediately for any error that is not a resource-limit rejection
      * @return T
      */
     public static function start(callable $start, bool|int|null $waitForResources, float $cooldownSecs = self::COOLDOWN_SECS): mixed

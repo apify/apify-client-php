@@ -303,6 +303,9 @@ final class ResourceContext
      * like transform that can make a page return more items than its requested limit, and an endpoint
      * that ignores {@code offset}/{@code limit} entirely (env vars, Actor versions) bypasses this loop
      * rather than going through it — so the returned count never needs capping to the requested limit.
+     *
+     * @template T
+     * @param PaginationList<T> $page
      */
     private static function advancedBy(PaginationList $page): int
     {

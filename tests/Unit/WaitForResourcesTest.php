@@ -71,19 +71,25 @@ final class WaitForResourcesTest extends TestCase
             throw self::rejectionError('actor-memory-limit-exceeded');
         };
 
+        // $start rejects unconditionally, so WaitForResources::start() is guaranteed to exhaust the
+        // 1-second budget and rethrow the last rejection; expectException() (rather than a try/catch
+        // with a fail()-on-fallthrough branch) asserts that, since PHPUnit itself fails the test if the
+        // call below returns instead of throwing, keeping the "it must throw" assertion live without a
+        // branch that PHPStan can (correctly, given this always-throwing $start) prove unreachable.
+        $this->expectException(ApifyApiException::class);
+        $this->expectExceptionMessage('rejected: actor-memory-limit-exceeded');
         try {
             WaitForResources::start($start, 1, cooldownSecs: 0.001);
-            self::fail('expected an ApifyApiException');
-        } catch (ApifyApiException $e) {
-            self::assertSame('actor-memory-limit-exceeded', $e->getType());
+        } finally {
+            // Roughly 1 / 0.001 attempts before the 1-second budget runs out; a wide range keeps this
+            // robust to scheduling jitter while still proving it bounds the retrying rather than
+            // retrying forever. $waitForResources only accepts a whole number of seconds, so 1 is the
+            // smallest nonzero budget this can exercise without hitting the (already separately tested)
+            // "0 makes a single attempt" case. The `finally` runs before the exception propagates out
+            // of this test method to PHPUnit's expectException() machinery above.
+            self::assertGreaterThan(10, $attempts);
+            self::assertLessThan(10000, $attempts);
         }
-        // Roughly 1 / 0.001 attempts before the 1-second budget runs out; a wide range keeps this
-        // robust to scheduling jitter while still proving it bounds the retrying rather than retrying
-        // forever. $waitForResources only accepts a whole number of seconds, so 1 is the smallest
-        // nonzero budget this can exercise without hitting the (already separately tested) "0 makes a
-        // single attempt" case.
-        self::assertGreaterThan(10, $attempts);
-        self::assertLessThan(10000, $attempts);
     }
 
     public function testActorStartAndTaskStartWireTheOptionIntoWaitForResources(): void
