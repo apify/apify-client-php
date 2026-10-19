@@ -17,6 +17,7 @@ use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\DownloadItemsFormat;
 use Generator;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 /** A client for a specific dataset (and run-nested variants). */
 final class DatasetClient
@@ -237,6 +238,32 @@ final class DatasetClient
         $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
         $response = $this->http->call('GET', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
         return (string) $response->getBody();
+    }
+
+    /**
+     * Opens a live, streaming connection to the dataset's items export in the given format and
+     * returns a stream over the serialized bytes, so a large export can be read (and, e.g., piped to a
+     * file) in chunks without holding the whole thing in memory.
+     *
+     * The reference client exposes this as a {@code stream} option of {@code downloadItems()} (having
+     * briefly shipped it as its own {@code streamItems()} method, folded back in one release later —
+     * apify/apify-client-js#1139, apify/apify-client-js#1152); this client keeps the separate method
+     * name since PHP has no equivalent of a single method whose return type switches on a boolean
+     * option, and a dedicated {@see streamItems()} name matches this client's existing {@see
+     * \Apify\Client\Resource\LogClient::get()}/{@see \Apify\Client\Resource\LogClient::stream()} split
+     * for the same buffered/streamed choice.
+     *
+     * Like {@see \Apify\Client\Resource\LogClient::stream()}, this bypasses the buffered/retrying
+     * transport, so because the response is consumed incrementally, it is not retried.
+     */
+    public function streamItems(
+        DownloadItemsFormat $format,
+        ?DatasetDownloadOptions $options = null,
+    ): StreamInterface {
+        $params = new QueryParams();
+        $params->addString('format', $format->value);
+        ($options ?? new DatasetDownloadOptions())->appendTo($params);
+        return $this->ctx->streamRaw('items', $params);
     }
 
     /**

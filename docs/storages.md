@@ -21,6 +21,7 @@ Single — `$client->dataset($id)`:
 - `listItems(?DatasetListItemsOptions $options = null): PaginationList` — one page of items decoded to PHP values.
 - `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. The iterator advances and terminates by the number of rows the API scanned (the `X-Apify-Pagination-Count` response header), not by the number of items a page returns, matching the reference JS client exactly — see the method's doc comment for why that matters with `skipEmpty`/`clean`/`unwind`.
 - `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string` — raw export bytes.
+- `streamItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): StreamInterface` — the same export as `downloadItems()`, as a PSR-7 stream instead of a fully-buffered string, so a large export can be read incrementally (e.g. piped to a file) without holding it all in memory. Bypasses the retrying transport, so a failed request is not retried.
 - `pushItems(mixed $items): void`
 - `getStatistics(): ?array` — throws if the dataset itself does not exist (a 404 here cannot mean
   anything else).
@@ -36,6 +37,14 @@ $csv = $client->dataset($dataset->getId())->downloadItems(DownloadItemsFormat::C
 foreach ($client->dataset($dataset->getId())->iterateItems(new DatasetListItemsOptions(), 1000) as $item) {
     echo ($item['url'] ?? '') . PHP_EOL;
 }
+
+// Stream a large export straight to a file instead of buffering it in memory.
+$stream = $client->dataset($dataset->getId())->streamItems(DownloadItemsFormat::CSV);
+$out = fopen('output.csv', 'wb');
+while (!$stream->eof()) {
+    fwrite($out, $stream->read(8192));
+}
+fclose($out);
 ```
 
 ## Key-value stores
@@ -53,7 +62,7 @@ Single — `$client->keyValueStore($id)`:
 - `iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all keys, following cursor pagination (`exclusiveStartKey`/`nextExclusiveStartKey`). The options' `limit` caps the total number of keys yielded across all pages (unset = all); `$chunkSize` is the per-page size (unset = the remaining total cap, or the server default when unbounded).
 - `recordExists(string $key): bool` — reports whether a record with the given key exists, without downloading its value (a `HEAD` request).
 - `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord`
-- `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null): void`
+- `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null, ?string $contentEncoding = null): void` — `$contentEncoding`, if given, is sent as the `Content-Encoding` header, for a `$value` that is already compressed (gzip, br, ...); the client's own best-effort request compression always backs off when `Content-Encoding` is already set, so the bytes reach the API exactly as given.
 - `setRecordJson(string $key, mixed $value): void` — convenience over `setRecord()` that JSON-encodes `$value` and stores it with a JSON content type.
 - `deleteRecord(string $key): void` — permanently removes the record with the given key.
 - `getRecordPublicUrl(string $key): string` — builds a shareable URL for downloading a single record; for a private store it appends an access signature so the URL works without an API token.
@@ -71,6 +80,10 @@ echo ($decoded['answer'] ?? '') . PHP_EOL;
 foreach ($client->keyValueStore($store->getId())->iterateKeys() as $key) {
     echo $key->getKey() . PHP_EOL;
 }
+
+// Upload an already-gzipped value without the client compressing it a second time.
+$gzipped = gzencode(json_encode(['answer' => 42]));
+$client->keyValueStore($store->getId())->setRecord('OUTPUT.json', $gzipped, 'application/json', contentEncoding: 'gzip');
 ```
 
 ## Request queues

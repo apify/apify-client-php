@@ -35,7 +35,9 @@ $publicProfile = $client->user('some-username')->get();
 
 ## Logs — `$client->log($buildOrRunId)`
 
-- `get(?LogOptions $options = null): ?string` — the full log as text.
+- `get(?LogOptions $options = null): ?string` — the full log as text. A PHP string is already a byte
+  sequence and is never re-decoded, so this already returns the log's exact bytes — there is no
+  separate "raw bytes" mode to opt into.
 - `stream(?LogOptions $options = null): StreamInterface` — a live stream of the log.
 
 ```php

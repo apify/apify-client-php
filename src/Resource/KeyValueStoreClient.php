@@ -183,9 +183,24 @@ final class KeyValueStoreClient
     /**
      * Stores a record with raw bytes and the given content type, honoring the given write options
      * ({@code timeoutSecs}, {@code doNotRetryTimeouts}).
+     *
+     * {@code $contentEncoding}, if given, is sent as the request's {@code Content-Encoding} header, for
+     * a {@code $value} that is already compressed (gzip, br, deflate, ...): the client's own best-effort
+     * request compression ({@see \Apify\Client\Internal\Compression}) always backs off when a {@code
+     * Content-Encoding} header is already present (see {@see
+     * \Apify\Client\Internal\HttpClientCore::call()}), so the bytes are stored exactly as given, never
+     * compressed a second time. Unlike the reference client's {@code setRecord()}, this has no
+     * "non-identity encoding on a non-binary value" validation case to replicate: a PHP string is
+     * already the raw-bytes case there, since JSON values go through the separate {@see setRecordJson()}
+     * instead of a union type on one method.
      */
-    public function setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null): void
-    {
+    public function setRecord(
+        string $key,
+        string $value,
+        string $contentType,
+        ?SetRecordOptions $options = null,
+        ?string $contentEncoding = null,
+    ): void {
         $options ??= new SetRecordOptions();
         $timeoutSecs = $this->ctx->resolveTimeout($options->timeoutSecs, TimeoutTiers::TIER_LONG);
         $this->ctx->putRaw(
@@ -194,7 +209,8 @@ final class KeyValueStoreClient
             $value,
             $contentType,
             $timeoutSecs,
-            $options->doNotRetryTimeouts
+            $options->doNotRetryTimeouts,
+            $contentEncoding !== null ? ['Content-Encoding' => $contentEncoding] : []
         );
     }
 

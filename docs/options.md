@@ -237,6 +237,11 @@ For `keyValueStore()->setRecord()`.
 | `timeoutSecs` | `?int` | Per-request timeout for the upload (capped at the client's overall request timeout). |
 | `doNotRetryTimeouts` | `bool` | If `true`, do not retry the upload on request timeout (default `false`). |
 
+`setRecord()` also takes a trailing `?string $contentEncoding = null` parameter (not a field of
+`SetRecordOptions`, which only holds the write-retry options above): set it to the encoding already
+applied to `$value` (e.g. `'gzip'`) so the client's own request compression backs off and the bytes
+are uploaded exactly as given.
+
 ## Request queues
 
 ### `RequestQueueClientOptions`

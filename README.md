@@ -206,6 +206,22 @@ exhausted does the underlying error surface, as an `Apify\Client\Exception\Trans
 `TransportException` means the request never produced a usable response (network failure or timeout)
 after all retries. Requests are retried on network errors, HTTP 429 and 5xx.
 
+Every error the client throws for a failed API interaction — `ApifyApiException` and its status
+subclasses above, plus `Apify\Client\Exception\InvalidResponseBodyException` (thrown when a
+successful response's body does not parse as JSON, e.g. a connection dropped mid-response) — extends
+the common `Apify\Client\Exception\ApifyClientException`, so one `catch` can handle both:
+
+```php
+try {
+    $client->actor('my-actor')->update(['title' => 'x']);
+} catch (ApifyClientException $e) {
+    // Either the API returned an error response, or its body could not be parsed.
+}
+```
+
+`ArgumentValidationError`-style invalid-argument errors (built-in `\InvalidArgumentException`s) and
+`TransportException` stay outside this hierarchy, matching the reference client.
+
 ## Versioning
 
 - `Apify\Client\Version::CLIENT_VERSION` — the semantic version of this library.

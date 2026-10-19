@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Internal;
 
+use Apify\Client\Exception\InvalidResponseBodyException;
 use JsonException;
 
 /**
@@ -29,6 +30,12 @@ final class Json
     /**
      * Decodes a JSON string into PHP values (objects become associative arrays).
      *
+     * Every caller of this method (directly or via {@see decodeData()}) decodes a response body the
+     * client just received over the wire, never a value the caller constructed itself (that path is
+     * {@see encode()}), so a malformed body is wrapped as an {@see InvalidResponseBodyException} —
+     * mirroring the reference client's {@code InvalidResponseBodyError} — instead of leaking the raw
+     * {@see JsonException}.
+     *
      * @return mixed the decoded value
      */
     public static function decode(string $body): mixed
@@ -36,7 +43,11 @@ final class Json
         if ($body === '') {
             return null;
         }
-        return json_decode($body, true, self::MAX_JSON_DEPTH, JSON_THROW_ON_ERROR);
+        try {
+            return json_decode($body, true, self::MAX_JSON_DEPTH, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new InvalidResponseBodyException($body, $e);
+        }
     }
 
     /**
@@ -59,7 +70,7 @@ final class Json
     {
         try {
             return self::decode($body);
-        } catch (JsonException) {
+        } catch (InvalidResponseBodyException) {
             return null;
         }
     }

@@ -9,6 +9,7 @@ use Apify\Client\Model\PaginationList;
 use Generator;
 use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 
 /**
@@ -459,17 +460,52 @@ final class ResourceContext
         }
     }
 
-    /** PUT with raw bytes and a content type, with an explicit per-request timeout and retry control. */
+    /**
+     * Opens a live, streaming connection to {@code $subPath} and returns its body as a stream, for
+     * incremental consumption instead of buffering the whole response in memory. Bypasses the
+     * buffered/retrying transport ({@see HttpClientCore::stream()}), so because the response is
+     * consumed incrementally, it is not retried: a non-2xx status is read eagerly and thrown as the
+     * matching {@see ApifyApiException} (there is nothing to stream in that case anyway).
+     *
+     * Shared by {@see \Apify\Client\Resource\LogClient::stream()} and
+     * {@see \Apify\Client\Resource\DatasetClient::streamItems()}, the two endpoints that expose a
+     * streamed read alongside their buffered one.
+     */
+    public function streamRaw(string $subPath, QueryParams $params): StreamInterface
+    {
+        $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
+        $response = $this->http->stream($url);
+        if ($response->getStatusCode() >= HttpClientCore::MAX_SUCCESS_STATUS) {
+            $body = (string) $response->getBody();
+            throw HttpClientCore::buildApiError(
+                $response->getStatusCode(),
+                $body,
+                1,
+                'GET',
+                HttpClientCore::extractPath($url)
+            );
+        }
+        return $response->getBody();
+    }
+
+    /**
+     * PUT with raw bytes and a content type, with an explicit per-request timeout and retry control.
+     *
+     * @param array<string,string> $extraHeaders additional request headers, e.g. a caller-supplied
+     *                                            {@code Content-Encoding} ({@see
+     *                                            \Apify\Client\Resource\KeyValueStoreClient::setRecord()})
+     */
     public function putRaw(
         string $subPath,
         QueryParams $params,
         string $body,
         string $contentType,
         ?float $timeoutSecs = null,
-        bool $doNotRetryTimeouts = false
+        bool $doNotRetryTimeouts = false,
+        array $extraHeaders = []
     ): void {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $this->http->call('PUT', $url, $body, $contentType, $timeoutSecs ?? $this->requestTimeoutSecs, $doNotRetryTimeouts);
+        $this->http->call('PUT', $url, $body, $contentType, $timeoutSecs ?? $this->requestTimeoutSecs, $doNotRetryTimeouts, $extraHeaders);
     }
 
     // ---- Wait-for-finish ------------------------------------------------------
