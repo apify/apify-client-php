@@ -9,13 +9,9 @@ use JsonException;
 /**
  * Thrown when a successful (2xx) response body does not parse as valid JSON, typically a document cut
  * short by a connection dropped mid-response. Mirrors the reference client's
- * {@code InvalidResponseBodyError}.
- *
- * For an endpoint whose body this client decodes as JSON, {@see \Apify\Client\Internal\HttpClientCore::call()}
- * runs that decoding step itself before returning, inside its own retry loop, so this is retried exactly
- * like a retryable status code and surfaces only once the retries are exhausted — matching the
- * reference client, which parses a (non-streamed) response body inside its own retry loop for the same
- * reason (a dropped connection is usually fixed by retrying).
+ * {@code InvalidResponseBodyError}. See {@see \Apify\Client\Internal\HttpClientCore::call()}'s
+ * {@code $validateBody} param for why this is retried like a retryable status code instead of thrown on
+ * the first occurrence.
  */
 final class InvalidResponseBodyException extends ApifyClientException
 {

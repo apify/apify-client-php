@@ -126,9 +126,17 @@ final class HttpClientCore
                     if ($validateBody === null) {
                         return $response;
                     }
+                    // Buffer the body into a string exactly once: a PSR-18 transport's body is not
+                    // guaranteed seekable/re-readable (@see HttpClientInterface), so a second
+                    // `(string) $response->getBody()` by the caller (every JSON call site does this to
+                    // get the body it already validated here) could otherwise read past EOF and see
+                    // '' instead of the real payload. The response handed back therefore carries a
+                    // fresh, rewound stream built from that buffered string, which every PSR-7 stream
+                    // factory implementation backs with a seekable resource.
+                    $raw = (string) $response->getBody();
                     try {
-                        $validateBody((string) $response->getBody());
-                        return $response;
+                        $validateBody($raw);
+                        return $response->withBody($this->streamFactory->createStream($raw));
                     } catch (InvalidResponseBodyException $e) {
                         $lastError = $e;
                         $retryable = true;

@@ -32,9 +32,9 @@ final class Json
      *
      * Every caller of this method (directly or via {@see decodeData()}) decodes a response body the
      * client just received over the wire, never a value the caller constructed itself (that path is
-     * {@see encode()}), so a malformed body is wrapped as an {@see InvalidResponseBodyException} —
-     * mirroring the reference client's {@code InvalidResponseBodyError} — instead of leaking the raw
-     * {@see JsonException}.
+     * {@see encode()}), so a malformed body is wrapped as an {@see InvalidResponseBodyException} instead
+     * of leaking the raw {@see JsonException}. See {@see \Apify\Client\Internal\HttpClientCore::call()}'s
+     * {@code $validateBody} param for why this is retried rather than thrown on the first occurrence.
      *
      * @return mixed the decoded value
      */
