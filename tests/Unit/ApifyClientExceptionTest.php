@@ -42,10 +42,13 @@ final class ApifyClientExceptionTest extends TestCase
 
     public function testInvalidResponseBodyExceptionIsAnApifyClientException(): void
     {
+        // maxRetries: 0 so the single queued malformed body surfaces immediately instead of being
+        // retried (see HttpClientTest for coverage of the retry behavior itself).
         $transport = (new MockTransport())->queueResponse(200, 'this is not valid JSON {');
+        $client = new ApifyClient(token: 't', maxRetries: 0, timeoutSecs: 5, httpClient: $transport);
 
         try {
-            $this->client($transport)->actor('a1')->get();
+            $client->actor('a1')->get();
             self::fail('expected InvalidResponseBodyException');
         } catch (InvalidResponseBodyException $e) {
             self::assertInstanceOf(ApifyClientException::class, $e);

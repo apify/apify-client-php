@@ -6,6 +6,7 @@ namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Exception\ApifyApiException;
+use Apify\Client\Exception\InvalidResponseBodyException;
 use Apify\Client\Internal\Json;
 use Apify\Client\Options\DatasetListItemsOptions;
 use PHPUnit\Framework\TestCase;
@@ -73,6 +74,36 @@ final class HttpClientTest extends TestCase
             self::assertSame('bad-input', $e->getType());
             self::assertStringContainsString('invalid', $e->getApiMessage());
             self::assertSame(1, $transport->callCount());
+        }
+    }
+
+    public function testMalformedJsonBodyIsRetriedThenSucceeds(): void
+    {
+        // A successful (2xx) response whose body fails to parse as JSON is retried exactly like a
+        // retryable status code — matching the reference client, which parses the body inside its own
+        // retry loop for the same reason (a connection dropped mid-response is usually fixed by a retry).
+        $transport = (new MockTransport())
+            ->queueResponse(200, 'not valid JSON {')
+            ->queueResponse(200, Json::encode(['data' => ['id' => 'recovered']]));
+
+        $actor = $this->client($transport)->actor('x')->get();
+        self::assertSame('recovered', $actor?->getId());
+        self::assertSame(2, $transport->callCount());
+    }
+
+    public function testMalformedJsonBodyThrowsOnceRetriesAreExhausted(): void
+    {
+        $transport = (new MockTransport())
+            ->queueResponse(200, 'not valid JSON {')
+            ->queueResponse(200, 'still not valid JSON {');
+        $client = new ApifyClient(token: 'test-token', maxRetries: 1, minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
+
+        try {
+            $client->actor('x')->get();
+            self::fail('expected InvalidResponseBodyException');
+        } catch (InvalidResponseBodyException $e) {
+            self::assertSame('still not valid JSON {', $e->getRawBody());
+            self::assertSame(2, $transport->callCount());
         }
     }
 

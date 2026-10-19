@@ -206,10 +206,13 @@ exhausted does the underlying error surface, as an `Apify\Client\Exception\Trans
 `TransportException` means the request never produced a usable response (network failure or timeout)
 after all retries. Requests are retried on network errors, HTTP 429 and 5xx.
 
+A successful (2xx) response whose body does not parse as JSON (e.g. a connection dropped
+mid-response) is retried the same way, for an endpoint whose body this client decodes as JSON; only
+once those retries are exhausted does it surface, as `Apify\Client\Exception\InvalidResponseBodyException`.
+
 Every error the client throws for a failed API interaction — `ApifyApiException` and its status
-subclasses above, plus `Apify\Client\Exception\InvalidResponseBodyException` (thrown when a
-successful response's body does not parse as JSON, e.g. a connection dropped mid-response) — extends
-the common `Apify\Client\Exception\ApifyClientException`, so one `catch` can handle both:
+subclasses above, plus `InvalidResponseBodyException` — extends the common
+`Apify\Client\Exception\ApifyClientException`, so one `catch` can handle both:
 
 ```php
 try {

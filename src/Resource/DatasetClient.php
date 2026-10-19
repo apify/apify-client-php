@@ -198,7 +198,7 @@ final class DatasetClient
         $params = new QueryParams();
         $options->appendTo($params);
         $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs);
+        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs, validateBody: Json::decode(...));
 
         $items = Json::decode((string) $response->getBody());
         $items = is_array($items) ? array_values($items) : [];
@@ -245,13 +245,11 @@ final class DatasetClient
      * returns a stream over the serialized bytes, so a large export can be read (and, e.g., piped to a
      * file) in chunks without holding the whole thing in memory.
      *
-     * The reference client exposes this as a {@code stream} option of {@code downloadItems()} (having
-     * briefly shipped it as its own {@code streamItems()} method, folded back in one release later —
-     * apify/apify-client-js#1139, apify/apify-client-js#1152); this client keeps the separate method
-     * name since PHP has no equivalent of a single method whose return type switches on a boolean
-     * option, and a dedicated {@see streamItems()} name matches this client's existing {@see
-     * \Apify\Client\Resource\LogClient::get()}/{@see \Apify\Client\Resource\LogClient::stream()} split
-     * for the same buffered/streamed choice.
+     * The reference client exposes this as a {@code stream} option of {@code downloadItems()}; this
+     * client keeps a separate method instead, since PHP has no equivalent of a single method whose
+     * return type switches on a boolean option, and a dedicated {@see streamItems()} name matches this
+     * client's existing {@see \Apify\Client\Resource\LogClient::get()}/{@see
+     * \Apify\Client\Resource\LogClient::stream()} split for the same buffered/streamed choice.
      *
      * Like {@see \Apify\Client\Resource\LogClient::stream()}, this bypasses the buffered/retrying
      * transport, so because the response is consumed incrementally, it is not retried.
@@ -295,7 +293,7 @@ final class DatasetClient
      */
     public function getStatistics(int|float|string|null $timeoutSecs = null): ?array
     {
-        $response = $this->ctx->getRawRequired('statistics', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
+        $response = $this->ctx->getRawRequired('statistics', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT), Json::decode(...));
         $decoded = Json::decodeData((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }

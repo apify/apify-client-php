@@ -139,7 +139,7 @@ final class TaskClient
      */
     public function getInput(int|float|string|null $timeoutSecs = null): mixed
     {
-        $response = $this->ctx->getRawRequired('input', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
+        $response = $this->ctx->getRawRequired('input', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT), Json::decode(...));
         return Json::decode((string) $response->getBody());
     }
 
@@ -156,7 +156,8 @@ final class TaskClient
             $this->ctx->subUrl('input'),
             Json::encode($input),
             ResourceContext::CONTENT_TYPE_JSON,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT),
+            validateBody: Json::decode(...)
         );
         return Json::decode((string) $response->getBody());
     }

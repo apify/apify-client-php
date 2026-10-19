@@ -12,7 +12,9 @@
 - Added `ApifyClientException`, a common base class for every error the client throws for a failed API
   interaction. `ApifyApiException` (and its status subclasses) now extend it.
 - Added `InvalidResponseBodyException` (extends `ApifyClientException`), thrown instead of a raw
-  `JsonException` when a successful response body fails to parse as JSON.
+  `JsonException` when a successful response body fails to parse as JSON. For an endpoint whose body
+  is decoded as JSON, this is now retried with the same backoff as a retryable status code, matching
+  the reference client.
 
 ## 0.9.0
 
