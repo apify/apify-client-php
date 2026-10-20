@@ -83,4 +83,24 @@ final class ScheduleIntegrationTest extends IntegrationTestCase
             $client->schedule((string) $sch->getId())->delete();
         }
     }
+
+    public function testScheduleNotificationsRoundTrip(): void
+    {
+        // `notifications` (apify-docs #3087: ScheduleNotifications) is not exposed via a typed
+        // Schedule getter, only the generic ApifyResource::get() fallback, since this client passes
+        // create/update bodies through untyped (see client requirements) — this proves the field
+        // actually round-trips through the real API rather than only through this client's own types.
+        $client = $this->requireClient();
+        $def = self::scheduleDef(self::uniqueName('sch-notif'));
+        $def['notifications'] = ['email' => true];
+        $sch = $client->schedules()->create($def);
+        try {
+            self::assertSame(['email' => true], $sch->get('notifications'));
+
+            $updated = $client->schedule((string) $sch->getId())->update(['notifications' => ['email' => false]]);
+            self::assertSame(['email' => false], $updated->get('notifications'));
+        } finally {
+            $client->schedule((string) $sch->getId())->delete();
+        }
+    }
 }

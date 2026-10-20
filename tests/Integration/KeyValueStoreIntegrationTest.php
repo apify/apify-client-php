@@ -118,6 +118,42 @@ final class KeyValueStoreIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testSetRecordWithContentEncodingStoresPreCompressedValueAsIs(): void
+    {
+        $client = $this->requireClient();
+        $store = $client->keyValueStores()->getOrCreate(self::uniqueName('kvs-gzip'));
+        try {
+            $kvs = $client->keyValueStore((string) $store->getId());
+            // High-entropy padding (hex of random bytes), so it survives gzip compression large
+            // enough to stay above the client's own compression threshold (see assertion below) —
+            // repetitive padding would compress away almost entirely.
+            $original = json_encode(['hello' => 'world', 'n' => 42, 'padding' => bin2hex(random_bytes(2048))]);
+            self::assertIsString($original);
+            $gzipped = gzencode($original);
+            self::assertIsString($gzipped);
+            // A gzipped JSON payload is itself well over the 1 KiB auto-compression threshold, so
+            // this also proves the client's own compression genuinely backed off: if it had gzipped
+            // the already-gzipped bytes a second time, the API would receive double-compressed gzip
+            // under a single Content-Encoding: gzip header, decode it once, and store the *inner*
+            // gzip bytes as the record's "JSON" — which could never decode back to the original value
+            // below.
+            self::assertGreaterThan(1024, strlen($gzipped));
+
+            $kvs->setRecord('precompressed.json', $gzipped, 'application/json', contentEncoding: 'gzip');
+
+            // The live API decompresses a Content-Encoding-tagged upload on ingest and serves the
+            // record's plain bytes back out (it does not echo Content-Encoding on GET, nor keep the
+            // compressed bytes verbatim), so the round-trip is verified through the parsed value
+            // rather than a byte-for-byte comparison against $gzipped.
+            $record = $kvs->getRecord('precompressed.json');
+            self::assertNotNull($record);
+            self::assertSame($original, $record->getValue());
+            self::assertStringContainsString('application/json', (string) $record->getContentType());
+        } finally {
+            $client->keyValueStore((string) $store->getId())->delete();
+        }
+    }
+
     public function testRecordPublicUrlIsFetchable(): void
     {
         $client = $this->requireClient();

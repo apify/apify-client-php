@@ -42,6 +42,16 @@ final class MockTransport implements HttpClientInterface
         return $this;
     }
 
+    /**
+     * Queues a fully-constructed response as-is, e.g. one built with a non-seekable body, instead of
+     * the plain string body {@see queueResponse()} always wraps in a seekable stream.
+     */
+    public function queueRawResponse(ResponseInterface $response): self
+    {
+        $this->queue[] = $response;
+        return $this;
+    }
+
     public function lastRequest(): RequestInterface
     {
         if ($this->received === []) {

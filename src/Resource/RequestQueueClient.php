@@ -191,7 +191,8 @@ final class RequestQueueClient
             $url,
             Json::encode($request->toArray()),
             ResourceContext::CONTENT_TYPE_JSON,
-            timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM),
+            validateBody: Json::decode(...)
         );
         $data = Json::decodeData((string) $response->getBody());
         return new RequestQueueOperationInfo(is_array($data) ? $data : []);
@@ -516,7 +517,7 @@ final class RequestQueueClient
         $this->applyClientKey($params);
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment($id) . '/lock'));
-        $response = $this->http->call('PUT', $url, null, '', timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        $response = $this->http->call('PUT', $url, null, '', timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM), validateBody: Json::decode(...));
         return RequestLockInfo::fromData(Json::decodeData((string) $response->getBody()));
     }
 

@@ -78,7 +78,7 @@ final class BuildClient
      */
     public function getOpenApiDefinition(int|float|string|null $timeoutSecs = null): ?array
     {
-        $response = $this->ctx->getRawRequired('openapi.json', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        $response = $this->ctx->getRawRequired('openapi.json', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM), Json::decode(...));
         $decoded = Json::decode((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }

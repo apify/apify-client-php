@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Apify\Client\Exception;
 
-use RuntimeException;
-
 /**
  * Thrown for HTTP requests that reach the Apify API but receive a non-success status code.
  *
  * It mirrors the {@code ApifyApiError} of the reference JavaScript client and exposes the parsed
  * error {@see getType() type}, the human-readable {@see getMessage() message}, the HTTP
  * {@see getStatusCode() status code}, the number of the final {@see getAttempt() attempt}, and the
- * request {@see getHttpMethod() method}/{@see getPath() path}.
+ * request {@see getHttpMethod() method}/{@see getPath() path}. Extends {@see ApifyClientException},
+ * the common base every client error shares.
  */
-class ApifyApiException extends RuntimeException
+class ApifyApiException extends ApifyClientException
 {
     private int $statusCode;
     private ?string $type;

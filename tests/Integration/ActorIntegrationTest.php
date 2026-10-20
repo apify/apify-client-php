@@ -146,6 +146,27 @@ final class ActorIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testActorPermissionLevelRoundTrip(): void
+    {
+        // `actorPermissionLevel` (apify-docs #3087: CreateActorRequest/UpdateActorRequest) is not
+        // exposed via a typed Actor getter, only the generic ApifyResource::get() fallback, since this
+        // client passes create/update bodies through untyped (see client requirements) — this proves
+        // the field actually round-trips through the real API rather than only through this client's
+        // own types.
+        $client = $this->requireClient();
+        $def = self::minimalActor(self::uniqueName('perm-level'));
+        $def['actorPermissionLevel'] = 'LIMITED_PERMISSIONS';
+        $created = $client->actors()->create($def);
+        try {
+            self::assertSame('LIMITED_PERMISSIONS', $created->get('actorPermissionLevel'));
+
+            $updated = $client->actor((string) $created->getId())->update(['actorPermissionLevel' => 'FULL_PERMISSIONS']);
+            self::assertSame('FULL_PERMISSIONS', $updated->get('actorPermissionLevel'));
+        } finally {
+            $client->actor((string) $created->getId())->delete();
+        }
+    }
+
     public function testValidateInput(): void
     {
         $client = $this->requireClient();

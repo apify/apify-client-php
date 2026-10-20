@@ -17,14 +17,14 @@ use Psr\Http\Message\StreamInterface;
  */
 final class LogClient
 {
-    private function __construct(private HttpClientCore $http, private ResourceContext $ctx)
+    private function __construct(private ResourceContext $ctx)
     {
     }
 
     /** @internal */
     public static function forId(HttpClientCore $http, string $baseUrl, string $id): self
     {
-        return new self($http, ResourceContext::single($http, $baseUrl, 'logs', $id));
+        return new self(ResourceContext::single($http, $baseUrl, 'logs', $id));
     }
 
     /**
@@ -38,11 +38,15 @@ final class LogClient
         if ($inheritedParams !== null) {
             $ctx->baseParams = $inheritedParams->copy();
         }
-        return new self($http, $ctx);
+        return new self($ctx);
     }
 
     /**
      * Fetches the log as text, or {@code null} if the log does not exist.
+     *
+     * Unlike the reference client, there is no separate {@code buffer} option: a PHP string is already
+     * a byte sequence, never re-decoded, so this already returns the exact bytes the API sent — the
+     * same thing the reference client's {@code buffer: true} opts into for its own string/Buffer split.
      *
      * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::log()} or
      * {@see \Apify\Client\Resource\BuildClient::log()}), a 404 is rethrown instead, since it could mean
@@ -68,19 +72,6 @@ final class LogClient
         $params = new QueryParams();
         $params->addBool('stream', true);
         ($options ?? new LogOptions())->appendTo($params);
-        $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl(''));
-
-        $response = $this->http->stream($url);
-        if ($response->getStatusCode() >= HttpClientCore::MAX_SUCCESS_STATUS) {
-            $body = (string) $response->getBody();
-            throw HttpClientCore::buildApiError(
-                $response->getStatusCode(),
-                $body,
-                1,
-                'GET',
-                HttpClientCore::extractPath($url)
-            );
-        }
-        return $response->getBody();
+        return $this->ctx->streamRaw('', $params);
     }
 }

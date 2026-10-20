@@ -44,6 +44,20 @@ final class LogClientTest extends TestCase
         self::assertStringContainsString('raw=1', $uri);
     }
 
+    public function testGetReturnsExactBytesForNonUtf8Content(): void
+    {
+        // The reference client's get({ buffer: true }) exists so binary/non-UTF-8 log bytes are not
+        // mangled by decoding to a string. A PHP string is already a byte sequence and get() never
+        // decodes it, so it already behaves like that mode with no separate option needed — this
+        // proves bytes that are not valid UTF-8 still round-trip exactly.
+        $invalidUtf8 = "line with invalid utf-8: \xFF\xFE bytes\n";
+        $transport = (new MockTransport())->queueResponse(200, $invalidUtf8);
+        $log = $this->client($transport)->log('run1')->get();
+
+        self::assertSame($invalidUtf8, $log);
+        self::assertSame(strlen($invalidUtf8), strlen((string) $log));
+    }
+
     public function testStreamedLogUsesStreamQueryAndReturnsReadableStream(): void
     {
         $transport = (new MockTransport())->queueResponse(200, 'streamed log body');

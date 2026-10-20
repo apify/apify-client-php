@@ -8,6 +8,7 @@ use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Exception\ConflictException;
 use Apify\Client\Exception\ForbiddenException;
 use Apify\Client\Exception\InvalidRequestException;
+use Apify\Client\Exception\InvalidResponseBodyException;
 use Apify\Client\Exception\NotFoundException;
 use Apify\Client\Exception\RateLimitException;
 use Apify\Client\Exception\ServerException;
@@ -83,6 +84,13 @@ final class HttpClientCore
      * Sends a request with auth, User-Agent and the retry policy applied.
      *
      * @param array<string,string> $extraHeaders
+     * @param (callable(string): mixed)|null $validateBody For an endpoint whose successful response body this
+     *        client decodes as JSON, the decoding step itself (e.g. {@see \Apify\Client\Internal\Json::decode()}),
+     *        run here against the buffered body before this method returns, so a body that fails to parse —
+     *        usually a connection dropped mid-response — is retried exactly like a retryable status code, instead
+     *        of surfacing on the first occurrence. Matches the reference client, which parses a (non-streamed)
+     *        response body inside its own retry loop for the same reason. Omit it for an endpoint whose body this
+     *        client does not decode (raw bytes/text, or a response it never reads), which has nothing to validate.
      */
     public function call(
         string $method,
@@ -91,7 +99,8 @@ final class HttpClientCore
         string $contentType = '',
         ?float $timeoutSecs = null,
         bool $doNotRetryTimeouts = false,
-        array $extraHeaders = []
+        array $extraHeaders = [],
+        ?callable $validateBody = null
     ): ResponseInterface {
         // Compress the body once, up front, so every retry reuses the already-compressed payload.
         [$body, $extraHeaders] = $this->maybeCompressBody($body, $contentType, $extraHeaders);
@@ -114,10 +123,28 @@ final class HttpClientCore
                 );
                 $status = $response->getStatusCode();
                 if ($status < self::MAX_SUCCESS_STATUS) {
-                    return $response;
+                    if ($validateBody === null) {
+                        return $response;
+                    }
+                    // Buffer the body into a string exactly once: a PSR-18 transport's body is not
+                    // guaranteed seekable/re-readable (@see HttpClientInterface), so a second
+                    // `(string) $response->getBody()` by the caller (every JSON call site does this to
+                    // get the body it already validated here) could otherwise read past EOF and see
+                    // '' instead of the real payload. The response handed back therefore carries a
+                    // fresh, rewound stream built from that buffered string, which every PSR-7 stream
+                    // factory implementation backs with a seekable resource.
+                    $raw = (string) $response->getBody();
+                    try {
+                        $validateBody($raw);
+                        return $response->withBody($this->streamFactory->createStream($raw));
+                    } catch (InvalidResponseBodyException $e) {
+                        $lastError = $e;
+                        $retryable = true;
+                    }
+                } else {
+                    $lastError = self::buildApiError($status, (string) $response->getBody(), $attempt, $method, $path);
+                    $retryable = self::isStatusRetryable($status);
                 }
-                $lastError = self::buildApiError($status, (string) $response->getBody(), $attempt, $method, $path);
-                $retryable = self::isStatusRetryable($status);
             } catch (TransportException $e) {
                 $lastError = $e;
                 // Network/timeout failures are retryable, unless the caller opted out of retrying timeouts.

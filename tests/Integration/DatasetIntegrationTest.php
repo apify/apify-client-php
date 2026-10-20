@@ -87,6 +87,28 @@ final class DatasetIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testStreamItemsMatchesDownloadItems(): void
+    {
+        $client = $this->requireClient();
+        $ds = $client->datasets()->getOrCreate(self::uniqueName('ds-stream'));
+        try {
+            $dataset = $client->dataset((string) $ds->getId());
+            $dataset->pushItems([['n' => 1], ['n' => 2]]);
+
+            $buffered = $dataset->downloadItems(DownloadItemsFormat::CSV);
+            $stream = $dataset->streamItems(DownloadItemsFormat::CSV);
+            $streamed = '';
+            while (!$stream->eof()) {
+                $streamed .= $stream->read(8192);
+            }
+
+            self::assertSame($buffered, $streamed);
+            self::assertStringContainsString('n', $buffered);
+        } finally {
+            $client->dataset((string) $ds->getId())->delete();
+        }
+    }
+
     public function testDatasetCrudFlow(): void
     {
         $client = $this->requireClient();

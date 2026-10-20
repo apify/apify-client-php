@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0
+
+- Synced with Apify OpenAPI spec `v2-2026-10-19T133704Z` (realigned Actor, version, env var and
+  schedule request schemas; no client code changes required, since those bodies were already passed
+  through untyped).
+- Added `DatasetClient::streamItems()`, returning a stream over a dataset items export instead of
+  buffering it fully in memory, matching the reference client's streamed export.
+- Added a `$contentEncoding` parameter to `KeyValueStoreClient::setRecord()`, so an already-compressed
+  value (gzip, br, ...) is uploaded as is instead of being compressed a second time.
+- Added `ApifyClientException`, a common base class for every error the client throws for a failed API
+  interaction. `ApifyApiException` (and its status subclasses) now extend it.
+- Added `InvalidResponseBodyException` (extends `ApifyClientException`), thrown instead of a raw
+  `JsonException` when a successful response body fails to parse as JSON. For an endpoint whose body
+  is decoded as JSON, this is now retried with the same backoff as a retryable status code, matching
+  the reference client.
+
 ## 0.9.0
 
 - Synced with Apify OpenAPI spec `v2-2026-10-08T073338Z`.
