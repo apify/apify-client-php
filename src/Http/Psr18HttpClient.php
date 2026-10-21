@@ -34,7 +34,12 @@ final class Psr18HttpClient implements HttpClientInterface
     {
         $response = $this->sendRequest($request);
         try {
-            $contents = $response->getBody()->getContents();
+            $body = $response->getBody();
+            // Some clients hand back a body they wrote without rewinding it, which would read as empty.
+            if ($body->isSeekable()) {
+                $body->rewind();
+            }
+            $contents = $body->getContents();
         } catch (\RuntimeException $e) {
             throw new TransportException($e->getMessage(), $e);
         }

@@ -138,6 +138,16 @@ final class HttpClientTest extends TestCase
         self::assertSame('my-actor', $actor->getName());
     }
 
+    public function testPsr18ClientReadsABodyThatWasNotRewound(): void
+    {
+        // Some PSR-18 clients return a body they wrote without rewinding it; it must not read as empty.
+        $body = Utils::streamFor(Json::encode(['data' => ['id' => 'abc']]));
+        $body->getContents();
+        $client = new ApifyClient(token: 'test-token', httpClient: new Psr18HttpClient(new StubPsr18Client(new Response(200, [], $body))));
+
+        self::assertSame('abc', $client->actor('abc')->get()?->getId());
+    }
+
     public function testPsr18ClientMapsAFailedBodyReadToARetriedTransportError(): void
     {
         // A lazily read body that fails mid-transfer (connection dropped) is a transport failure: it is
@@ -189,7 +199,7 @@ final class HttpClientTest extends TestCase
         $this->expectExceptionMessage('misconfigured client');
         try {
             (new Psr18HttpClient($client))->send(new Request('GET', 'https://example.com/x'), 5.0);
-        } catch (TransportException $e) {
+        } catch (TransportException) {
             self::fail('a RuntimeException of the wrapped client must not be rewrapped as a TransportException');
         }
     }
