@@ -174,18 +174,24 @@ final class HttpClientTest extends TestCase
         self::assertSame($body, $response->getBody());
     }
 
-    public function testPsr18ClientDoesNotRewrapUnrelatedRuntimeExceptions(): void
+    public function testPsr18ClientDoesNotRewrapARuntimeExceptionOfTheWrappedClient(): void
     {
-        // Only a failed body read is a transport failure; an exception of the wrapped client keeps its type.
+        // Only a failed body read and a PSR-18 ClientExceptionInterface are transport failures; any other
+        // exception of the wrapped client keeps its own type.
         $client = new class () implements ClientInterface {
             public function sendRequest(RequestInterface $request): ResponseInterface
             {
-                throw new \LogicException('misconfigured client');
+                throw new \RuntimeException('misconfigured client');
             }
         };
 
-        $this->expectException(\LogicException::class);
-        (new Psr18HttpClient($client))->send(new Request('GET', 'https://example.com/x'), 5.0);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('misconfigured client');
+        try {
+            (new Psr18HttpClient($client))->send(new Request('GET', 'https://example.com/x'), 5.0);
+        } catch (TransportException $e) {
+            self::fail('a RuntimeException of the wrapped client must not be rewrapped as a TransportException');
+        }
     }
 
     public function testTransportErrorsAreRetried(): void
