@@ -85,7 +85,7 @@ For `store()->list()` / `store()->iterate()`.
 | `sortBy` | `?string` | The sort field (e.g. `popularity`, `newest`). |
 | `category` | `?string` | Filter Actors by category. |
 | `username` | `?string` | Filter Actors by owner username. |
-| `pricingModel` | `?string` | Filter by pricing model (`FREE`, `FLAT_PRICE_PER_MONTH`, `PRICE_PER_DATASET_ITEM`, `PAY_PER_EVENT`). |
+| `pricingModel` | `?string` | Filter by pricing model (`FREE`, `PRICE_PER_DATASET_ITEM`, `PAY_PER_EVENT`). |
 | `includeUnrunnableActors` | `?bool` | Include Actors the current user cannot run. |
 | `allowsAgenticUsers` | `?bool` | Filter to Actors that allow agentic users. |
 | `responseFormat` | `?string` | The response format (`full`, `agent`). |

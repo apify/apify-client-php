@@ -166,7 +166,7 @@ final class ResourceContext
     public function getResourceRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null): mixed
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('GET', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: Json::decode(...));
+        $response = $this->http->call('GET', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return Json::decodeData((string) $response->getBody());
     }
 
@@ -178,7 +178,7 @@ final class ResourceContext
     public function updateResource(string $subPath, mixed $body, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams(new QueryParams())->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('PUT', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: Json::decode(...));
+        $response = $this->http->call('PUT', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -347,7 +347,7 @@ final class ResourceContext
     public function createResource(QueryParams $params, mixed $body, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl(''));
-        $response = $this->http->call('POST', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: Json::decode(...));
+        $response = $this->http->call('POST', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -368,8 +368,8 @@ final class ResourceContext
         $url = $params->applyToUrl($this->subUrl(''));
         $effectiveTimeout = $this->effectiveTimeout($timeoutSecs);
         $response = $schema !== null
-            ? $this->http->call('POST', $url, Json::encode(['schema' => $schema]), self::CONTENT_TYPE_JSON, timeoutSecs: $effectiveTimeout, validateBody: Json::decode(...))
-            : $this->http->call('POST', $url, timeoutSecs: $effectiveTimeout, validateBody: Json::decode(...));
+            ? $this->http->call('POST', $url, Json::encode(['schema' => $schema]), self::CONTENT_TYPE_JSON, timeoutSecs: $effectiveTimeout)
+            : $this->http->call('POST', $url, timeoutSecs: $effectiveTimeout);
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -381,7 +381,7 @@ final class ResourceContext
     public function postWithBody(string $subPath, QueryParams $params, ?string $body, string $contentType, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: Json::decode(...));
+        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -394,7 +394,7 @@ final class ResourceContext
     public function postWithBodyNoEnvelope(string $subPath, QueryParams $params, ?string $body, string $contentType, ?float $timeoutSecs = null): mixed
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: Json::decode(...));
+        $response = $this->http->call('POST', $url, $body, $contentType, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return Json::decode((string) $response->getBody());
     }
 
@@ -406,7 +406,7 @@ final class ResourceContext
     public function deleteWithBody(string $subPath, QueryParams $params, mixed $body, ?float $timeoutSecs = null): array
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        $response = $this->http->call('DELETE', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: Json::decode(...));
+        $response = $this->http->call('DELETE', $url, Json::encode($body), self::CONTENT_TYPE_JSON, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
@@ -414,13 +414,11 @@ final class ResourceContext
      * GET returning the raw response (no data envelope). Returns {@code null} on not-found, unless
      * this context addresses an ID-less chained resource ({@see $hasId}) and {@code $subPath} is the
      * resource itself ({@code ''}), in which case the 404 is rethrown (see {@see deleteResource()}).
-     *
-     * @param (callable(string): mixed)|null $validateBody See {@see getRawRequired()}.
      */
-    public function getRaw(string $subPath, QueryParams $params, ?float $timeoutSecs = null, ?callable $validateBody = null): ?ResponseInterface
+    public function getRaw(string $subPath, QueryParams $params, ?float $timeoutSecs = null): ?ResponseInterface
     {
         try {
-            return $this->getRawRequired($subPath, $params, $timeoutSecs, $validateBody);
+            return $this->getRawRequired($subPath, $params, $timeoutSecs);
         } catch (ApifyApiException $e) {
             if (HttpClientCore::isNotFound($e) && $this->swallowsNotFound($subPath)) {
                 return null;
@@ -431,22 +429,12 @@ final class ResourceContext
 
     /**
      * GET returning the raw response (no data envelope). Propagates every error, including a 404.
-     *
-     * This primitive is shared by endpoints whose body the caller decodes as JSON afterward (e.g.
-     * {@see \Apify\Client\Resource\TaskClient::getInput()}) and ones that return raw bytes/text it
-     * never decodes (e.g. {@see \Apify\Client\Resource\ScheduleClient::getLog()}), so — unlike the
-     * JSON-returning primitives above, which always decode and can validate unconditionally — it
-     * cannot validate the body itself. A JSON-decoding caller passes its decode step (e.g. {@see
-     * \Apify\Client\Internal\Json::decode()}) as {@code $validateBody} so a malformed body is retried
-     * instead of failing on the first occurrence (see {@see HttpClientCore::call()}); a raw caller
-     * omits it.
-     *
-     * @param (callable(string): mixed)|null $validateBody
+     * The caller decodes the body itself, if it is JSON.
      */
-    public function getRawRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null, ?callable $validateBody = null): ResponseInterface
+    public function getRawRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null): ResponseInterface
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
-        return $this->http->call('GET', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs), validateBody: $validateBody);
+        return $this->http->call('GET', $url, timeoutSecs: $this->effectiveTimeout($timeoutSecs));
     }
 
     /**

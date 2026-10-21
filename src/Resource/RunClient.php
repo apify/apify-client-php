@@ -175,7 +175,7 @@ final class RunClient
             $this->ctx->subUrl('charge'),
             Json::encode($body),
             ResourceContext::CONTENT_TYPE_JSON,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT),
             false,
             [self::CHARGE_IDEMPOTENCY_HEADER => $idempotencyKey]
         );

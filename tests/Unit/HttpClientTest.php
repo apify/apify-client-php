@@ -8,12 +8,15 @@ use Apify\Client\ApifyClient;
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Exception\InvalidResponseBodyException;
 use Apify\Client\Exception\ServerException;
+use Apify\Client\Exception\TransportException;
+use Apify\Client\Http\Psr18HttpClient;
 use Apify\Client\Internal\Json;
 use Apify\Client\Options\DatasetListItemsOptions;
 use GuzzleHttp\Psr7\NoSeekStream;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\StreamInterface;
 
 final class HttpClientTest extends TestCase
 {
@@ -116,22 +119,43 @@ final class HttpClientTest extends TestCase
         }
     }
 
-    public function testNonSeekableResponseBodyIsOnlyReadOnce(): void
+    public function testPsr18ClientBuffersANonSeekableResponseBody(): void
     {
-        // A PSR-18 transport's response body is not guaranteed seekable/re-readable (the contract
-        // HttpClientInterface/Psr18HttpClient exposes); a NoSeekStream reproduces that here. call()
-        // must validate/return the body from a single buffered read, since a second
-        // `(string) $response->getBody()` on a stream like this one yields '' once already exhausted
-        // (GuzzleHttp\Psr7\StreamDecoratorTrait::__toString() skips the rewind-on-seek it does for a
-        // seekable stream), which would otherwise make the resource silently look empty.
+        // A PSR-18 client's response body is not guaranteed seekable/re-readable; a NoSeekStream
+        // reproduces that. Psr18HttpClient reads it in full, so the body can be read again afterward.
         $body = new NoSeekStream(Utils::streamFor(Json::encode(['data' => ['id' => 'abc', 'name' => 'my-actor']])));
-        $transport = (new MockTransport())->queueRawResponse(new Response(200, [], $body));
+        $psr18 = new StubPsr18Client(new Response(200, [], $body));
+        $client = new ApifyClient(token: 'test-token', httpClient: new Psr18HttpClient($psr18));
 
-        $actor = $this->client($transport)->actor('abc')->get();
+        $actor = $client->actor('abc')->get();
 
         self::assertNotNull($actor);
         self::assertSame('abc', $actor->getId());
         self::assertSame('my-actor', $actor->getName());
+    }
+
+    public function testPsr18ClientMapsAFailedBodyReadToARetriedTransportError(): void
+    {
+        // A lazily read body that fails mid-transfer (connection dropped) is a transport failure: it is
+        // retried, and once the retries run out it surfaces as a TransportException.
+        $failingBody = $this->createStub(StreamInterface::class);
+        $failingBody->method('getContents')->willThrowException(new \RuntimeException('connection reset while reading the body'));
+        $psr18 = new StubPsr18Client(new Response(200, [], $failingBody));
+        $client = new ApifyClient(
+            token: 'test-token',
+            maxRetries: 1,
+            minDelayBetweenRetriesMillis: 1,
+            timeoutSecs: 5,
+            httpClient: new Psr18HttpClient($psr18)
+        );
+
+        try {
+            $client->actor('x')->get();
+            self::fail('expected TransportException');
+        } catch (TransportException $e) {
+            self::assertStringContainsString('connection reset', $e->getMessage());
+            self::assertSame(2, $psr18->calls);
+        }
     }
 
     public function testTransportErrorsAreRetried(): void

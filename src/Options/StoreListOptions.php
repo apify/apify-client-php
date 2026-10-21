@@ -26,8 +26,8 @@ final class StoreListOptions
         /** Filter Actors by owner username. */
         public readonly ?string $username = null,
         /**
-         * Filter Actors by pricing model ({@code FREE}, {@code FLAT_PRICE_PER_MONTH},
-         * {@code PRICE_PER_DATASET_ITEM}, {@code PAY_PER_EVENT}).
+         * Filter Actors by pricing model ({@code FREE}, {@code PRICE_PER_DATASET_ITEM},
+         * {@code PAY_PER_EVENT}).
          */
         public readonly ?string $pricingModel = null,
         /** Include Actors the current user cannot run. */
