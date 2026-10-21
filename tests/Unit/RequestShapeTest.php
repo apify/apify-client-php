@@ -52,6 +52,14 @@ final class RequestShapeTest extends TestCase
         self::assertSame(['eventName' => 'e', 'count' => 1], Json::decode((string) $transport->lastRequest()->getBody()));
     }
 
+    public function testRunChargeUsesTheShortTimeoutTierByDefault(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, '');
+        $client = new ApifyClient(token: 't', timeoutSecs: 100, timeoutShortSecs: 7, timeoutMediumSecs: 30, httpClient: $transport);
+        $client->run('run1')->charge(new RunChargeOptions(eventName: 'e'));
+        self::assertSame([7.0], $transport->timeouts);
+    }
+
     public function testRunChargeUsesProvidedIdempotencyKey(): void
     {
         $transport = (new MockTransport())->queueResponse(200, '');

@@ -13,9 +13,13 @@ use Apify\Client\Http\Psr18HttpClient;
 use Apify\Client\Internal\Json;
 use Apify\Client\Options\DatasetListItemsOptions;
 use GuzzleHttp\Psr7\NoSeekStream;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
 final class HttpClientTest extends TestCase
@@ -156,6 +160,32 @@ final class HttpClientTest extends TestCase
             self::assertStringContainsString('connection reset', $e->getMessage());
             self::assertSame(2, $psr18->calls);
         }
+    }
+
+    public function testPsr18StreamingReturnsTheBodyWithoutReadingIt(): void
+    {
+        // Log streaming relies on the body staying live, so sendStreaming() must not read it.
+        $body = $this->createStub(StreamInterface::class);
+        $body->method('getContents')->willThrowException(new \RuntimeException('must not be read'));
+        $transport = new Psr18HttpClient(new StubPsr18Client(new Response(200, [], $body)));
+
+        $response = $transport->sendStreaming(new Request('GET', 'https://example.com/log'), 5.0);
+
+        self::assertSame($body, $response->getBody());
+    }
+
+    public function testPsr18ClientDoesNotRewrapUnrelatedRuntimeExceptions(): void
+    {
+        // Only a failed body read is a transport failure; an exception of the wrapped client keeps its type.
+        $client = new class () implements ClientInterface {
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                throw new \LogicException('misconfigured client');
+            }
+        };
+
+        $this->expectException(\LogicException::class);
+        (new Psr18HttpClient($client))->send(new Request('GET', 'https://example.com/x'), 5.0);
     }
 
     public function testTransportErrorsAreRetried(): void

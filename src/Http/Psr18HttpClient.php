@@ -16,13 +16,13 @@ use Psr\Http\Message\ResponseInterface;
  * application can plug in its own configured HTTP client (proxy, TLS, connection pool).
  *
  * PSR-18 has no per-request timeout, so the {@code timeoutSecs} argument is ignored here — configure
- * the timeout on the wrapped PSR-18 client instead. Streaming falls back to a normal request (the
- * response body is still readable, just buffered by the underlying client).
+ * the timeout on the wrapped PSR-18 client instead.
  *
- * The body is read in full inside {@see send()}, since a PSR-18 client may return a body it reads lazily:
+ * {@see send()} reads the response body in full, since a PSR-18 client may return a body it reads lazily:
  * a connection dropped mid-body then surfaces as a {@see TransportException} (which is retried) and not
  * as a failure later, when the response is already taken as complete. The response is returned with a
- * seekable buffered body.
+ * seekable buffered body. {@see sendStreaming()} returns the body as the wrapped client provides it, so
+ * it is live only if that client reads it lazily.
  */
 final class Psr18HttpClient implements HttpClientInterface
 {
@@ -32,16 +32,26 @@ final class Psr18HttpClient implements HttpClientInterface
 
     public function send(RequestInterface $request, float $timeoutSecs): ResponseInterface
     {
+        $response = $this->sendRequest($request);
         try {
-            $response = $this->client->sendRequest($request);
-            return $response->withBody(Utils::streamFor($response->getBody()->getContents()));
-        } catch (ClientExceptionInterface | \RuntimeException $e) {
+            $contents = $response->getBody()->getContents();
+        } catch (\RuntimeException $e) {
             throw new TransportException($e->getMessage(), $e);
         }
+        return $response->withBody(Utils::streamFor($contents));
     }
 
     public function sendStreaming(RequestInterface $request, float $timeoutSecs): ResponseInterface
     {
-        return $this->send($request, $timeoutSecs);
+        return $this->sendRequest($request);
+    }
+
+    private function sendRequest(RequestInterface $request): ResponseInterface
+    {
+        try {
+            return $this->client->sendRequest($request);
+        } catch (ClientExceptionInterface $e) {
+            throw new TransportException($e->getMessage(), $e);
+        }
     }
 }
