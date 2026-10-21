@@ -167,6 +167,9 @@ final class RunClient
             $idempotencyKey = $this->generateIdempotencyKey($options->eventName);
         }
         $body = ['eventName' => $options->eventName, 'count' => $options->countValue()];
+        if ($options->requestId !== null) {
+            $body['requestId'] = $options->requestId;
+        }
         $this->http->call(
             'POST',
             $this->ctx->subUrl('charge'),

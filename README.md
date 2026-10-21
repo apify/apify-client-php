@@ -206,9 +206,11 @@ exhausted does the underlying error surface, as an `Apify\Client\Exception\Trans
 `TransportException` means the request never produced a usable response (network failure or timeout)
 after all retries. Requests are retried on network errors, HTTP 429 and 5xx.
 
-A successful (2xx) response whose body does not parse as JSON (e.g. a connection dropped
-mid-response) is retried the same way, for an endpoint whose body this client decodes as JSON; only
-once those retries are exhausted does it surface, as `Apify\Client\Exception\InvalidResponseBodyException`.
+A successful (2xx) response whose body does not parse as JSON, for an endpoint whose body this client
+decodes as JSON, is not retried (it arrived in full, so a retry would get the same body back) and throws
+`Apify\Client\Exception\InvalidResponseBodyException` on the first attempt. An error response whose body
+does not parse (e.g. a gateway's HTML 502 page) throws the `ApifyApiException` subclass for its status,
+with the raw body in the message, and is retried by status like any other error response.
 
 Every error the client throws for a failed API interaction — `ApifyApiException` and its status
 subclasses above, plus `InvalidResponseBodyException` — extends the common

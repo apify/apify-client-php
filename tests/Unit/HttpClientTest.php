@@ -7,6 +7,7 @@ namespace Apify\Client\Tests\Unit;
 use Apify\Client\ApifyClient;
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Exception\InvalidResponseBodyException;
+use Apify\Client\Exception\ServerException;
 use Apify\Client\Internal\Json;
 use Apify\Client\Options\DatasetListItemsOptions;
 use GuzzleHttp\Psr7\NoSeekStream;
@@ -80,32 +81,37 @@ final class HttpClientTest extends TestCase
         }
     }
 
-    public function testMalformedJsonBodyIsRetriedThenSucceeds(): void
+    public function testMalformedJsonBodyOnSuccessThrowsWithoutRetry(): void
     {
-        // A successful (2xx) response whose body fails to parse as JSON is retried exactly like a
-        // retryable status code — matching the reference client, which parses the body inside its own
-        // retry loop for the same reason (a connection dropped mid-response is usually fixed by a retry).
+        // A successful (2xx) response arrived in full (a transfer cut short fails in the transport
+        // instead), so retrying would get the same unparsable body back. Matches the reference client.
         $transport = (new MockTransport())
             ->queueResponse(200, 'not valid JSON {')
-            ->queueResponse(200, Json::encode(['data' => ['id' => 'recovered']]));
+            ->queueResponse(200, Json::encode(['data' => ['id' => 'unused']]));
 
-        $actor = $this->client($transport)->actor('x')->get();
-        self::assertSame('recovered', $actor?->getId());
-        self::assertSame(2, $transport->callCount());
+        try {
+            $this->client($transport)->actor('x')->get();
+            self::fail('expected InvalidResponseBodyException');
+        } catch (InvalidResponseBodyException $e) {
+            self::assertSame('not valid JSON {', $e->getRawBody());
+            self::assertSame(1, $transport->callCount());
+        }
     }
 
-    public function testMalformedJsonBodyThrowsOnceRetriesAreExhausted(): void
+    public function testErrorStatusWithUnparsableBodyIsRetriedAndThrowsItsStatusException(): void
     {
+        // A gateway's HTML error page is reported by its status code, with the raw body as the message.
         $transport = (new MockTransport())
-            ->queueResponse(200, 'not valid JSON {')
-            ->queueResponse(200, 'still not valid JSON {');
+            ->queueResponse(502, '<html>Bad Gateway</html>')
+            ->queueResponse(502, '<html>Bad Gateway</html>');
         $client = new ApifyClient(token: 'test-token', maxRetries: 1, minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
 
         try {
             $client->actor('x')->get();
-            self::fail('expected InvalidResponseBodyException');
-        } catch (InvalidResponseBodyException $e) {
-            self::assertSame('still not valid JSON {', $e->getRawBody());
+            self::fail('expected ServerException');
+        } catch (ServerException $e) {
+            self::assertSame(502, $e->getStatusCode());
+            self::assertStringContainsString('<html>Bad Gateway</html>', $e->getApiMessage());
             self::assertSame(2, $transport->callCount());
         }
     }

@@ -86,11 +86,12 @@ final class HttpClientCore
      * @param array<string,string> $extraHeaders
      * @param (callable(string): mixed)|null $validateBody For an endpoint whose successful response body this
      *        client decodes as JSON, the decoding step itself (e.g. {@see \Apify\Client\Internal\Json::decode()}),
-     *        run here against the buffered body before this method returns, so a body that fails to parse —
-     *        usually a connection dropped mid-response — is retried exactly like a retryable status code, instead
-     *        of surfacing on the first occurrence. Matches the reference client, which parses a (non-streamed)
-     *        response body inside its own retry loop for the same reason. Omit it for an endpoint whose body this
-     *        client does not decode (raw bytes/text, or a response it never reads), which has nothing to validate.
+     *        run here against the buffered body before this method returns. A body that fails to parse throws
+     *        {@see InvalidResponseBodyException} on the first attempt without a retry: a transfer cut short
+     *        fails in the transport (and is retried as a transport error), so a returned body arrived in full
+     *        and a retry would get the same bytes back. Matches the reference client. Omit it for an endpoint
+     *        whose body this client does not decode (raw bytes/text, or a response it never reads), which has
+     *        nothing to validate.
      */
     public function call(
         string $method,
@@ -134,13 +135,8 @@ final class HttpClientCore
                     // fresh, rewound stream built from that buffered string, which every PSR-7 stream
                     // factory implementation backs with a seekable resource.
                     $raw = (string) $response->getBody();
-                    try {
-                        $validateBody($raw);
-                        return $response->withBody($this->streamFactory->createStream($raw));
-                    } catch (InvalidResponseBodyException $e) {
-                        $lastError = $e;
-                        $retryable = true;
-                    }
+                    $validateBody($raw);
+                    return $response->withBody($this->streamFactory->createStream($raw));
                 } else {
                     $lastError = self::buildApiError($status, (string) $response->getBody(), $attempt, $method, $path);
                     $retryable = self::isStatusRetryable($status);

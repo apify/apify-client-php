@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+- Synced with Apify OpenAPI spec `v2-2026-10-20T121847Z` (nullable build `buildTag`, new error types,
+  rental pricing marked deprecated; no client code changes required, since those models are read
+  untyped).
+- Added a `requestId` option to `RunChargeOptions`, sent as `requestId` in the `charge()` request body:
+  the ID of the Server Actor request being charged, required for multi-tenant Server Actor runs.
+- **Breaking:** a successful response whose body fails to parse as JSON now throws
+  `InvalidResponseBodyException` on the first attempt instead of being retried, since the body arrived
+  in full and a retry would return the same bytes. An error response whose body fails to parse throws
+  the `ApifyApiException` subclass for its status, as before.
+
 ## 0.10.0
 
 - Synced with Apify OpenAPI spec `v2-2026-10-19T133704Z` (realigned Actor, version, env var and
