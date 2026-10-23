@@ -7,12 +7,20 @@ namespace Apify\Client\Tests\Unit;
 use Apify\Client\ApifyClient;
 use Apify\Client\Exception\ApifyApiException;
 use Apify\Client\Exception\InvalidResponseBodyException;
+use Apify\Client\Exception\ServerException;
+use Apify\Client\Exception\TransportException;
+use Apify\Client\Http\Psr18HttpClient;
 use Apify\Client\Internal\Json;
 use Apify\Client\Options\DatasetListItemsOptions;
 use GuzzleHttp\Psr7\NoSeekStream;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 final class HttpClientTest extends TestCase
 {
@@ -80,52 +88,120 @@ final class HttpClientTest extends TestCase
         }
     }
 
-    public function testMalformedJsonBodyIsRetriedThenSucceeds(): void
+    public function testMalformedJsonBodyOnSuccessThrowsWithoutRetry(): void
     {
-        // A successful (2xx) response whose body fails to parse as JSON is retried exactly like a
-        // retryable status code — matching the reference client, which parses the body inside its own
-        // retry loop for the same reason (a connection dropped mid-response is usually fixed by a retry).
+        // A successful (2xx) response arrived in full (a transfer cut short fails in the transport
+        // instead), so retrying would get the same unparsable body back. Matches the reference client.
         $transport = (new MockTransport())
             ->queueResponse(200, 'not valid JSON {')
-            ->queueResponse(200, Json::encode(['data' => ['id' => 'recovered']]));
+            ->queueResponse(200, Json::encode(['data' => ['id' => 'unused']]));
 
-        $actor = $this->client($transport)->actor('x')->get();
-        self::assertSame('recovered', $actor?->getId());
-        self::assertSame(2, $transport->callCount());
+        try {
+            $this->client($transport)->actor('x')->get();
+            self::fail('expected InvalidResponseBodyException');
+        } catch (InvalidResponseBodyException $e) {
+            self::assertSame('not valid JSON {', $e->getRawBody());
+            self::assertSame(1, $transport->callCount());
+        }
     }
 
-    public function testMalformedJsonBodyThrowsOnceRetriesAreExhausted(): void
+    public function testErrorStatusWithUnparsableBodyIsRetriedAndThrowsItsStatusException(): void
     {
+        // A gateway's HTML error page is reported by its status code, with the raw body as the message.
         $transport = (new MockTransport())
-            ->queueResponse(200, 'not valid JSON {')
-            ->queueResponse(200, 'still not valid JSON {');
+            ->queueResponse(502, '<html>Bad Gateway</html>')
+            ->queueResponse(502, '<html>Bad Gateway</html>');
         $client = new ApifyClient(token: 'test-token', maxRetries: 1, minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
 
         try {
             $client->actor('x')->get();
-            self::fail('expected InvalidResponseBodyException');
-        } catch (InvalidResponseBodyException $e) {
-            self::assertSame('still not valid JSON {', $e->getRawBody());
+            self::fail('expected ServerException');
+        } catch (ServerException $e) {
+            self::assertSame(502, $e->getStatusCode());
+            self::assertStringContainsString('<html>Bad Gateway</html>', $e->getApiMessage());
             self::assertSame(2, $transport->callCount());
         }
     }
 
-    public function testNonSeekableResponseBodyIsOnlyReadOnce(): void
+    public function testPsr18ClientBuffersANonSeekableResponseBody(): void
     {
-        // A PSR-18 transport's response body is not guaranteed seekable/re-readable (the contract
-        // HttpClientInterface/Psr18HttpClient exposes); a NoSeekStream reproduces that here. call()
-        // must validate/return the body from a single buffered read, since a second
-        // `(string) $response->getBody()` on a stream like this one yields '' once already exhausted
-        // (GuzzleHttp\Psr7\StreamDecoratorTrait::__toString() skips the rewind-on-seek it does for a
-        // seekable stream), which would otherwise make the resource silently look empty.
+        // A PSR-18 client's response body is not guaranteed seekable/re-readable; a NoSeekStream
+        // reproduces that. Psr18HttpClient reads it in full, so the body can be read again afterward.
         $body = new NoSeekStream(Utils::streamFor(Json::encode(['data' => ['id' => 'abc', 'name' => 'my-actor']])));
-        $transport = (new MockTransport())->queueRawResponse(new Response(200, [], $body));
+        $psr18 = new StubPsr18Client(new Response(200, [], $body));
+        $client = new ApifyClient(token: 'test-token', httpClient: new Psr18HttpClient($psr18));
 
-        $actor = $this->client($transport)->actor('abc')->get();
+        $actor = $client->actor('abc')->get();
 
         self::assertNotNull($actor);
         self::assertSame('abc', $actor->getId());
         self::assertSame('my-actor', $actor->getName());
+    }
+
+    public function testPsr18ClientReadsABodyThatWasNotRewound(): void
+    {
+        // Some PSR-18 clients return a body they wrote without rewinding it; it must not read as empty.
+        $body = Utils::streamFor(Json::encode(['data' => ['id' => 'abc']]));
+        $body->getContents();
+        $client = new ApifyClient(token: 'test-token', httpClient: new Psr18HttpClient(new StubPsr18Client(new Response(200, [], $body))));
+
+        self::assertSame('abc', $client->actor('abc')->get()?->getId());
+    }
+
+    public function testPsr18ClientMapsAFailedBodyReadToARetriedTransportError(): void
+    {
+        // A lazily read body that fails mid-transfer (connection dropped) is a transport failure: it is
+        // retried, and once the retries run out it surfaces as a TransportException.
+        $failingBody = $this->createStub(StreamInterface::class);
+        $failingBody->method('getContents')->willThrowException(new \RuntimeException('connection reset while reading the body'));
+        $psr18 = new StubPsr18Client(new Response(200, [], $failingBody));
+        $client = new ApifyClient(
+            token: 'test-token',
+            maxRetries: 1,
+            minDelayBetweenRetriesMillis: 1,
+            timeoutSecs: 5,
+            httpClient: new Psr18HttpClient($psr18)
+        );
+
+        try {
+            $client->actor('x')->get();
+            self::fail('expected TransportException');
+        } catch (TransportException $e) {
+            self::assertStringContainsString('connection reset', $e->getMessage());
+            self::assertSame(2, $psr18->calls);
+        }
+    }
+
+    public function testPsr18StreamingReturnsTheBodyWithoutReadingIt(): void
+    {
+        // Log streaming relies on the body staying live, so sendStreaming() must not read it.
+        $body = $this->createStub(StreamInterface::class);
+        $body->method('getContents')->willThrowException(new \RuntimeException('must not be read'));
+        $transport = new Psr18HttpClient(new StubPsr18Client(new Response(200, [], $body)));
+
+        $response = $transport->sendStreaming(new Request('GET', 'https://example.com/log'), 5.0);
+
+        self::assertSame($body, $response->getBody());
+    }
+
+    public function testPsr18ClientDoesNotRewrapARuntimeExceptionOfTheWrappedClient(): void
+    {
+        // Only a failed body read and a PSR-18 ClientExceptionInterface are transport failures; any other
+        // exception of the wrapped client keeps its own type.
+        $client = new class () implements ClientInterface {
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                throw new \RuntimeException('misconfigured client');
+            }
+        };
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('misconfigured client');
+        try {
+            (new Psr18HttpClient($client))->send(new Request('GET', 'https://example.com/x'), 5.0);
+        } catch (TransportException) {
+            self::fail('a RuntimeException of the wrapped client must not be rewrapped as a TransportException');
+        }
     }
 
     public function testTransportErrorsAreRetried(): void

@@ -167,12 +167,15 @@ final class RunClient
             $idempotencyKey = $this->generateIdempotencyKey($options->eventName);
         }
         $body = ['eventName' => $options->eventName, 'count' => $options->countValue()];
+        if ($options->requestId !== null) {
+            $body['requestId'] = $options->requestId;
+        }
         $this->http->call(
             'POST',
             $this->ctx->subUrl('charge'),
             Json::encode($body),
             ResourceContext::CONTENT_TYPE_JSON,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM),
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT),
             false,
             [self::CHARGE_IDEMPOTENCY_HEADER => $idempotencyKey]
         );

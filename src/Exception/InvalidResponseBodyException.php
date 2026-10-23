@@ -7,11 +7,10 @@ namespace Apify\Client\Exception;
 use JsonException;
 
 /**
- * Thrown when a successful (2xx) response body does not parse as valid JSON, typically a document cut
- * short by a connection dropped mid-response. Mirrors the reference client's
- * {@code InvalidResponseBodyError}. See {@see \Apify\Client\Internal\HttpClientCore::call()}'s
- * {@code $validateBody} param for why this is retried like a retryable status code instead of thrown on
- * the first occurrence.
+ * Thrown when the body of a successful (2xx) response does not parse as valid JSON, for example a
+ * non-JSON value served as {@code application/json}. The response arrived in full, so the request is not
+ * retried. An error status with an unparsable body throws {@see ApifyApiException} for its status code
+ * instead. Mirrors the reference client's {@code InvalidResponseBodyError}.
  */
 final class InvalidResponseBodyException extends ApifyClientException
 {

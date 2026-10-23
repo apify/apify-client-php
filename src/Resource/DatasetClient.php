@@ -198,7 +198,7 @@ final class DatasetClient
         $params = new QueryParams();
         $options->appendTo($params);
         $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs, validateBody: Json::decode(...));
+        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs);
 
         $items = Json::decode((string) $response->getBody());
         $items = is_array($items) ? array_values($items) : [];
@@ -293,7 +293,7 @@ final class DatasetClient
      */
     public function getStatistics(int|float|string|null $timeoutSecs = null): ?array
     {
-        $response = $this->ctx->getRawRequired('statistics', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT), Json::decode(...));
+        $response = $this->ctx->getRawRequired('statistics', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         $decoded = Json::decodeData((string) $response->getBody());
         return is_array($decoded) ? $decoded : null;
     }

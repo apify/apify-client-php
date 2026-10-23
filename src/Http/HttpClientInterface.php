@@ -16,8 +16,9 @@ use Psr\Http\Message\ResponseInterface;
  * round-trip.
  *
  * A non-2xx HTTP status is <b>not</b> an error at this layer — return it as a normal response.
- * Only transport-level failures (connection refused, DNS, timeout) should be thrown, as an
- * {@see \Apify\Client\Exception\TransportException}.
+ * Only transport-level failures (connection refused, DNS, timeout, a connection dropped before the
+ * response body is complete) should be thrown, as an {@see \Apify\Client\Exception\TransportException}.
+ * The client takes a returned body as complete and does not retry one that fails to parse.
  *
  * Swap the default implementation ({@see GuzzleHttpClient}) via the {@code httpClient} constructor
  * argument of {@see \Apify\Client\ApifyClient} to share a connection pool, customize TLS/proxy

@@ -39,6 +39,27 @@ final class RequestShapeTest extends TestCase
         self::assertSame(['eventName' => 'result', 'count' => 3], Json::decode((string) $request->getBody()));
     }
 
+    public function testRunChargeSendsRequestIdOnlyWhenProvided(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, '')->queueResponse(200, '');
+        $this->client($transport)->run('run1')->charge(new RunChargeOptions(eventName: 'e', requestId: 'req-1'));
+        self::assertSame(
+            ['eventName' => 'e', 'count' => 1, 'requestId' => 'req-1'],
+            Json::decode((string) $transport->lastRequest()->getBody())
+        );
+
+        $this->client($transport)->run('run1')->charge(new RunChargeOptions(eventName: 'e'));
+        self::assertSame(['eventName' => 'e', 'count' => 1], Json::decode((string) $transport->lastRequest()->getBody()));
+    }
+
+    public function testRunChargeUsesTheShortTimeoutTierByDefault(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, '');
+        $client = new ApifyClient(token: 't', timeoutSecs: 100, timeoutShortSecs: 7, timeoutMediumSecs: 30, httpClient: $transport);
+        $client->run('run1')->charge(new RunChargeOptions(eventName: 'e'));
+        self::assertSame([7.0], $transport->timeouts);
+    }
+
     public function testRunChargeUsesProvidedIdempotencyKey(): void
     {
         $transport = (new MockTransport())->queueResponse(200, '');

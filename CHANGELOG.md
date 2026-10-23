@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0
+
+- Synced with Apify OpenAPI spec `v2-2026-10-20T121847Z`; `StoreListOptions::$pricingModel` no longer
+  lists the removed `FLAT_PRICE_PER_MONTH` value.
+- Added a `requestId` option to `RunChargeOptions`, sent as `requestId` in the `charge()` request body:
+  the ID of the Server Actor request being charged, required for multi-tenant Server Actor runs.
+- Fixed a successful response whose body fails to parse as JSON being retried: it now throws
+  `InvalidResponseBodyException` on the first attempt, since the body arrived in full and a retry would
+  return the same bytes.
+- `Psr18HttpClient` now reads the response body inside `send()`, so a body cut off mid-transfer is
+  retried as a `TransportException` instead of surfacing as a raw `RuntimeException`.
+- `RunClient::charge()` now defaults to the short request timeout tier, like the reference client
+  (previously medium).
+
 ## 0.10.0
 
 - Synced with Apify OpenAPI spec `v2-2026-10-19T133704Z` (realigned Actor, version, env var and

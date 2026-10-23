@@ -19,6 +19,12 @@ final class RunChargeOptions
          * charge instead of being deduplicated against the original.
          */
         public readonly ?string $idempotencyKey = null,
+        /**
+         * The ID of the Server Actor request being charged, taken from the {@code X-Actor-Request-ID}
+         * header of the incoming request. Required for multi-tenant Server Actor runs, where it maps the
+         * charge to the caller's account instead of the account that started the run. Ignored elsewhere.
+         */
+        public readonly ?string $requestId = null,
     ) {
     }
 

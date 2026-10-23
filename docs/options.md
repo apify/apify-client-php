@@ -85,7 +85,7 @@ For `store()->list()` / `store()->iterate()`.
 | `sortBy` | `?string` | The sort field (e.g. `popularity`, `newest`). |
 | `category` | `?string` | Filter Actors by category. |
 | `username` | `?string` | Filter Actors by owner username. |
-| `pricingModel` | `?string` | Filter by pricing model (`FREE`, `FLAT_PRICE_PER_MONTH`, `PRICE_PER_DATASET_ITEM`, `PAY_PER_EVENT`). |
+| `pricingModel` | `?string` | Filter by pricing model (`FREE`, `PRICE_PER_DATASET_ITEM`, `PAY_PER_EVENT`). |
 | `includeUnrunnableActors` | `?bool` | Include Actors the current user cannot run. |
 | `allowsAgenticUsers` | `?bool` | Filter to Actors that allow agentic users. |
 | `responseFormat` | `?string` | The response format (`full`, `agent`). |
@@ -154,6 +154,7 @@ For `run()->charge()` (pay-per-event Actors). `eventName` is **required**.
 | `eventName` | `string` | Name of the event to charge for. |
 | `count` | `?int` | Number of times to charge the event (defaults to 1). |
 | `idempotencyKey` | `?string` | Deduplicates the charge across retries; auto-generated if unset. Expires 3 minutes after the charge — reusing it later creates a new charge rather than deduplicating. |
+| `requestId` | `?string` | ID of the Server Actor request being charged, from the `X-Actor-Request-ID` header of the incoming request. Required for multi-tenant Server Actor runs. |
 
 ## Builds
 
