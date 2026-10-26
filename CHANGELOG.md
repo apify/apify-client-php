@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1
+
+- Synced with Apify OpenAPI spec `v2-2026-10-26T112451Z`. The spec now documents the full Actor
+  definition on a build (`title`, `description`, `meta`, `output`, `storages.datasets`,
+  `storages.keyValueStore`, `webServerSchema`, `webServerMcpPath`); `Build::get('actorDefinition')` and
+  `Build::toArray()` already return these fields as received, so no client code changes were required.
+
 ## 0.11.0
 
 - Synced with Apify OpenAPI spec `v2-2026-10-20T121847Z`; `StoreListOptions::$pricingModel` no longer
