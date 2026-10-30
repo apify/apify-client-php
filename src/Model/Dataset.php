@@ -42,4 +42,16 @@ final class Dataset extends ApifyResource
     {
         return $this->getInt('itemCount');
     }
+
+    /** The URL of the dataset in Apify Console. */
+    public function getConsoleUrl(): ?string
+    {
+        return $this->getNormalizedUrl('consoleUrl');
+    }
+
+    /** The public URL of the dataset items. */
+    public function getItemsPublicUrl(): ?string
+    {
+        return $this->getNormalizedUrl('itemsPublicUrl');
+    }
 }

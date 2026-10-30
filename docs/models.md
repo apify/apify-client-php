@@ -8,7 +8,7 @@ returns. Each model exposes the commonly-used fields as typed getters; every mod
   even fields without a dedicated getter).
 - `get(string $key): mixed` — a single raw field by its API name.
 
-Getters return `null` when the field is absent from the API response. The `RequestQueueRequest`
+Getters return `null` when the field is absent from the API response. Getters of URL fields (such as `getContainerUrl()` or `getConsoleUrl()`) return the URL normalized the way the reference client does: the scheme and host are lowercased, an internationalized host is punycoded (needs the `intl` extension), a default port is dropped, an empty path becomes `/` and unsafe characters are percent-encoded. A value that is not an absolute URL is returned unchanged. `toArray()` and `get()` still return the URL exactly as the API sent it, so compare a stored URL with a getter value after normalizing the stored one too. The `RequestQueueRequest`
 model is also used as an input object and therefore additionally exposes setters and a constructor
 (see [Input models](#input-models)).
 
@@ -42,7 +42,7 @@ model is also used as an input object and therefore additionally exposes setters
 | `getDefaultDatasetId(): ?string` | ID of the run's default dataset. |
 | `getDefaultKeyValueStoreId(): ?string` | ID of the run's default key-value store. |
 | `getDefaultRequestQueueId(): ?string` | ID of the run's default request queue. |
-| `getContainerUrl(): ?string` | The run container's live URL. |
+| `getContainerUrl(): ?string` | The run container's live URL (normalized). |
 | `isTerminal(): bool` | Whether the run has reached a terminal status. |
 
 ### `Build`
@@ -76,6 +76,7 @@ model is also used as an input object and therefore additionally exposes setters
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
 | `isPublic(): ?bool` | Whether the task is published on its public landing page. |
 | `getPublicConfig(): ?array` | Public landing page display configuration, or `null` if not published. |
+| `getStandbyUrl(): ?string` | The Actor Standby URL of the task (normalized), if any. |
 
 ### `Schedule`
 | Getter | Description |
@@ -91,7 +92,7 @@ model is also used as an input object and therefore additionally exposes setters
 |---|---|
 | `getId(): ?string` | The webhook ID. |
 | `getUserId(): ?string` | ID of the webhook owner. |
-| `getRequestUrl(): ?string` | URL the webhook posts to. |
+| `getRequestUrl(): ?string` | URL the webhook posts to (normalized). |
 | `getEventTypes(): array` | Event types that trigger the webhook. |
 
 ### `WebhookDispatch`
@@ -116,6 +117,8 @@ Returned when listing/iterating the Apify Store.
 | `getName(): ?string` | The Actor's technical name. |
 | `getUsername(): ?string` | Username of the Actor's owner. |
 | `getTitle(): ?string` | Human-readable title. |
+| `getUrl(): ?string` | The Actor's URL in Apify Store (normalized). |
+| `getUserPictureUrl(): ?string` | The owner's picture URL (normalized). |
 
 ## Storage models
 
@@ -128,6 +131,8 @@ Returned when listing/iterating the Apify Store.
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
 | `getItemCount(): ?int` | Number of items stored. |
+| `getConsoleUrl(): ?string` | The dataset's URL in Apify Console (normalized). |
+| `getItemsPublicUrl(): ?string` | Public URL of the dataset items (normalized). |
 
 ### `KeyValueStore`
 | Getter | Description |
@@ -137,6 +142,9 @@ Returned when listing/iterating the Apify Store.
 | `getUserId(): ?string` | ID of the owner. |
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
+| `getConsoleUrl(): ?string` | The store's URL in Apify Console (normalized). |
+| `getKeysPublicUrl(): ?string` | Public URL listing the store's keys (normalized). |
+| `getRecordsPublicUrl(): ?string` | Public URL of the store's records (normalized). |
 
 ### `KeyValueStoreRecord`
 | Getter | Description |
@@ -150,6 +158,7 @@ Returned when listing/iterating the Apify Store.
 |---|---|
 | `getKey(): string` | The key name. |
 | `getSize(): ?int` | The value size in bytes. |
+| `getRecordPublicUrl(): ?string` | Public URL of the record (normalized). |
 
 ### `KeyValueStoreKeysPage`
 One page returned by `listKeys()`.
@@ -170,6 +179,7 @@ One page returned by `listKeys()`.
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
 | `getTotalRequestCount(): ?int` | Total number of requests ever added. |
+| `getConsoleUrl(): ?string` | The queue's URL in Apify Console (normalized). |
 
 ### `RequestQueueHead`
 Returned by `listHead()`.
@@ -268,6 +278,7 @@ Pass `url` and `uniqueKey` positionally for the common case; `data` seeds any ad
 | `getUserData(): mixed` / `setUserData(array): self` | Arbitrary user data attached to the request. |
 | `getRetryCount(): ?int` | How many times this request has already been retried (read-only, populated by `listHead()`/`listAndLockHead()`/`listRequests()`). |
 | `getLockExpiresAt(): ?string` | When this request's lock expires (read-only, populated by `listAndLockHead()` only). |
+| `getHandledAt(): ?string` | When the request was handled; `null` while it is still pending. |
 
 ### `ActorEnvVar`
 Constructor: `new ActorEnvVar(?string $name = null, ?string $value = null, ?bool $isSecret = null, array $data = [])`.

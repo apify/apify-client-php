@@ -37,6 +37,20 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
         self::assertLessThanOrEqual(3, $count, 'the total-item cap (limit) must bound iteration');
     }
 
+    public function testIterateRunDatasetItems(): void
+    {
+        $client = $this->requireClient();
+        $run = $client->actor('apify/hello-world')->call(null, null, 120);
+        self::assertSame('SUCCEEDED', $run->getStatus());
+
+        $runClient = $client->run((string) $run->getId());
+        $expected = $runClient->dataset()->listItems()->getItems();
+        self::assertNotEmpty($expected, 'the hello-world Actor pushes at least one item');
+
+        $iterated = iterator_to_array($runClient->iterateDatasetItems(null, 1), false);
+        self::assertSame($expected, $iterated);
+    }
+
     public function testRunActorAndReadOutputs(): void
     {
         $client = $this->requireClient();

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
+use Apify\Client\Internal\UrlNormalizer;
+
 /**
  * Base class for API resource models.
  *
@@ -38,6 +40,16 @@ abstract class ApifyResource
     public function get(string $key): mixed
     {
         return $this->data[$key] ?? null;
+    }
+
+    /**
+     * A URL field, normalized like the reference client does for every field the specification marks
+     * as a URL (see {@see UrlNormalizer}). A value that is not an absolute URL is returned unchanged.
+     */
+    protected function getNormalizedUrl(string $key): ?string
+    {
+        $value = $this->getString($key);
+        return $value === null ? null : UrlNormalizer::normalize($value);
     }
 
     protected function getString(string $key): ?string

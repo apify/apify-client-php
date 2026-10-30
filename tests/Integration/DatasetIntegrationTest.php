@@ -109,6 +109,28 @@ final class DatasetIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testPushPreSerializedItemsAndNormalizedUrls(): void
+    {
+        $client = $this->requireClient();
+        $ds = $client->datasets()->getOrCreate(self::uniqueName('ds-json'));
+        try {
+            $dataset = $client->dataset((string) $ds->getId());
+            // A string is the JSON serialization of an item or a list of items, sent as is.
+            $dataset->pushItems('[{"n":1},{"n":2}]');
+            $dataset->pushItems(['n' => 3]);
+
+            self::assertSame([['n' => 1], ['n' => 2], ['n' => 3]], $dataset->listItems()->getItems());
+
+            // The URL getters return the normalized form of the URL the API sent.
+            $fetched = $dataset->get();
+            self::assertNotNull($fetched);
+            self::assertStringStartsWith('https://', (string) $fetched->getConsoleUrl());
+            self::assertStringContainsString((string) $ds->getId(), (string) $fetched->getConsoleUrl());
+        } finally {
+            $client->dataset((string) $ds->getId())->delete();
+        }
+    }
+
     public function testDatasetCrudFlow(): void
     {
         $client = $this->requireClient();

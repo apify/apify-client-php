@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.12.0
+
+- Synced with Apify OpenAPI spec `v2-2026-10-29T100357Z` (Server Actor tenancy on a run's `standby`
+  deployment, new build/webhook/schedule/Actor Standby fields); every new field is already returned as
+  received by `toArray()`/`get()`, so no further client code changes were required.
+- Ported the remaining `apify-client-js` v3 behaviors:
+  - URL fields of the models are normalized like the reference client does (lowercased scheme and host,
+    punycoded host with the `intl` extension, default port dropped, `/` for an empty path, unsafe
+    characters percent-encoded): `ActorRun::getContainerUrl()` and `Webhook::getRequestUrl()` now return
+    the normalized form, and the matching getters were added to `Dataset` (`getConsoleUrl()`,
+    `getItemsPublicUrl()`), `KeyValueStore` (`getConsoleUrl()`, `getKeysPublicUrl()`,
+    `getRecordsPublicUrl()`), `KeyValueStoreKey::getRecordPublicUrl()`, `RequestQueue::getConsoleUrl()`,
+    `Task::getStandbyUrl()` and `ActorStoreListItem` (`getUrl()`, `getUserPictureUrl()`).
+    **Breaking:** the two pre-existing getters can return a different string than before (for example
+    with a trailing slash); `toArray()`/`get()` still return the raw value.
+  - **Breaking:** `DatasetClient::pushItems()` takes `array|object|string` and rejects anything the API
+    cannot accept (a scalar, or a list containing a non-object) with `InvalidArgumentException` before
+    sending. A string is now sent as is, as the JSON serialization of an item or a list of items, instead
+    of being JSON-encoded a second time. A push that times out is no longer retried, since the items may
+    already be stored.
+- Added `RunClient::iterateDatasetItems()`, which lazily iterates the default dataset of a run while the
+  run is still producing items and pins a `lastRun()` client to the run it resolved first.
+- Added `RequestQueueRequest::getHandledAt()`, `null` for a pending request.
+- Documented that `getRecord()` returns raw bytes and `setRecord()` sends its value as is.
+
 ## 0.11.1
 
 - Synced with Apify OpenAPI spec `v2-2026-10-26T112451Z`. The spec now documents the full Actor

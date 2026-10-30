@@ -77,4 +77,10 @@ final class Task extends ApifyResource
         $value = $this->get('publicConfig');
         return is_array($value) ? $value : null;
     }
+
+    /** The Actor Standby URL of the task, if it runs in Standby mode. */
+    public function getStandbyUrl(): ?string
+    {
+        return $this->getNormalizedUrl('standbyUrl');
+    }
 }

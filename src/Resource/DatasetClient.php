@@ -16,6 +16,7 @@ use Apify\Client\Options\DatasetDownloadOptions;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\DownloadItemsFormat;
 use Generator;
+use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
@@ -267,18 +268,49 @@ final class DatasetClient
     /**
      * Pushes one or more items to the dataset.
      *
-     * @param mixed $items must serialize to a JSON object or an array of objects
+     * The API accepts only an object or an array of objects, so {@code $items} must be one of: an
+     * associative array or an object (a single item), a list of those (several items), or a string that
+     * already holds the JSON serialization of either (sent as is). Anything else, such as a scalar or a
+     * list containing one, is rejected up front instead of by the API. A timed-out push is not retried:
+     * the API may already have stored the items, and a retry would duplicate them.
+     *
+     * @param array<mixed>|object|string $items
+     * @throws InvalidArgumentException when {@code $items} is not an item, a list of items or a JSON string
      */
-    public function pushItems(mixed $items, int|float|string|null $timeoutSecs = null): void
+    public function pushItems(array|object|string $items, int|float|string|null $timeoutSecs = null): void
     {
+        if (!is_string($items)) {
+            self::assertItemShape($items);
+        }
         $url = $this->ctx->mergedParams(new QueryParams())->applyToUrl($this->ctx->subUrl('items'));
         $this->http->call(
             'POST',
             $url,
-            Json::encode($items),
+            is_string($items) ? $items : Json::encode($items),
             ResourceContext::CONTENT_TYPE_JSON_CHARSET,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG),
+            true
         );
+    }
+
+    /**
+     * @param array<mixed>|object $items
+     * @throws InvalidArgumentException
+     */
+    private static function assertItemShape(array|object $items): void
+    {
+        if (!is_array($items) || !array_is_list($items)) {
+            return; // A single item: an associative array or an object.
+        }
+        foreach ($items as $index => $item) {
+            if (!is_object($item) && !(is_array($item) && !array_is_list($item))) {
+                throw new InvalidArgumentException(sprintf(
+                    'pushItems(): item at index %d must be an object or an associative array, %s given.',
+                    $index,
+                    get_debug_type($item)
+                ));
+            }
+        }
     }
 
     /**

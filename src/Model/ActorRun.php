@@ -88,7 +88,7 @@ final class ActorRun extends ApifyResource
     /** The URL of the run's container (for live access). */
     public function getContainerUrl(): ?string
     {
-        return $this->getString('containerUrl');
+        return $this->getNormalizedUrl('containerUrl');
     }
 
     /** Whether the run has reached a terminal (finished) status. */

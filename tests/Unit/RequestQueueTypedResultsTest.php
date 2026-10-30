@@ -174,4 +174,34 @@ final class RequestQueueTypedResultsTest extends TestCase
         }
         self::assertSame(0, $transport->callCount());
     }
+
+    public function testPendingStoredRequestWithNullHandledAtIsReadable(): void
+    {
+        // The API returns an explicit `handledAt: null` for a request that is still pending (reference
+        // client #1079); the getter must report it as absent instead of failing on the null.
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => [
+            'id' => 'r1',
+            'url' => 'https://example.com',
+            'uniqueKey' => 'https://example.com',
+            'handledAt' => null,
+        ]]));
+
+        $request = $this->client($transport)->requestQueue('q1')->getRequest('r1');
+
+        self::assertNotNull($request);
+        self::assertSame('r1', $request->getId());
+        self::assertNull($request->getHandledAt());
+    }
+
+    public function testHandledRequestExposesHandledAt(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => [
+            'id' => 'r1',
+            'handledAt' => '2026-08-01T00:00:00.000Z',
+        ]]));
+
+        $request = $this->client($transport)->requestQueue('q1')->getRequest('r1');
+
+        self::assertSame('2026-08-01T00:00:00.000Z', $request?->getHandledAt());
+    }
 }

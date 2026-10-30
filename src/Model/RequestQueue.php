@@ -42,4 +42,10 @@ final class RequestQueue extends ApifyResource
     {
         return $this->getInt('totalRequestCount');
     }
+
+    /** The URL of the queue in Apify Console. */
+    public function getConsoleUrl(): ?string
+    {
+        return $this->getNormalizedUrl('consoleUrl');
+    }
 }

@@ -18,4 +18,10 @@ final class KeyValueStoreKey extends ApifyResource
     {
         return $this->getInt('size');
     }
+
+    /** The public URL of the record. */
+    public function getRecordPublicUrl(): ?string
+    {
+        return $this->getNormalizedUrl('recordPublicUrl');
+    }
 }

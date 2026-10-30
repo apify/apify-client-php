@@ -10,11 +10,13 @@ use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
+use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\LogOptions;
 use Apify\Client\Options\MetamorphOptions;
 use Apify\Client\Options\RunChargeOptions;
 use Apify\Client\Options\RunResurrectOptions;
+use Generator;
 use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 
@@ -29,13 +31,19 @@ final class RunClient
     /** Header the API uses to deduplicate charge requests. */
     private const CHARGE_IDEMPOTENCY_HEADER = 'idempotency-key';
 
+    /** Default number of dataset items requested per page by {@see iterateDatasetItems()}. */
+    private const DEFAULT_ITERATE_CHUNK_SIZE = 1000;
+
+    /** Default seconds {@see iterateDatasetItems()} waits for a still-running run between polls. */
+    private const DEFAULT_ITERATE_POLL_INTERVAL_SECS = 5;
+
     private ResourceContext $ctx;
 
     /** @internal */
     public function __construct(
         private HttpClientCore $http,
-        string $baseUrl,
-        string $resourcePath,
+        private string $baseUrl,
+        private string $resourcePath,
         private string $id,
     ) {
         $this->ctx = ResourceContext::single($http, $baseUrl, $resourcePath, $id);
@@ -202,6 +210,67 @@ final class RunClient
             static fn (array $d): bool => (new ActorRun($d))->isTerminal()
         );
         return new ActorRun($data);
+    }
+
+    /**
+     * Lazily iterates over the items of the run's default dataset while the run is still producing them.
+     *
+     * It reads the items that exist so far, then waits up to {@code $pollIntervalSecs} for the run to
+     * finish and reads what was added in the meantime, until the run has reached a terminal status and its
+     * dataset is drained. A {@code lastRun()} client is pinned to the run it resolved on the first request,
+     * so a newer run never swaps the dataset mid-iteration. The {@code offset}/{@code limit} of the options
+     * select the slice of the dataset to yield, {@code $chunkSize} is the page size (default 1000), and
+     * every other filtering option applies to each page. {@code desc} is not supported, since items
+     * appended by a running Actor can only be followed in ascending order.
+     *
+     * @return Generator<int,mixed>
+     * @throws InvalidArgumentException when the options set {@code desc}
+     */
+    public function iterateDatasetItems(
+        ?DatasetListItemsOptions $options = null,
+        ?int $chunkSize = null,
+        int $pollIntervalSecs = self::DEFAULT_ITERATE_POLL_INTERVAL_SECS,
+        int|float|string|null $timeoutSecs = null
+    ): Generator {
+        $options ??= new DatasetListItemsOptions();
+        if ($options->desc !== null) {
+            throw new InvalidArgumentException('iterateDatasetItems(): the desc option is not supported.');
+        }
+        $pageSize = ($chunkSize !== null && $chunkSize > 0) ? $chunkSize : self::DEFAULT_ITERATE_CHUNK_SIZE;
+        $position = $options->offset ?? 0;
+        $end = ($options->limit !== null && $options->limit > 0) ? $position + $options->limit : null;
+
+        $run = $this->get(null, $timeoutSecs);
+        // A lastRun() client resolves `runs/last` on each request, so pin the run it resolved first.
+        $runClient = ($run !== null && $run->get('id') !== $this->id)
+            ? new self($this->http, $this->baseUrl, $this->resourcePath, (string) $run->get('id'))
+            : $this;
+        $datasetClient = $runClient->dataset();
+
+        while (true) {
+            $isFinished = $run === null || $run->isTerminal();
+            $itemCount = $datasetClient->get($timeoutSecs)?->getItemCount() ?? 0;
+            if ($end !== null) {
+                $itemCount = min($itemCount, $end);
+            }
+            while ($position < $itemCount) {
+                $pageLimit = min($pageSize, $itemCount - $position);
+                yield from $datasetClient->listItems($options->withPagination($position, $pageLimit), $timeoutSecs)->getItems();
+                $position += $pageLimit;
+            }
+            if ($end !== null && $position >= $end) {
+                return;
+            }
+            if ($isFinished) {
+                break;
+            }
+            $run = $runClient->waitForFinish($pollIntervalSecs);
+        }
+
+        // The run is over, so drain whatever remains. The dataset iterator ends on a page that scans no
+        // rows, which stays correct when item-dropping filters shorten a page.
+        $remaining = $end !== null ? $end - $position : null;
+        yield from $datasetClient->iterateItems($options->withPagination($position, $remaining), $pageSize, $timeoutSecs);
     }
 
     /**

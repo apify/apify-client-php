@@ -116,4 +116,13 @@ final class RequestQueueRequest extends ApifyResource
     {
         return $this->getString('lockExpiresAt');
     }
+
+    /**
+     * ISO 8601 timestamp of when the request was handled, {@code null} for a request that is still
+     * pending (the API returns an explicit {@code null} then) and for one built locally.
+     */
+    public function getHandledAt(): ?string
+    {
+        return $this->getString('handledAt');
+    }
 }

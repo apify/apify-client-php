@@ -30,4 +30,16 @@ final class ActorStoreListItem extends ApifyResource
     {
         return $this->getString('title');
     }
+
+    /** The URL of the Actor in Apify Store. */
+    public function getUrl(): ?string
+    {
+        return $this->getNormalizedUrl('url');
+    }
+
+    /** The URL of the Actor owner's picture. */
+    public function getUserPictureUrl(): ?string
+    {
+        return $this->getNormalizedUrl('userPictureUrl');
+    }
 }

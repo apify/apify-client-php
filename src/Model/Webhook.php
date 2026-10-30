@@ -22,7 +22,7 @@ final class Webhook extends ApifyResource
     /** The URL the webhook posts to. */
     public function getRequestUrl(): ?string
     {
-        return $this->getString('requestUrl');
+        return $this->getNormalizedUrl('requestUrl');
     }
 
     /**

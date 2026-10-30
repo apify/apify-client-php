@@ -36,4 +36,22 @@ final class KeyValueStore extends ApifyResource
     {
         return $this->getString('modifiedAt');
     }
+
+    /** The URL of the store in Apify Console. */
+    public function getConsoleUrl(): ?string
+    {
+        return $this->getNormalizedUrl('consoleUrl');
+    }
+
+    /** The public URL of the store keys. */
+    public function getKeysPublicUrl(): ?string
+    {
+        return $this->getNormalizedUrl('keysPublicUrl');
+    }
+
+    /** The public URL of the store records. */
+    public function getRecordsPublicUrl(): ?string
+    {
+        return $this->getNormalizedUrl('recordsPublicUrl');
+    }
 }

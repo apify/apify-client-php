@@ -28,6 +28,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `resurrect(?RunResurrectOptions $options = null): ActorRun`
 - `charge(RunChargeOptions $options): void` — for pay-per-event Actors.
 - `waitForFinish(?int $waitSecs = null): ActorRun`
+- `iterateDatasetItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null, int $pollIntervalSecs = 5): iterable` — lazily iterates the items of the run's default dataset while the run is still producing them: it reads what exists, waits up to `$pollIntervalSecs` for the run to finish, and repeats until the run is over and the dataset is drained. The options' `offset`/`limit` select the slice to yield, `$chunkSize` is the page size (default 1000), and `desc` is not supported (throws `InvalidArgumentException`). A `lastRun()` client sticks to the run it resolved first.
 - `dataset(): DatasetClient`, `keyValueStore(): KeyValueStoreClient`, `requestQueue(): RequestQueueClient`
   — `get()`/`delete()` on these throw instead of resolving to `null`/no-op on a 404, since there is no
   ID to pin the 404 to the run or the sub-resource.
