@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A webhook notifies an external service when specific events occur. */
 final class Webhook extends ApifyResource
 {
+    protected const URL_FIELDS = ['requestUrl'];
+
     /** The unique webhook ID. */
     public function getId(): ?string
     {

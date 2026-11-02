@@ -63,6 +63,6 @@ final class DatasetCollectionClient
      */
     public function getOrCreate(?string $name = null, ?array $schema = null, int|float|string|null $timeoutSecs = null): Dataset
     {
-        return new Dataset($this->ctx->getOrCreateNamed($name, $schema, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
+        return new Dataset($this->ctx->getOrCreateNamed($name, $schema, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 }

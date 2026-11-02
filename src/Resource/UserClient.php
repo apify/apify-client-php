@@ -10,26 +10,21 @@ use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\User;
-use LogicException;
 
 /**
  * A client for accessing user data ({@code /v2/users/{userId}} or {@code /v2/users/me}).
  *
- * For the current user ({@code me}), it also exposes account usage and limits. Those endpoints only
- * exist for {@code me} and throw {@see LogicException} if called on another user's client.
+ * It also exposes the user's monthly usage and account limits, addressed by the same user ID (or
+ * {@code me}).
  */
 final class UserClient
 {
-    private const ME = 'me';
-
     private ResourceContext $ctx;
-    private bool $isMe;
 
     /** @internal */
     public function __construct(private HttpClientCore $http, string $baseUrl, string $id)
     {
         $this->ctx = ResourceContext::single($http, $baseUrl, 'users', $id);
-        $this->isMe = $id === self::ME;
     }
 
     /**
@@ -43,15 +38,13 @@ final class UserClient
     }
 
     /**
-     * Fetches the current account's monthly usage for the month containing the given date (formatted
-     * as {@code YYYY-MM-DD}). An empty/{@code null} date reports the current month. Only available
-     * for {@code me}.
+     * Fetches the user's monthly usage for the month containing the given date (formatted as
+     * {@code YYYY-MM-DD}). An empty/{@code null} date reports the current month.
      *
      * @return array<string,mixed>
      */
     public function monthlyUsage(?string $date = null, int|float|string|null $timeoutSecs = null): array
     {
-        $this->requireMe();
         $params = new QueryParams();
         if ($date !== null && $date !== '') {
             $params->addString('date', $date);
@@ -61,25 +54,23 @@ final class UserClient
     }
 
     /**
-     * Fetches the current account's resource limits. Only available for {@code me}.
+     * Fetches the user's resource limits.
      *
      * @return array<string,mixed>
      */
     public function limits(int|float|string|null $timeoutSecs = null): array
     {
-        $this->requireMe();
         $data = $this->ctx->getResourceRequired('limits', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         return is_array($data) ? $data : [];
     }
 
     /**
-     * Updates the current account's resource limits. Only available for {@code me}.
+     * Updates the user's resource limits.
      *
      * @param mixed $newLimits any JSON-serializable limits object
      */
     public function updateLimits(mixed $newLimits, int|float|string|null $timeoutSecs = null): void
     {
-        $this->requireMe();
         $this->http->call(
             'PUT',
             $this->ctx->subUrl('limits'),
@@ -87,12 +78,5 @@ final class UserClient
             ResourceContext::CONTENT_TYPE_JSON,
             $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
-    }
-
-    private function requireMe(): void
-    {
-        if (!$this->isMe) {
-            throw new LogicException('this operation is only available for the current user (use me())');
-        }
     }
 }

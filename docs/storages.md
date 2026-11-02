@@ -25,7 +25,7 @@ Single — `$client->dataset($id)`:
 - `pushItems(mixed $items): void`
 - `getStatistics(): ?array` — throws if the dataset itself does not exist (a 404 here cannot mean
   anything else).
-- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null, ?DownloadItemsFormat $format = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`. `$format` selects the served output format (defaults to `json`).
+- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null, ?DownloadItemsFormat $format = null, int|float|string|null $timeoutSecs = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`, which must be positive (an `InvalidArgumentException` is thrown otherwise, before any request; omit it for a URL that never expires). `$timeoutSecs` applies to the request that fetches the dataset (default: the `long` tier). `$format` selects the served output format (defaults to `json`).
 
 ```php
 $dataset = $client->datasets()->getOrCreate('my-dataset');
@@ -61,12 +61,12 @@ Single — `$client->keyValueStore($id)`:
 - `listKeys(?ListKeysOptions $options = null): KeyValueStoreKeysPage`
 - `iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all keys, following cursor pagination (`exclusiveStartKey`/`nextExclusiveStartKey`). The options' `limit` caps the total number of keys yielded across all pages (unset = all); `$chunkSize` is the per-page size (unset = the remaining total cap, or the server default when unbounded).
 - `recordExists(string $key): bool` — reports whether a record with the given key exists, without downloading its value (a `HEAD` request).
-- `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord`
-- `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null, ?string $contentEncoding = null): void` — `$contentEncoding`, if given, is sent as the `Content-Encoding` header, for a `$value` that is already compressed (gzip, br, ...); the client's own best-effort request compression always backs off when `Content-Encoding` is already set, so the bytes reach the API exactly as given.
+- `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord` — the record value is never parsed: `getValue()` returns the exact bytes the API sent, whatever the content type, so a JSON record is decoded by the caller.
+- `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null, ?string $contentEncoding = null): void` — `$value` is sent exactly as given, also under `application/json`, so it has to be valid JSON already (use `setRecordJson()` to have an array encoded). `$contentEncoding`, if given, is sent as the `Content-Encoding` header, for a `$value` that is already compressed (gzip, br, ...); the client's own best-effort request compression always backs off when `Content-Encoding` is already set, so the bytes reach the API exactly as given.
 - `setRecordJson(string $key, mixed $value): void` — convenience over `setRecord()` that JSON-encodes `$value` and stores it with a JSON content type.
 - `deleteRecord(string $key): void` — permanently removes the record with the given key.
-- `getRecordPublicUrl(string $key): string` — builds a shareable URL for downloading a single record; for a private store it appends an access signature so the URL works without an API token.
-- `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null): string` — builds a shareable URL for listing this store's keys (forwarding the given key filters); for a private store it appends an access signature, optionally bounded to `$expiresInSecs`.
+- `getRecordPublicUrl(string $key, int|float|string|null $timeoutSecs = null): string` — builds a shareable URL for downloading a single record; for a private store it appends an access signature so the URL works without an API token.
+- `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null, int|float|string|null $timeoutSecs = null): string` — builds a shareable URL for listing this store's keys (forwarding the given key filters); for a private store it appends an access signature, optionally bounded to `$expiresInSecs`, which must be positive (an `InvalidArgumentException` is thrown otherwise, before any request; omit it for a URL that never expires). `$timeoutSecs` applies to the request that fetches the store (default: the `long` tier).
 
 ```php
 $store = $client->keyValueStores()->getOrCreate('my-store');

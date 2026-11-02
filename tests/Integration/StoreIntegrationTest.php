@@ -15,6 +15,22 @@ final class StoreIntegrationTest extends IntegrationTestCase
         self::assertLessThanOrEqual(5, count($page->getItems()));
     }
 
+    public function testListStoreWithInputSchema(): void
+    {
+        $client = $this->requireClient();
+        $withSchema = $client->store()->list(new StoreListOptions(search: 'website content crawler', limit: 10, includeInputSchema: true));
+        self::assertNotEmpty($withSchema->getItems());
+        $withoutSchema = $client->store()->list(new StoreListOptions(search: 'website content crawler', limit: 10));
+        foreach ($withoutSchema->getItems() as $item) {
+            self::assertNull($item->get('inputSchema'), 'the input schema is only returned on request');
+        }
+        $schemas = array_filter(
+            array_map(static fn ($item) => $item->get('inputSchema'), $withSchema->getItems()),
+            static fn ($schema) => $schema !== null,
+        );
+        self::assertNotEmpty($schemas, 'at least one Store Actor carries its input schema');
+    }
+
     public function testIterateStore(): void
     {
         $client = $this->requireClient();

@@ -108,7 +108,7 @@ final class TaskClient
                 $params,
                 $body,
                 ResourceContext::CONTENT_TYPE_JSON,
-                $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+                $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM, $options->waitForFinish)
             )),
             $options->waitForResources,
         );
@@ -120,11 +120,15 @@ final class TaskClient
      * @param mixed    $input    optionally overrides the task's stored input
      * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
      *                           {@code $options->waitForResources} start does not count toward it.
+     * @param int|float|string|null $timeoutSecs timeout of the start request and of every poll (a number of
+     *                           seconds, a tier name or {@code 'noTimeout'}); default {@code 'noTimeout'}
      */
-    public function call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun
+    public function call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        $run = $this->start($input, $options);
-        return $this->root->run((string) $run->getId())->waitForFinish($waitSecs);
+        // Like the reference client, the start request and every poll have no request timeout by default.
+        $timeoutSecs ??= TimeoutTiers::NO_TIMEOUT;
+        $run = $this->start($input, $options, $timeoutSecs);
+        return $this->root->run((string) $run->getId())->waitForFinish($waitSecs, $timeoutSecs);
     }
 
     /**
@@ -164,7 +168,7 @@ final class TaskClient
     /** Returns a client for the last run of this task, optionally filtered by status and/or origin. */
     public function lastRun(?LastRunOptions $options = null): RunClient
     {
-        $client = new RunClient($this->http, $this->ctx->subUrl(''), 'runs', 'last');
+        $client = new RunClient($this->root, $this->http, $this->ctx->subUrl(''), 'runs', 'last');
         $client->setLastRunParams($options ?? new LastRunOptions());
         return $client;
     }

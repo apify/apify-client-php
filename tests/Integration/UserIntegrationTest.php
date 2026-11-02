@@ -27,6 +27,15 @@ final class UserIntegrationTest extends IntegrationTestCase
         self::assertNotEmpty($client->me()->monthlyUsage('2026-06-01'));
     }
 
+    public function testGetMonthlyUsageAndLimitsByUserId(): void
+    {
+        $client = $this->requireClient();
+        $id = $client->me()->get()?->getId();
+        self::assertNotNull($id);
+        self::assertNotEmpty($client->user($id)->monthlyUsage());
+        self::assertNotEmpty($client->user($id)->limits());
+    }
+
     public function testGetLimits(): void
     {
         $client = $this->requireClient();

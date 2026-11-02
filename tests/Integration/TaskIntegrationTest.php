@@ -97,6 +97,23 @@ final class TaskIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testTaskLastRun(): void
+    {
+        $client = $this->requireClient();
+        $task = $client->tasks()->create(self::taskDef(self::uniqueName('task-last')));
+        try {
+            $tc = $client->task((string) $task->getId());
+            $run = $tc->call(null, null, 120);
+            self::assertSame('SUCCEEDED', $run->getStatus());
+
+            $lastRun = $tc->lastRun()->get();
+            self::assertNotNull($lastRun);
+            self::assertSame($run->getId(), $lastRun->getId());
+        } finally {
+            $client->task((string) $task->getId())->delete();
+        }
+    }
+
     public function testTaskCrudFlow(): void
     {
         $client = $this->requireClient();
@@ -114,6 +131,7 @@ final class TaskIntegrationTest extends IntegrationTestCase
             self::assertSame('Updated Title', $updated->getTitle());
             self::assertSame('Updated description', $updated->getDescription());
             $tc->runs()->list(new ListOptions(), new RunListOptions());
+            self::assertSame(0, $tc->webhooks()->list(new ListOptions())->getCount());
         } finally {
             $client->task((string) $task->getId())->delete();
         }

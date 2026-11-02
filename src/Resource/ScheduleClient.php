@@ -45,14 +45,19 @@ final class ScheduleClient
     }
 
     /**
-     * Fetches the schedule's invocation log as text (an empty string if there is no log yet).
+     * Fetches the schedule's invocation log: one entry per invocation, each with {@code message},
+     * {@code level} and {@code createdAt}. The list is empty when the schedule has not run yet.
      *
      * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
-     * this fixed sub-path 404s is the schedule itself being gone (matching the reference client). The
-     * return type is therefore never {@code null}.
+     * this fixed sub-path 404s is the schedule itself being gone (matching the reference client).
+     *
+     * @return list<array<string,mixed>>
      */
-    public function getLog(int|float|string|null $timeoutSecs = null): string
+    public function getLog(int|float|string|null $timeoutSecs = null): array
     {
-        return (string) $this->ctx->getRawRequired('log', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG))->getBody();
+        $entries = $this->ctx->getResourceRequired('log', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        /** @var list<array<string,mixed>> $log */
+        $log = is_array($entries) ? array_values($entries) : [];
+        return $log;
     }
 }

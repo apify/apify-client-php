@@ -36,6 +36,11 @@ final class StoreListOptions
         public readonly ?bool $allowsAgenticUsers = null,
         /** The response format ({@code full}, {@code agent}). */
         public readonly ?string $responseFormat = null,
+        /**
+         * Include the compact input schema of each Actor's default build in the listing (only
+         * returned when the default build succeeded and defines input properties).
+         */
+        public readonly ?bool $includeInputSchema = null,
     ) {
     }
 
@@ -56,6 +61,7 @@ final class StoreListOptions
             $this->includeUnrunnableActors,
             $this->allowsAgenticUsers,
             $this->responseFormat,
+            $this->includeInputSchema,
         );
     }
 
@@ -71,6 +77,7 @@ final class StoreListOptions
             ->addString('pricingModel', $this->pricingModel)
             ->addBool('includeUnrunnableActors', $this->includeUnrunnableActors)
             ->addBool('allowsAgenticUsers', $this->allowsAgenticUsers)
-            ->addString('responseFormat', $this->responseFormat);
+            ->addString('responseFormat', $this->responseFormat)
+            ->addBool('includeInputSchema', $this->includeInputSchema);
     }
 }

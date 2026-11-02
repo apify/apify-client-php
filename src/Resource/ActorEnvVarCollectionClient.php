@@ -37,7 +37,7 @@ final class ActorEnvVarCollectionClient
             '',
             new QueryParams(),
             static fn (array $d) => ActorEnvVar::fromArray($d),
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
     }
 
@@ -60,7 +60,7 @@ final class ActorEnvVarCollectionClient
     public function create(ActorEnvVar $envVar, int|float|string|null $timeoutSecs = null): ActorEnvVar
     {
         return ActorEnvVar::fromArray(
-            $this->ctx->createResource(new QueryParams(), $envVar->toArray(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+            $this->ctx->createResource(new QueryParams(), $envVar->toArray(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT))
         );
     }
 }

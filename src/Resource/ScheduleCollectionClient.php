@@ -61,6 +61,6 @@ final class ScheduleCollectionClient
      */
     public function create(mixed $schedule, int|float|string|null $timeoutSecs = null): Schedule
     {
-        return new Schedule($this->ctx->createResource(new QueryParams(), $schedule, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
+        return new Schedule($this->ctx->createResource(new QueryParams(), $schedule, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 }

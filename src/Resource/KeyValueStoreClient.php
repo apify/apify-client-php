@@ -18,6 +18,7 @@ use Apify\Client\Options\GetRecordOptions;
 use Apify\Client\Options\ListKeysOptions;
 use Apify\Client\Options\SetRecordOptions;
 use Generator;
+use InvalidArgumentException;
 
 /** A client for a specific key-value store (and run-nested variants). */
 final class KeyValueStoreClient
@@ -72,7 +73,7 @@ final class KeyValueStoreClient
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): KeyValueStore
     {
-        return new KeyValueStore($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
+        return new KeyValueStore($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)));
     }
 
     /**
@@ -153,13 +154,15 @@ final class KeyValueStoreClient
         return $this->ctx->headExists(
             'records/' . ResourceContext::encodePathSegment($key),
             new QueryParams(),
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)
         );
     }
 
     /**
      * Fetches a record by key, or {@code null} if it does not exist. Like the reference client, it
-     * requests the record as an attachment so the API returns the raw bytes directly.
+     * requests the record as an attachment so the API returns the raw bytes directly. The value is never
+     * parsed: {@see KeyValueStoreRecord::getValue()} holds the exact bytes the API sent whatever the
+     * content type, so a JSON record is decoded by the caller.
      */
     public function getRecord(string $key, ?GetRecordOptions $options = null, int|float|string|null $timeoutSecs = null): ?KeyValueStoreRecord
     {
@@ -182,7 +185,9 @@ final class KeyValueStoreClient
 
     /**
      * Stores a record with raw bytes and the given content type, honoring the given write options
-     * ({@code timeoutSecs}, {@code doNotRetryTimeouts}).
+     * ({@code timeoutSecs}, {@code doNotRetryTimeouts}). {@code $value} is sent exactly as given, also
+     * under {@code application/json}, so it has to be valid JSON already; use {@see setRecordJson()} to
+     * have a value encoded.
      *
      * {@code $contentEncoding}, if given, is sent as the request's {@code Content-Encoding} header, for
      * a {@code $value} that is already compressed (gzip, br, deflate, ...): the client's own best-effort
@@ -238,10 +243,10 @@ final class KeyValueStoreClient
      * exposes a URL-signing secret key (i.e. it is private), appends an HMAC-SHA256 signature so the
      * URL grants access without an API token. The URL is built from the configured public base URL.
      */
-    public function getRecordPublicUrl(string $key): string
+    public function getRecordPublicUrl(string $key, int|float|string|null $timeoutSecs = null): string
     {
         $params = new QueryParams();
-        $store = $this->get();
+        $store = $this->get($timeoutSecs ?? TimeoutTiers::TIER_LONG);
         if ($store !== null) {
             $secret = $store->get('urlSigningSecretKey');
             if (is_string($secret)) {
@@ -254,15 +259,21 @@ final class KeyValueStoreClient
     /**
      * Builds a public URL for listing this store's keys, forwarding the given key-listing filters
      * into the URL. As with {@see getRecordPublicUrl()}, a signature is appended for private stores
-     * unless the caller already supplied one. {@code $expiresInSecs} optionally bounds a signed URL.
+     * unless the caller already supplied one. {@code $expiresInSecs} optionally bounds a signed URL; it
+     * must be positive, otherwise an {@see InvalidArgumentException} is thrown before any request is
+     * sent. {@code $timeoutSecs} applies to the request that fetches the store (default: the {@code long}
+     * tier).
+     *
+     * @throws InvalidArgumentException if {@code $expiresInSecs} is zero or negative
      */
-    public function createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null): string
+    public function createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null, int|float|string|null $timeoutSecs = null): string
     {
+        Signatures::requirePositiveExpiry($expiresInSecs);
         $options ??= new ListKeysOptions();
         $params = new QueryParams();
         $options->appendTo($params);
         if ($options->signature === null) {
-            $store = $this->get();
+            $store = $this->get($timeoutSecs ?? TimeoutTiers::TIER_LONG);
             if ($store !== null) {
                 $secret = $store->get('urlSigningSecretKey');
                 if (is_string($secret)) {

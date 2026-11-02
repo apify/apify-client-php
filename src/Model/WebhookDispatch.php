@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A single invocation of a webhook. */
 final class WebhookDispatch extends ApifyResource
 {
+    protected const URL_FIELDS = ['webhook.requestUrl'];
+
     /** The unique dispatch ID. */
     public function getId(): ?string
     {

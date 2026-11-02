@@ -100,6 +100,7 @@ final class DocSnippetsTest extends TestCase
             'Apify\Client\Options\MetamorphOptions',
             'Apify\Client\Options\RunResurrectOptions',
             'Apify\Client\Options\RunChargeOptions',
+            'Apify\Client\Options\RunIterateDatasetItemsOptions',
             'Apify\Client\Options\ValidateInputOptions',
             'Apify\Client\Options\BatchAddRequestsOptions',
         ];

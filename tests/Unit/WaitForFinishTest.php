@@ -84,4 +84,13 @@ final class WaitForFinishTest extends TestCase
         $this->expectException(\Apify\Client\Exception\ForbiddenException::class);
         $this->client($transport)->run('run1')->waitForFinish(30);
     }
+
+    public function testShortPollTimeoutStillAsksForAPositiveServerHold(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, self::runBody('SUCCEEDED'));
+
+        $this->client($transport)->run('run1')->waitForFinish(30, 5);
+
+        self::assertStringContainsString('waitForFinish=2', (string) $transport->lastRequest()->getUri());
+    }
 }

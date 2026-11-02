@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A key-value store holds arbitrary data records. */
 final class KeyValueStore extends ApifyResource
 {
+    protected const URL_FIELDS = ['consoleUrl', 'keysPublicUrl', 'recordsPublicUrl'];
+
     /** The unique store ID. */
     public function getId(): ?string
     {

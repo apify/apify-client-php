@@ -9,6 +9,8 @@ use Apify\Client\Internal\Statuses;
 /** A single execution of an Actor. */
 final class ActorRun extends ApifyResource
 {
+    protected const URL_FIELDS = ['consoleUrl', 'containerUrl', 'output.*'];
+
     /** The unique run ID. */
     public function getId(): ?string
     {

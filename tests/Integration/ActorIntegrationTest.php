@@ -48,6 +48,22 @@ final class ActorIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testActorDefaultBuildAndWebhookList(): void
+    {
+        $client = $this->requireClient();
+
+        $defaultBuild = $client->actor('apify/hello-world')->defaultBuild();
+        self::assertNotNull($defaultBuild->get());
+
+        $created = $client->actors()->create(self::minimalActor(self::uniqueName('hooks')));
+        try {
+            $page = $client->actor((string) $created->getId())->webhooks()->list(new ListOptions());
+            self::assertSame(0, $page->getCount());
+        } finally {
+            $client->actor((string) $created->getId())->delete();
+        }
+    }
+
     public function testActorVersionCrudFlow(): void
     {
         $client = $this->requireClient();

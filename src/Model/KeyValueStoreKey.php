@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A single key listed from a key-value store. */
 final class KeyValueStoreKey extends ApifyResource
 {
+    protected const URL_FIELDS = ['recordPublicUrl'];
+
     /** The record key. */
     public function getKey(): ?string
     {

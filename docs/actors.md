@@ -35,7 +35,7 @@ Addressed by ID or `username~name` (a `username/name` is accepted too).
 - `update(mixed $newFields): Actor`
 - `delete(): void`
 - `start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun` — start and return immediately.
-- `call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null): ActorRun` — start and wait.
+- `call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun` — start and wait. `$timeoutSecs` is the timeout of the start request and of every poll (default `'noTimeout'`).
 - `validateInput(mixed $input = null, ?ValidateInputOptions $options = null): bool`
 
 `$input` is a JSON-serializable array (the normal case), or a raw `string` of bytes sent exactly as

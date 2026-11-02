@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A request queue stores URLs to be crawled. */
 final class RequestQueue extends ApifyResource
 {
+    protected const URL_FIELDS = ['consoleUrl'];
+
     /** The unique queue ID. */
     public function getId(): ?string
     {

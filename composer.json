@@ -36,6 +36,9 @@
         "friendsofphp/php-cs-fixer": "^3.52",
         "phpstan/phpstan": "^1.11"
     },
+    "suggest": {
+        "ext-intl": "Converts an internationalized host of a URL field in a response to punycode, as the reference client does."
+    },
     "autoload": {
         "psr-4": {
             "Apify\\Client\\": "src/"

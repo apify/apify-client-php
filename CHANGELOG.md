@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.12.0
+
+- Synced with Apify OpenAPI spec `v2-2026-11-01T214220Z`. Response models return the new fields as
+  received (`toArray()`/`get()`), including the `RunStandby` deployment of Server Actor runs and a
+  `null` schedule `uiState`.
+- Added a `deployment` filter to `RunListOptions` (Actor Standby deployments; honoured by `runs()` and
+  `actor($id)->runs()`) and an `includeInputSchema` option to `StoreListOptions`.
+- `UserClient::monthlyUsage()`, `limits()` and `updateLimits()` now work for any user ID, not only `me()`,
+  as the spec documents the by-ID endpoints; they no longer throw `LogicException`.
+- Added `RunClient::iterateDatasetItems()` with `RunIterateDatasetItemsOptions`: lazily reads a run's
+  default dataset while the run is still producing items and returns once the run has finished and the
+  dataset is drained.
+- **Breaking:** the `short` and `medium` timeout tiers now default to 5 and 30 seconds, as in the
+  reference client, instead of the overall `timeoutSecs`. The `long` tier and `timeoutMaxSecs` still
+  default to `timeoutSecs` (360 seconds). Configure `timeoutShortSecs`/`timeoutMediumSecs` or pass a
+  per-call `$timeoutSecs` for a call that needs longer.
+- A request that asks the API to hold its response with `waitForFinish` (`RunClient::get()`,
+  `BuildClient::get()`, `ActorClient::defaultBuild()` and the `waitForFinish` option of `ActorClient::start()`/
+  `build()` and `TaskClient::start()`) now gets that hold, at most 60 seconds, on top of its tier timeout.
+- **Breaking:** the URL fields of response models that the spec declares as `format: uri` are returned in the
+  WHATWG URL serialization (trailing slash for an empty path, lowercased scheme and host, default port
+  dropped, punycode host with the optional `intl` extension, percent-encoded unsafe characters), e.g.
+  `ActorRun::getContainerUrl()` returns `https://abc.runs.apify.net/`.
+- **Breaking:** `ScheduleClient::getLog()` returns the list of invocation entries (`message`, `level`,
+  `createdAt`) the endpoint responds with, instead of the raw JSON text, and uses the `medium` tier.
+- **Breaking:** `DatasetClient::createItemsPublicUrl()` and `KeyValueStoreClient::createKeysPublicUrl()` throw
+  `InvalidArgumentException` for an `expiresInSecs` of zero or less before sending any request; leave it out
+  for a URL that never expires. `createItemsPublicUrl()`, `createKeysPublicUrl()` and `getRecordPublicUrl()`
+  take a trailing `$timeoutSecs` for the request that fetches the storage (default `long` tier).
+- `DatasetClient::pushItems()` no longer retries a request that timed out, since the API may already have stored
+  the items.
+- Aligned the default timeout tier of individual methods with the reference client: `short` for
+  `ActorClient::validateInput()`, `BuildClient::abort()`, the Actor version and env-var collection calls, the
+  storage collections' `getOrCreate()`, the schedule and webhook `create()`, and the request-queue `listHead()`,
+  `addRequest()`, `batchDeleteRequests()` and `deleteRequestLock()`; `long` for the key-value store `update()`
+  and `recordExists()`; `medium` for `DatasetClient::pushItems()`.
+- `RunClient::waitForFinish()`, `BuildClient::waitForFinish()`, and `call()` on Actors and tasks take an
+  optional `$timeoutSecs`; polls and the start request of `call()` have no request timeout by default.
+- Documented that `KeyValueStoreClient::getRecord()` never parses a record and that `setRecord()` sends its
+  value as given, also under `application/json`.
+
 ## 0.11.1
 
 - Synced with Apify OpenAPI spec `v2-2026-10-26T112451Z`. The spec now documents the full Actor

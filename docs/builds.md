@@ -22,7 +22,7 @@ An Actor's builds are available at `$client->actor($id)->builds()`.
 - `get(?int $waitForFinishSecs = null): ?Build` — fetch, optionally waiting server-side (max 60s).
 - `abort(): Build`
 - `delete(): void`
-- `waitForFinish(?int $waitSecs = null): Build` — poll until terminal (`null` waits indefinitely).
+- `waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): Build` — poll until terminal (`null` waits indefinitely); `$timeoutSecs` is the timeout of each poll request (default `'noTimeout'`).
 - `getOpenApiDefinition(): ?array` — the build's generated OpenAPI document. Throws if the build
   itself does not exist (a 404 here cannot mean anything else).
 - `log(): LogClient` — `get()` throws instead of resolving to `null` on a 404, since there is no ID
