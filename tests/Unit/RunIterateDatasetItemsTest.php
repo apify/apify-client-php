@@ -53,7 +53,10 @@ final class RunIterateDatasetItemsTest extends TestCase
         return $queries;
     }
 
-    /** @param iterable<mixed> $items @return list<int> */
+    /**
+     * @param iterable<mixed> $items
+     * @return list<int>
+     */
     private static function ids(iterable $items): array
     {
         $ids = [];
