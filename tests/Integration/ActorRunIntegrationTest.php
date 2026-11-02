@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Tests\Integration;
 
+use Apify\Client\ApifyClient;
 use Apify\Client\Internal\UrlNormalizer;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\LastRunOptions;
@@ -113,14 +114,9 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
                 }
             })();
             JS;
-        $definition = self::minimalActor(self::uniqueName('live'));
-        $definition['versions'][0]['sourceFiles'][1]['content'] = $script;
-        $actor = $client->actors()->create($definition);
+        $actorId = $this->createBuiltActor($client, 'live', $script);
         try {
-            $actorClient = $client->actor((string) $actor->getId());
-            $build = $actorClient->build('0.0');
-            self::assertSame('SUCCEEDED', $client->build((string) $build->getId())->waitForFinish(300)->getStatus());
-
+            $actorClient = $client->actor($actorId);
             $run = $actorClient->start();
             $runClient = $client->run((string) $run->getId());
             $statusWhenReceived = [];
@@ -135,21 +131,70 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
             self::assertContains($statusWhenReceived[0], ['READY', 'RUNNING']);
             self::assertTrue($runClient->get()?->isTerminal());
         } finally {
-            $client->actor((string) $actor->getId())->delete();
+            $client->actor($actorId)->delete();
         }
+    }
+
+    /**
+     * Creates an Actor whose {@code main.js} is the given script and waits for its build to succeed;
+     * returns the Actor ID. The caller deletes the Actor.
+     */
+    private function createBuiltActor(ApifyClient $client, string $label, string $mainJs): string
+    {
+        $definition = self::minimalActor(self::uniqueName($label));
+        $definition['versions'][0]['sourceFiles'][1]['content'] = $mainJs;
+        $actorId = (string) $client->actors()->create($definition)->getId();
+        try {
+            $build = $client->actor($actorId)->build('0.0');
+            self::assertSame('SUCCEEDED', $client->build((string) $build->getId())->waitForFinish(300)->getStatus());
+        } catch (\Throwable $e) {
+            $client->actor($actorId)->delete();
+            throw $e;
+        }
+        return $actorId;
     }
 
     public function testRunsListAcceptsTheDeploymentFilter(): void
     {
         $client = $this->requireClient();
-        $filter = new RunListOptions(status: ['RUNNING'], deployment: ['SINGLE_TENANT']);
-        // `hello-world` runs are not Actor Standby runs and none is running, so a deployment filter that the API
-        // applies leaves nothing, where the same listing without it returns the finished runs.
-        $client->actor('apify/hello-world')->call(null, null, 120);
-        $unfiltered = new RunListOptions(status: ['SUCCEEDED']);
-        self::assertNotEmpty($client->runs()->list(new ListOptions(limit: 5), $unfiltered)->getItems());
-        self::assertSame([], $client->runs()->list(new ListOptions(limit: 5), $filter)->getItems());
-        self::assertSame([], $client->actor('apify/hello-world')->runs()->list(new ListOptions(limit: 5), $filter)->getItems());
+        // A test-owned Actor whose run keeps running, so the listing is isolated from other tests.
+        $actorId = $this->createBuiltActor($client, 'deploy', 'setTimeout(() => {}, 180000);');
+        try {
+            $actor = $client->actor($actorId);
+            $run = $actor->start();
+            $runId = (string) $run->getId();
+            $running = new RunListOptions(status: ['RUNNING']);
+            $standbyOnly = new RunListOptions(status: ['RUNNING'], deployment: ['SINGLE_TENANT']);
+
+            // Run listings lag, so wait until the running run shows up without the filter...
+            self::assertEventuallyIterated(
+                [$runId],
+                static function () use ($actor, $running): array {
+                    $seen = [];
+                    foreach ($actor->runs()->iterate(new ListOptions(), $running) as $listed) {
+                        $seen[(string) $listed->getId()] = true;
+                    }
+                    return $seen;
+                },
+                'running run',
+            );
+
+            // ...then the same listing with the deployment filter leaves it out: it is not a Standby run.
+            $filtered = [];
+            foreach ($actor->runs()->iterate(new ListOptions(), $standbyOnly) as $listed) {
+                $filtered[] = $listed->getId();
+            }
+            self::assertNotContains($runId, $filtered);
+            $accountWide = [];
+            foreach ($client->runs()->iterate(new ListOptions(limit: 50), $standbyOnly) as $listed) {
+                $accountWide[] = $listed->getId();
+            }
+            self::assertNotContains($runId, $accountWide);
+
+            $client->run($runId)->abort();
+        } finally {
+            $client->actor($actorId)->delete();
+        }
     }
 
     public function testRunUrlFieldsAreNormalized(): void

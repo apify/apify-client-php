@@ -34,16 +34,11 @@ final class DatasetClient
     }
 
     /**
-     * Creates a dataset client for a run's default dataset (nested path only, no ID). Any
-     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
-     * accessor) become base params so every request resolves the correct run's dataset. @internal
+     * Creates a dataset client over a ready context, such as the one of a run's default dataset (nested
+     * path only, no ID). @internal
      */
-    public static function nested(HttpClientCore $http, string $base, string $subPath, ?QueryParams $inheritedParams = null): self
+    public static function fromContext(HttpClientCore $http, ResourceContext $ctx): self
     {
-        $ctx = ResourceContext::collection($http, $base, $subPath);
-        if ($inheritedParams !== null) {
-            $ctx->baseParams = $inheritedParams->copy();
-        }
         return new self($http, $ctx);
     }
 

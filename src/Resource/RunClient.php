@@ -229,7 +229,7 @@ final class RunClient
      */
     public function dataset(): DatasetClient
     {
-        return DatasetClient::nested($this->http, $this->ctx->subUrl(''), 'dataset', $this->ctx->baseParams);
+        return DatasetClient::fromContext($this->http, $this->datasetContext());
     }
 
     /**
@@ -313,8 +313,9 @@ final class RunClient
         // A last-run client resolves `runs/last` on each request, so a newer run would swap the dataset
         // mid-iteration: pin the iteration to the run the first request resolved to.
         $runClient = $run !== null && $run->getId() !== null && $run->getId() !== $this->id ? $this->root->run($run->getId()) : $this;
-        $datasetClient = $runClient->dataset();
+        // One context serves both the dataset client and the page reads, so they cannot drift apart.
         $itemsCtx = $runClient->datasetContext();
+        $datasetClient = DatasetClient::fromContext($this->http, $itemsCtx);
         $requestTimeoutSecs = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
 
         while (true) {

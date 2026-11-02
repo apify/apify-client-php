@@ -8,6 +8,7 @@ use Apify\Client\ApifyClient;
 use Apify\Client\Internal\Json;
 use Apify\Client\Options\RunListOptions;
 use Apify\Client\Options\StoreListOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -107,6 +108,21 @@ final class SpecSyncTest extends TestCase
         self::assertStringEndsWith('/v2/schedules/s1/log', (string) $transport->lastRequest()->getUri());
         // The schedule log is read with the medium tier (30s by default), not the long download tier.
         self::assertSame([30.0, 30.0], $transport->timeouts);
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function emptyScheduleLogBodies(): iterable
+    {
+        yield 'null data' => ['{"data":null}'];
+        yield 'missing data' => ['{}'];
+    }
+
+    #[DataProvider('emptyScheduleLogBodies')]
+    public function testScheduleLogWithoutEntriesIsAnEmptyList(string $body): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, $body);
+
+        self::assertSame([], $this->client($transport)->schedule('s1')->getLog());
     }
 
     public function testScheduleWithANullUiStateIsReadAsIs(): void

@@ -553,8 +553,7 @@ final class ResourceContext
      * Clamps a caller-supplied server-side {@code waitForFinish} value (seconds) so a synchronous get
      * never asks the API to hold the connection for longer than a request can last: the value is capped
      * at 60 seconds, and below the {@code timeoutMaxSecs} cap of a single attempt by a safety margin.
-     * Returns {@code null} for a {@code null} input. An explicit per-call timeout shorter than the hold
-     * is used as given.
+     * Returns {@code null} for a {@code null} input.
      */
     public function clampServerWait(?int $waitForFinishSecs): ?int
     {
