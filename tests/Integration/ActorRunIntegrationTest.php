@@ -11,6 +11,7 @@ use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ListOptions;
 use Apify\Client\Options\RunIterateDatasetItemsOptions;
 use Apify\Client\Options\RunListOptions;
+use Apify\Client\Resource\RunCollectionClient;
 
 final class ActorRunIntegrationTest extends IntegrationTestCase
 {
@@ -157,58 +158,51 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
     public function testRunsListAcceptsTheDeploymentFilter(): void
     {
         $client = $this->requireClient();
-        // A test-owned Actor whose run keeps running, so the listing is isolated from other tests.
-        $actorId = $this->createBuiltActor($client, 'deploy', 'setTimeout(() => {}, 180000);');
+        // A test-owned Actor whose run keeps running, so the listing is isolated from other tests. The run is
+        // aborted at the end, so it can be given a lifetime that outlasts the retries below.
+        $actorId = $this->createBuiltActor($client, 'deploy', 'setTimeout(() => {}, 600000);');
         try {
             $actor = $client->actor($actorId);
-            $run = $actor->start();
-            $runId = (string) $run->getId();
+            $runId = (string) $actor->start()->getId();
             $running = new RunListOptions(status: ['RUNNING']);
             $standbyOnly = new RunListOptions(status: ['RUNNING'], deployment: ['SINGLE_TENANT']);
+            // Newest first, so the 50 runs read account-wide include this one.
+            $newestFirst = new ListOptions(limit: 50, desc: true);
 
-            // Run listings lag, so wait until the running run shows up without the filter...
+            // Run listings lag: wait until the running run shows up without the filter, then check that the same
+            // listing with the deployment filter leaves it out, as it is not a Standby run.
             self::assertEventuallyIterated(
                 [$runId],
-                static function () use ($actor, $running): array {
-                    $seen = [];
-                    foreach ($actor->runs()->iterate(new ListOptions(), $running) as $listed) {
-                        $seen[(string) $listed->getId()] = true;
-                    }
-                    return $seen;
-                },
+                fn (): array => self::listedRunIds($actor->runs(), new ListOptions(), $running),
                 'running run',
             );
+            self::assertArrayNotHasKey($runId, self::listedRunIds($actor->runs(), new ListOptions(), $standbyOnly));
 
-            // ...then the same listing with the deployment filter leaves it out: it is not a Standby run.
-            $filtered = [];
-            foreach ($actor->runs()->iterate(new ListOptions(), $standbyOnly) as $listed) {
-                $filtered[] = $listed->getId();
-            }
-            self::assertNotContains($runId, $filtered);
-            // The account-wide listing, newest first so that the 50 runs it reads include this one: it shows
-            // the run without the filter and leaves it out with the filter.
-            $newestFirst = new ListOptions(limit: 50, desc: true);
             self::assertEventuallyIterated(
                 [$runId],
-                static function () use ($client, $newestFirst, $running): array {
-                    $seen = [];
-                    foreach ($client->runs()->iterate($newestFirst, $running) as $listed) {
-                        $seen[(string) $listed->getId()] = true;
-                    }
-                    return $seen;
-                },
+                fn (): array => self::listedRunIds($client->runs(), $newestFirst, $running),
                 'running run (account-wide)',
             );
-            $accountWide = [];
-            foreach ($client->runs()->iterate($newestFirst, $standbyOnly) as $listed) {
-                $accountWide[] = $listed->getId();
-            }
-            self::assertNotContains($runId, $accountWide);
+            self::assertArrayNotHasKey($runId, self::listedRunIds($client->runs(), $newestFirst, $standbyOnly));
 
             $client->run($runId)->abort();
         } finally {
             $client->actor($actorId)->delete();
         }
+    }
+
+    /**
+     * The IDs of the runs a listing yields, as a set (ID => true).
+     *
+     * @return array<string,true>
+     */
+    private static function listedRunIds(RunCollectionClient $runs, ListOptions $options, RunListOptions $filter): array
+    {
+        $ids = [];
+        foreach ($runs->iterate($options, $filter) as $listed) {
+            $ids[(string) $listed->getId()] = true;
+        }
+        return $ids;
     }
 
     public function testRunUrlFieldsAreNormalized(): void
