@@ -41,7 +41,8 @@ final class UrlNormalizer
      * {@code VerifyDnsLength} off): empty label, label too long, domain too long, leading hyphen,
      * trailing hyphen and hyphens in positions 3 and 4.
      */
-    private const IGNORED_IDNA_ERRORS = 0x3F;
+    private const IGNORED_IDNA_ERRORS = IDNA_ERROR_EMPTY_LABEL | IDNA_ERROR_LABEL_TOO_LONG | IDNA_ERROR_DOMAIN_NAME_TOO_LONG
+        | IDNA_ERROR_LEADING_HYPHEN | IDNA_ERROR_TRAILING_HYPHEN | IDNA_ERROR_HYPHEN_3_4;
 
     /** The highest valid port number. */
     private const MAX_PORT = 65535;
@@ -212,9 +213,11 @@ final class UrlNormalizer
         }
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
             $info = [];
-            $flags = IDNA_NONTRANSITIONAL_TO_ASCII | IDNA_CHECK_BIDI | IDNA_CHECK_CONTEXTJ;
+            // IDNA_CHECK_BIDI is left off: ICU applies the RFC 5893 rules more strictly than WHATWG parsers do,
+            // so it would leave hosts such as `١.com` unnormalized that `new URL()` accepts.
+            $flags = IDNA_NONTRANSITIONAL_TO_ASCII | IDNA_CHECK_CONTEXTJ;
             $ascii = idn_to_ascii($lower, $flags, INTL_IDNA_VARIANT_UTS46, $info);
-            if ($ascii === false && ($info['errors'] ?? -1) !== 0 && (($info['errors'] ?? -1) & ~self::IGNORED_IDNA_ERRORS) === 0) {
+            if ($ascii === false && (($info['errors'] ?? -1) & ~self::IGNORED_IDNA_ERRORS) === 0) {
                 $ascii = $info['result'] ?? false;
             }
             // The UTS #46 mapping turns fullwidth look-alikes into the forbidden ASCII characters.

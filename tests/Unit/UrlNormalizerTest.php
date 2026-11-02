@@ -51,9 +51,6 @@ final class UrlNormalizerTest extends TestCase
         yield 'fragment without path' => ['https://example.com#f', 'https://example.com/#f'];
         yield 'empty segments are kept' => ['https://example.com//a//b', 'https://example.com//a//b'];
         yield 'backslash is a slash' => ['https://example.com/a\\b', 'https://example.com/a/b'];
-        yield 'hyphens in an internationalized host' => ["https://AB--c.b\u{00FC}cher.example/x", 'https://ab--c.xn--bcher-kva.example/x'];
-        yield 'leading hyphen in an internationalized host' => ["https://-a.b\u{00FC}cher.example/x", 'https://-a.xn--bcher-kva.example/x'];
-        yield 'empty label in an internationalized host' => ["https://a..b\u{00FC}cher.example/x", 'https://a..xn--bcher-kva.example/x'];
         yield 'websocket scheme' => ['wss://Example.com:443', 'wss://example.com/'];
     }
 
@@ -73,6 +70,27 @@ final class UrlNormalizerTest extends TestCase
         self::assertSame('https://xn--bcher-kva.example/stra%C3%9Fe', UrlNormalizer::normalize('https://bücher.example/straße'));
     }
 
+    /** @return iterable<string,array{string,string}> */
+    public static function internationalizedHostCases(): iterable
+    {
+        yield 'hyphens' => ["https://AB--c.b\u{00FC}cher.example/x", 'https://ab--c.xn--bcher-kva.example/x'];
+        yield 'leading hyphen' => ["https://-a.b\u{00FC}cher.example/x", 'https://-a.xn--bcher-kva.example/x'];
+        yield 'empty label' => ["https://a..b\u{00FC}cher.example/x", 'https://a..xn--bcher-kva.example/x'];
+        yield 'right-to-left digit label' => ["https://\u{0661}.com/", 'https://xn--9hb.com/'];
+        yield 'right-to-left label after an ASCII one' => ["https://\u{05D0}.1a.com/", 'https://xn--4db.1a.com/'];
+        yield 'replacement character' => ["https://example.com\u{FFFD}/", "https://example.com\u{FFFD}/"];
+        yield 'zero width joiner' => ["https://a\u{200D}b\u{00FC}.com/", "https://a\u{200D}b\u{00FC}.com/"];
+    }
+
+    #[DataProvider('internationalizedHostCases')]
+    public function testInternationalizedHostsFollowWhatwg(string $input, string $expected): void
+    {
+        if (!function_exists('idn_to_ascii')) {
+            self::markTestSkipped('The intl extension is needed to convert an internationalized host to punycode.');
+        }
+        self::assertSame($expected, UrlNormalizer::normalize($input));
+    }
+
     /** @return iterable<string,array{string}> */
     public static function untouchedValues(): iterable
     {
@@ -88,9 +106,6 @@ final class UrlNormalizerTest extends TestCase
         yield 'fullwidth percent in host' => ["https://ex\u{FF05}ample.com/a"];
         yield 'text after the IPv6 literal' => ['https://[::1]x/y'];
         yield 'not an IP literal in brackets' => ['https://[nothost]/x'];
-        yield 'replacement character in host' => ["https://example.com\u{FFFD}/"];
-        yield 'bidi violation in host' => ["https://\u{0661}.\u{05D0}b\u{00FC}/"];
-        yield 'zero width joiner in host' => ["https://a\u{200D}b\u{00FC}.com/"];
         yield 'port out of range' => ['https://example.com:70000/x'];
     }
 
