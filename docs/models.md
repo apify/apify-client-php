@@ -8,7 +8,18 @@ returns. Each model exposes the commonly-used fields as typed getters; every mod
   even fields without a dedicated getter).
 - `get(string $key): mixed` — a single raw field by its API name.
 
-Getters return `null` when the field is absent from the API response. The `RequestQueueRequest`
+Getters return `null` when the field is absent from the API response.
+
+URL fields the OpenAPI specification declares as `format: uri` — a run's `consoleUrl`, `containerUrl` and
+`output` links, the `consoleUrl` and public URLs of storages, a key's `recordPublicUrl`, a task's
+`standbyUrl`, a webhook's `requestUrl`, a Store Actor's `url` and `userPictureUrl`, and a user profile's
+`pictureUrl` and `websiteUrl` — are returned in the WHATWG URL serialization, as the reference client
+does, by the getters, `get()` and `toArray()` alike: an empty path gets a trailing slash
+(`https://abc.runs.apify.net` becomes `https://abc.runs.apify.net/`), the scheme and host are lowercased,
+a default port is dropped, an internationalized host becomes punycode (needs the optional `intl`
+extension) and unsafe characters are percent-encoded. A value that is not an absolute http(s)/ws(s)/ftp
+URL is kept as received. Normalize a stored URL the same way before comparing it with one of these
+fields. The `RequestQueueRequest`
 model is also used as an input object and therefore additionally exposes setters and a constructor
 (see [Input models](#input-models)).
 

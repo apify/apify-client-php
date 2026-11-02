@@ -22,6 +22,17 @@ final class RunListOptions
         public readonly ?string $startedAfter = null,
         /** Filter to runs started before this ISO-8601 timestamp. */
         public readonly ?string $startedBefore = null,
+        /**
+         * Filter to runs of the given Actor Standby deployments ({@code SINGLE_TENANT},
+         * {@code MULTI_TENANT_FREE_USERS}, {@code MULTI_TENANT_PAYING_USERS},
+         * {@code MULTI_TENANT_OWNER_PAID}); sent as a comma-separated list. Honoured by the Actor-scoped
+         * and account-wide run collections. The API requires {@code status} to be set to non-terminal
+         * statuses only ({@code READY}, {@code RUNNING}, {@code TIMING-OUT}, {@code ABORTING}) when this
+         * filter is used.
+         *
+         * @var list<string>|null
+         */
+        public readonly ?array $deployment = null,
     ) {
     }
 
@@ -30,6 +41,7 @@ final class RunListOptions
     {
         $q->addCsv('status', $this->status !== null ? array_values($this->status) : null)
             ->addString('startedAfter', $this->startedAfter)
-            ->addString('startedBefore', $this->startedBefore);
+            ->addString('startedBefore', $this->startedBefore)
+            ->addCsv('deployment', $this->deployment !== null ? array_values($this->deployment) : null);
     }
 }

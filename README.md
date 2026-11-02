@@ -67,9 +67,11 @@ $configured = new ApifyClient(
 | `maxRetries` | `8` | Maximum retries for failed requests. |
 | `minDelayBetweenRetriesMillis` | `500` | Minimum delay between retries (exponential backoff). |
 | `maxDelayBetweenRetriesMillis` | `timeoutSecs × 1000` (360000) | Upper bound (milliseconds) on the growing inter-retry delay; defaults to the request timeout expressed in milliseconds. |
-| `timeoutSecs` | `360` | Overall per-request timeout, and the default duration of every timeout tier below that is left unset. |
-| `timeoutShortSecs` / `timeoutMediumSecs` / `timeoutLongSecs` | `timeoutSecs` | Duration (seconds) of the named timeout tier — see [Timeout tiers](#timeout-tiers). |
-| `timeoutMaxSecs` | `timeoutSecs` | Upper bound on any single request's timeout, including a per-call override. |
+| `timeoutSecs` | `360` | Overall per-request timeout: the default duration of the `long` tier and of `timeoutMaxSecs`. |
+| `timeoutShortSecs` | `5` | Duration (seconds) of the `short` timeout tier — see [Timeout tiers](#timeout-tiers). |
+| `timeoutMediumSecs` | `30` | Duration (seconds) of the `medium` timeout tier. |
+| `timeoutLongSecs` | `timeoutSecs` | Duration (seconds) of the `long` timeout tier. |
+| `timeoutMaxSecs` | `timeoutSecs` | Upper bound on any single request attempt's timeout, including a per-call override and the growth across retries. |
 | `compression` | `null` (brotli, falling back to gzip) | Request-body compression: `'brotli'`, `'gzip'`, or a custom `HttpCompressorInterface` — see [HTTP compression](#http-compression). |
 | `userAgentSuffix` | `null` | Custom suffix appended to the `User-Agent` header. |
 | `httpClient` | Guzzle | The replaceable transport (`Apify\Client\Http\HttpClientInterface`). |
@@ -84,9 +86,12 @@ not thrown — `get()` returns `null` and `delete()` is treated as a successful 
 
 Every method that sends a request is assigned a timeout tier: `short` (metadata reads/writes, e.g.
 `get()`/`update()`/`delete()`), `medium` (listing/batch/trigger calls), or `long`
-(downloads/uploads/streaming). Each tier's duration defaults to the client's single `timeoutSecs`, so
-a client constructed without the tier options behaves exactly as before they existed; set
-`timeoutShortSecs`/`timeoutMediumSecs`/`timeoutLongSecs` to give a tier its own duration instead.
+(downloads/uploads/streaming). The tiers last 5 seconds (`short`), 30 seconds (`medium`) and the client's
+`timeoutSecs`, 360 seconds by default (`long`); set `timeoutShortSecs`/`timeoutMediumSecs`/
+`timeoutLongSecs` to give a tier another duration. A call that asks the API to hold its response with a
+`waitForFinish` value (`RunClient::get()`, `BuildClient::get()`, `ActorClient::defaultBuild()`, and the
+`waitForFinish` option of `ActorClient::start()`/`build()` and `TaskClient::start()`) gets that hold,
+at most 60 seconds, on top of its tier, so the client never aborts a request the API is still holding.
 
 Every method that sends a request additionally takes an optional trailing `$timeoutSecs`, overriding
 the tier for that one call — a number of seconds, a tier name (`'short'`/`'medium'`/`'long'`), or
@@ -99,7 +104,8 @@ $client->requestQueue('my-queue')->unlockRequests(timeoutSecs: 'noTimeout'); // 
 ```
 
 `timeoutMaxSecs` caps every tier and every per-call override alike (defaulting to `timeoutSecs`), so
-raise it whenever a call legitimately needs longer than the default 360 seconds. A request-queue
+raise it whenever a call legitimately needs longer than the default 360 seconds. A failed attempt is
+retried with a timeout doubled up to that cap. A request-queue
 client's own `timeoutSecs` (`requestQueue(id, options)`) caps every tier and per-call override of
 calls made through that client specifically, on top of `timeoutMaxSecs`.
 

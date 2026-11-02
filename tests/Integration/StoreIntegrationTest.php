@@ -15,6 +15,13 @@ final class StoreIntegrationTest extends IntegrationTestCase
         self::assertLessThanOrEqual(5, count($page->getItems()));
     }
 
+    public function testListStoreWithInputSchema(): void
+    {
+        $client = $this->requireClient();
+        $page = $client->store()->list(new StoreListOptions(limit: 5, includeInputSchema: true));
+        self::assertLessThanOrEqual(5, count($page->getItems()));
+    }
+
     public function testIterateStore(): void
     {
         $client = $this->requireClient();

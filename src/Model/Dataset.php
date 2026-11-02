@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A dataset stores structured results from Actor runs. */
 final class Dataset extends ApifyResource
 {
+    protected const URL_FIELDS = ['consoleUrl', 'itemsPublicUrl'];
+
     /** The unique dataset ID. */
     public function getId(): ?string
     {

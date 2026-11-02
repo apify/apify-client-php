@@ -90,7 +90,7 @@ final class ActorClient
                 $params,
                 $body,
                 $options->contentTypeOrDefault(),
-                $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+                $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM, $options->waitForFinish)
             )),
             $options->waitForResources,
         );
@@ -152,13 +152,14 @@ final class ActorClient
         }
         $params = new QueryParams();
         $params->addString('version', $versionNumber);
-        ($options ?? new ActorBuildOptions())->appendTo($params);
+        $options ??= new ActorBuildOptions();
+        $options->appendTo($params);
         return new Build($this->ctx->postWithBody(
             'builds',
             $params,
             null,
             ResourceContext::CONTENT_TYPE_JSON,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM, $options->waitForFinish)
         ));
     }
 
@@ -171,7 +172,7 @@ final class ActorClient
         $params = new QueryParams();
         // Clamp the server-side wait below the per-request timeout, consistent with run/build get().
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinish));
-        $data = $this->ctx->getResourceRequired('builds/default', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
+        $data = $this->ctx->getResourceRequired('builds/default', $params, $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT, $waitForFinish));
         $build = new Build(is_array($data) ? $data : []);
         return new BuildClient($this->http, $this->baseUrl, (string) $build->getId());
     }
@@ -179,7 +180,7 @@ final class ActorClient
     /** Returns a client for the last run of this Actor, optionally filtered by status and/or origin. */
     public function lastRun(?LastRunOptions $options = null): RunClient
     {
-        $client = new RunClient($this->http, $this->ctx->subUrl(''), 'runs', 'last');
+        $client = new RunClient($this->root, $this->http, $this->ctx->subUrl(''), 'runs', 'last');
         $client->setLastRunParams($options ?? new LastRunOptions());
         return $client;
     }

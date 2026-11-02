@@ -90,19 +90,18 @@ final class ApifyClient
      * @param int|null                 $maxDelayBetweenRetriesMillis upper bound for the growing inter-retry delay
      *                                                               (defaults to the request timeout)
      * @param int                      $timeoutSecs                  overall per-request timeout in seconds (default
-     *                                                               360); also the default duration of every timeout
-     *                                                               tier below that is left unset
+     *                                                               360); the default of the {@code long} tier and of
+     *                                                               {@code $timeoutMaxSecs}
      * @param int|null                 $timeoutShortSecs             duration (seconds) of the {@code short} timeout
-     *                                                               tier (metadata reads/writes); defaults to
-     *                                                               {@code $timeoutSecs}
+     *                                                               tier (metadata reads/writes); defaults to 5
      * @param int|null                 $timeoutMediumSecs            duration (seconds) of the {@code medium} timeout
-     *                                                               tier (listing/batch/trigger calls); defaults to
-     *                                                               {@code $timeoutSecs}
+     *                                                               tier (listing/batch/trigger calls); defaults to 30
      * @param int|null                 $timeoutLongSecs              duration (seconds) of the {@code long} timeout
      *                                                               tier (downloads/uploads/streaming); defaults to
      *                                                               {@code $timeoutSecs}
-     * @param int|null                 $timeoutMaxSecs               upper bound on any single request's timeout,
-     *                                                               including a per-call override; defaults to
+     * @param int|null                 $timeoutMaxSecs               upper bound on any single request attempt's
+     *                                                               timeout, including a per-call override and the
+     *                                                               growth across retries; defaults to
      *                                                               {@code $timeoutSecs}
      * @param string|null              $userAgentSuffix              custom suffix appended to the User-Agent header
      * @param HttpClientInterface|null $httpClient                   replaces the default transport (Guzzle)
@@ -217,7 +216,7 @@ final class ApifyClient
     /** A client for a specific Actor run. */
     public function run(string $id): RunClient
     {
-        return new RunClient($this->http, $this->baseUrl, 'actor-runs', $id);
+        return new RunClient($this, $this->http, $this->baseUrl, 'actor-runs', $id);
     }
 
     // ----- Dataset accessors ---------------------------------------------------

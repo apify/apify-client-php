@@ -34,7 +34,7 @@ final class BuildClient
         $params = new QueryParams();
         // Clamp to the client's per-request timeout so a short custom timeout doesn't abort the call.
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinishSecs));
-        $data = $this->ctx->getResource('', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
+        $data = $this->ctx->getResource('', $params, $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT, $waitForFinishSecs));
         return is_array($data) ? new Build($data) : null;
     }
 

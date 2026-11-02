@@ -39,6 +39,15 @@ abstract class IntegrationTestCase extends TestCase
         return $trimmed;
     }
 
+    /**
+     * How many times, and how many seconds apart, a listing is re-read while a resource the test just
+     * created is missing from it. The list endpoints read from database secondaries that may lag by up
+     * to 90 seconds, so 30 attempts 3 seconds apart cover that window; a pass returns as soon as every
+     * expected ID shows up.
+     */
+    private const LISTING_MAX_ATTEMPTS = 30;
+    private const LISTING_RETRY_DELAY_SECS = 3;
+
     /** Returns a configured client, or skips the test if {@code APIFY_TOKEN} is unset. */
     protected function requireClient(): ApifyClient
     {
@@ -69,7 +78,7 @@ abstract class IntegrationTestCase extends TestCase
      * Apify's list/pagination endpoints are eventually consistent, and this suite is designed to run
      * concurrently with other test runs (including other language clients) against the same shared
      * test account; under that load, a resource created immediately before an {@code iterate()} call
-     * can take a few seconds to be reflected in a collection listing. Retrying the whole pass (rather
+     * can take a while to be reflected in a collection listing. Retrying the whole pass (rather
      * than looping forever or giving up after one try) keeps the test genuinely exercising
      * {@code iterate()} while tolerating that lag: it still fails, with the same diagnostic message,
      * if a resource never appears within the bounded timeout.
@@ -80,17 +89,14 @@ abstract class IntegrationTestCase extends TestCase
      */
     protected static function assertEventuallyIterated(array $expectedIds, callable $collect, string $label): void
     {
-        $maxAttempts = 8;
-        $delaySecs = 0.5;
         $seen = [];
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+        for ($attempt = 1; $attempt <= self::LISTING_MAX_ATTEMPTS; $attempt++) {
             $seen = $collect();
             $missing = array_filter($expectedIds, static fn (string $id): bool => !isset($seen[$id]));
-            if ($missing === [] || $attempt === $maxAttempts) {
+            if ($missing === [] || $attempt === self::LISTING_MAX_ATTEMPTS) {
                 break;
             }
-            usleep((int) ($delaySecs * 1_000_000));
-            $delaySecs = min($delaySecs * 1.6, 5.0);
+            sleep(self::LISTING_RETRY_DELAY_SECS);
         }
         // Always assert (even on a first-attempt success) so the test genuinely records assertions
         // instead of relying on an early return, which PHPUnit flags as a "risky" no-assertion test.

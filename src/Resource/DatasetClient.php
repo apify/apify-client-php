@@ -191,9 +191,11 @@ final class DatasetClient
      * with the {@code X-Apify-Pagination-Count} "scanned rows" count ({@code null} if the response
      * omits the header), which {@see iterateItems()} uses to advance — see its doc comment.
      *
+     * @internal
+     *
      * @return array{0:PaginationList<mixed>,1:?int}
      */
-    private function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
+    public function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
     {
         $params = new QueryParams();
         $options->appendTo($params);

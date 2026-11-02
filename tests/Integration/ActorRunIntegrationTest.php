@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Apify\Client\Tests\Integration;
 
+use Apify\Client\Internal\UrlNormalizer;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ListOptions;
+use Apify\Client\Options\RunIterateDatasetItemsOptions;
 use Apify\Client\Options\RunListOptions;
 
 final class ActorRunIntegrationTest extends IntegrationTestCase
@@ -51,6 +53,60 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
 
         $client->run((string) $run->getId())->dataset()->listItems(new DatasetListItemsOptions());
         $client->run((string) $run->getId())->keyValueStore()->getRecord('OUTPUT');
+    }
+
+    public function testIterateDatasetItemsOfAFinishedRunYieldsEveryItem(): void
+    {
+        $client = $this->requireClient();
+        $run = $client->actor('apify/hello-world')->call(null, null, 120);
+        self::assertSame('SUCCEEDED', $run->getStatus());
+        $runClient = $client->run((string) $run->getId());
+
+        $expected = iterator_to_array($runClient->dataset()->iterateItems(), false);
+        $live = iterator_to_array($runClient->iterateDatasetItems(new RunIterateDatasetItemsOptions(chunkSize: 1, pollIntervalSecs: 1)), false);
+
+        self::assertSame($expected, $live);
+    }
+
+    public function testIterateDatasetItemsOfARunPushingItemsReadsThemWhileItRuns(): void
+    {
+        $client = $this->requireClient();
+        $actor = $client->actor('apify/hello-world');
+        $run = $actor->start();
+        $items = iterator_to_array($client->run((string) $run->getId())->iterateDatasetItems(new RunIterateDatasetItemsOptions(pollIntervalSecs: 1)), false);
+
+        // The iteration only returns once the run has finished and the dataset is drained, so it has
+        // seen everything the run pushed.
+        $finished = $client->run((string) $run->getId())->get();
+        self::assertNotNull($finished);
+        self::assertTrue($finished->isTerminal());
+        // The dataset's `itemCount` lags the pushed items by a few seconds, so compare with a read of the items.
+        $all = iterator_to_array($client->run((string) $run->getId())->dataset()->iterateItems(), false);
+        self::assertGreaterThanOrEqual(1, count($items));
+        self::assertSame($all, $items);
+    }
+
+    public function testRunsListAcceptsTheDeploymentFilter(): void
+    {
+        $client = $this->requireClient();
+        $filter = new RunListOptions(status: ['RUNNING'], deployment: ['SINGLE_TENANT']);
+        $page = $client->runs()->list(new ListOptions(limit: 5), $filter);
+        self::assertLessThanOrEqual(5, count($page->getItems()));
+        $page = $client->actor('apify/hello-world')->runs()->list(new ListOptions(limit: 5), $filter);
+        self::assertLessThanOrEqual(5, count($page->getItems()));
+    }
+
+    public function testRunUrlFieldsAreNormalized(): void
+    {
+        $client = $this->requireClient();
+        $run = $client->actor('apify/hello-world')->call(null, null, 120);
+
+        foreach (['consoleUrl', 'containerUrl'] as $field) {
+            $url = $run->get($field);
+            if (is_string($url)) {
+                self::assertSame(UrlNormalizer::normalize($url), $url, "$field must be returned normalized");
+            }
+        }
     }
 
     public function testLastRunAccess(): void

@@ -74,6 +74,7 @@ Extra filters for `runs()->list()`, combined with a `ListOptions`.
 | `status` | `list<string>\|null` | Filter by one or more run statuses (e.g. `SUCCEEDED`, `RUNNING`); sent comma-separated. |
 | `startedAfter` | `?string` | Only runs started after this ISO-8601 timestamp. |
 | `startedBefore` | `?string` | Only runs started before this ISO-8601 timestamp. |
+| `deployment` | `list<string>\|null` | Only Actor Standby runs of these deployments (`SINGLE_TENANT`, `MULTI_TENANT_FREE_USERS`, `MULTI_TENANT_PAYING_USERS`, `MULTI_TENANT_OWNER_PAID`); sent comma-separated. The API requires `status` to hold only non-terminal statuses (`READY`, `RUNNING`, `TIMING-OUT`, `ABORTING`) when it is used. Honoured by `runs()` and `actor($id)->runs()`. |
 
 ### `StoreListOptions`
 For `store()->list()` / `store()->iterate()`.
@@ -89,8 +90,23 @@ For `store()->list()` / `store()->iterate()`.
 | `includeUnrunnableActors` | `?bool` | Include Actors the current user cannot run. |
 | `allowsAgenticUsers` | `?bool` | Filter to Actors that allow agentic users. |
 | `responseFormat` | `?string` | The response format (`full`, `agent`). |
+| `includeInputSchema` | `?bool` | Include each Actor's compact input schema (only returned when its default build succeeded and defines input properties). |
 
 Supports [`withPagination($offset, $limit)`](#manual-offset-paging-with-withpagination).
+
+### `RunIterateDatasetItemsOptions`
+For `run($id)->iterateDatasetItems()`.
+| Field | Type | Description |
+|---|---|---|
+| `offset` | `?int` | Number of dataset rows to skip from the beginning (default 0). |
+| `limit` | `?int` | Maximum number of dataset rows to scan (default: no limit). Fewer items are yielded when filters drop some, more when `unwind` splits a row into several. |
+| `chunkSize` | `?int` | Maximum number of dataset rows requested per API call (default 1000). |
+| `clean` | `?bool` | Yield only non-empty items and skip hidden fields. |
+| `fields` / `omit` | `list<string>\|null` | Field names to include / exclude. |
+| `skipEmpty` | `?bool` | Skip empty items. |
+| `skipHidden` | `?bool` | Skip hidden fields (those starting with `#`). |
+| `unwind` | `list<string>\|null` | Field names to unwind: each array value becomes a separate item. |
+| `pollIntervalSecs` | `?int` | How long to wait for the run to finish between polls, in seconds (default 5). |
 
 ### `LastRunOptions`
 For `actor()->lastRun()` / `task()->lastRun()`.

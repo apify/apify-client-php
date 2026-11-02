@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** A pre-configured Actor run (an Actor task). */
 final class Task extends ApifyResource
 {
+    protected const URL_FIELDS = ['standbyUrl'];
+
     /** The unique task ID. */
     public function getId(): ?string
     {

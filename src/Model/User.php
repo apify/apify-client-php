@@ -10,6 +10,8 @@ namespace Apify\Client\Model;
  */
 final class User extends ApifyResource
 {
+    protected const URL_FIELDS = ['profile.pictureUrl', 'profile.websiteUrl'];
+
     /** The unique user ID. */
     public function getId(): ?string
     {

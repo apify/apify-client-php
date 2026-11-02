@@ -7,6 +7,8 @@ namespace Apify\Client\Model;
 /** An Actor as listed in the Apify Store. */
 final class ActorStoreListItem extends ApifyResource
 {
+    protected const URL_FIELDS = ['userPictureUrl', 'url'];
+
     /** The unique Actor ID. */
     public function getId(): ?string
     {

@@ -159,7 +159,9 @@ final class KeyValueStoreClient
 
     /**
      * Fetches a record by key, or {@code null} if it does not exist. Like the reference client, it
-     * requests the record as an attachment so the API returns the raw bytes directly.
+     * requests the record as an attachment so the API returns the raw bytes directly. The value is never
+     * parsed: {@see KeyValueStoreRecord::getValue()} holds the exact bytes the API sent whatever the
+     * content type, so a JSON record is decoded by the caller.
      */
     public function getRecord(string $key, ?GetRecordOptions $options = null, int|float|string|null $timeoutSecs = null): ?KeyValueStoreRecord
     {
@@ -182,7 +184,9 @@ final class KeyValueStoreClient
 
     /**
      * Stores a record with raw bytes and the given content type, honoring the given write options
-     * ({@code timeoutSecs}, {@code doNotRetryTimeouts}).
+     * ({@code timeoutSecs}, {@code doNotRetryTimeouts}). {@code $value} is sent exactly as given, also
+     * under {@code application/json}, so it has to be valid JSON already; use {@see setRecordJson()} to
+     * have a value encoded.
      *
      * {@code $contentEncoding}, if given, is sent as the request's {@code Content-Encoding} header, for
      * a {@code $value} that is already compressed (gzip, br, deflate, ...): the client's own best-effort

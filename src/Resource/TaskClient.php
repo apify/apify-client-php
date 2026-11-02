@@ -108,7 +108,7 @@ final class TaskClient
                 $params,
                 $body,
                 ResourceContext::CONTENT_TYPE_JSON,
-                $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+                $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM, $options->waitForFinish)
             )),
             $options->waitForResources,
         );
@@ -164,7 +164,7 @@ final class TaskClient
     /** Returns a client for the last run of this task, optionally filtered by status and/or origin. */
     public function lastRun(?LastRunOptions $options = null): RunClient
     {
-        $client = new RunClient($this->http, $this->ctx->subUrl(''), 'runs', 'last');
+        $client = new RunClient($this->root, $this->http, $this->ctx->subUrl(''), 'runs', 'last');
         $client->setLastRunParams($options ?? new LastRunOptions());
         return $client;
     }

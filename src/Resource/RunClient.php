@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace Apify\Client\Resource;
 
+use Apify\Client\ApifyClient;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorRun;
+use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\LogOptions;
 use Apify\Client\Options\MetamorphOptions;
 use Apify\Client\Options\RunChargeOptions;
+use Apify\Client\Options\RunIterateDatasetItemsOptions;
 use Apify\Client\Options\RunResurrectOptions;
+use Generator;
 use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 
@@ -29,10 +33,17 @@ final class RunClient
     /** Header the API uses to deduplicate charge requests. */
     private const CHARGE_IDEMPOTENCY_HEADER = 'idempotency-key';
 
+    /** Default number of dataset rows requested per API call by {@see iterateDatasetItems()}. */
+    private const ITERATE_DEFAULT_CHUNK_SIZE = 1000;
+
+    /** Default time, in seconds, {@see iterateDatasetItems()} waits for the run to finish between polls. */
+    private const ITERATE_DEFAULT_POLL_INTERVAL_SECS = 5;
+
     private ResourceContext $ctx;
 
     /** @internal */
     public function __construct(
+        private ApifyClient $root,
         private HttpClientCore $http,
         string $baseUrl,
         string $resourcePath,
@@ -68,7 +79,7 @@ final class RunClient
     {
         $params = new QueryParams();
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinishSecs));
-        $data = $this->ctx->getResource('', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
+        $data = $this->ctx->getResource('', $params, $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT, $waitForFinishSecs));
         return is_array($data) ? new ActorRun($data) : null;
     }
 
@@ -268,5 +279,88 @@ final class RunClient
     public function getStreamedLog(): StreamInterface
     {
         return $this->log()->stream(new LogOptions(raw: true));
+    }
+
+    /**
+     * Lazily iterates over the items of the run's default dataset while the run is still producing
+     * them, and returns once the run has finished and the dataset is drained.
+     *
+     * While the run has not finished, each poll yields the rows below the dataset's {@code itemCount}
+     * and then waits up to {@code pollIntervalSecs} for the run to finish, so the last rows are read as
+     * soon as it does. Each page is requested with a {@code limit} that ends at {@code itemCount}, so it
+     * covers exactly the rows it asks for, whatever the filters or {@code unwind} do to the items.
+     * {@code itemCount} lags a few seconds behind the pushed items, so once the run reaches a terminal
+     * status, the rows past it are read a page at a time until none are left. On a last-run client, the
+     * iteration sticks to the run its first request resolves to.
+     *
+     * @param int|float|string|null $timeoutSecs timeout of each API request (default: the {@code long}
+     *                                           tier)
+     * @return Generator<int,mixed> the dataset items, each decoded like {@see DatasetClient::listItems()}
+     */
+    public function iterateDatasetItems(?RunIterateDatasetItemsOptions $options = null, int|float|string|null $timeoutSecs = null): Generator
+    {
+        $options ??= new RunIterateDatasetItemsOptions();
+        $timeoutSecs ??= TimeoutTiers::TIER_LONG;
+        $pageSize = $options->chunkSize !== null && $options->chunkSize > 0 ? $options->chunkSize : self::ITERATE_DEFAULT_CHUNK_SIZE;
+        $pollIntervalSecs = max(0, $options->pollIntervalSecs ?? self::ITERATE_DEFAULT_POLL_INTERVAL_SECS);
+        $position = $options->offset ?? 0;
+        $end = $options->limit !== null && $options->limit > 0 ? $position + $options->limit : null;
+
+        $run = $this->get(null, $timeoutSecs);
+        // A last-run client resolves `runs/last` on each request, so a newer run would swap the dataset
+        // mid-iteration: pin the iteration to the run the first request resolved to.
+        $runClient = $run !== null && $run->getId() !== null && $run->getId() !== $this->id ? $this->root->run($run->getId()) : $this;
+        $datasetClient = $runClient->dataset();
+
+        while (true) {
+            $isFinished = $run === null || $run->isTerminal();
+            $itemCount = $datasetClient->get($timeoutSecs)?->getItemCount() ?? 0;
+            if ($end !== null) {
+                $itemCount = min($itemCount, $end);
+            }
+
+            while ($position < $itemCount) {
+                $pageLimit = min($pageSize, $itemCount - $position);
+                [$page] = $datasetClient->fetchItemsPage($options->toListItemsOptions($position, $pageLimit), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
+                foreach ($page->getItems() as $item) {
+                    yield $item;
+                }
+                $position += $pageLimit;
+            }
+
+            if ($end !== null && $position >= $end) {
+                return;
+            }
+            if ($isFinished) {
+                break;
+            }
+            $run = $runClient->waitForFinish($pollIntervalSecs);
+        }
+
+        // The run has finished but `itemCount` lags the pushed items: read on, a page at a time.
+        while (true) {
+            $pageLimit = $end !== null ? min($pageSize, $end - $position) : $pageSize;
+            [$page, $scanned] = $datasetClient->fetchItemsPage($options->toListItemsOptions($position, $pageLimit), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
+            foreach ($page->getItems() as $item) {
+                yield $item;
+            }
+            // Only an empty page marks the end, as filters can shorten a full one. A page that `clean`,
+            // `skipEmpty` or `unwind` emptied past a lagging `itemCount` reports no scanned rows either,
+            // so a plain, unfiltered one-row read confirms the dataset really has nothing left.
+            $isEmpty = $page->getItems() === [] && ($scanned ?? 0) === 0;
+            if ($isEmpty && (!$options->hasRowChangingFilter() || $this->hasNoItemsAt($datasetClient, $position, $timeoutSecs))) {
+                return;
+            }
+            $position += $pageLimit;
+            if ($end !== null && $position >= $end) {
+                return;
+            }
+        }
+    }
+
+    /** Whether an unfiltered read of one row at {@code $offset} finds nothing. */
+    private function hasNoItemsAt(DatasetClient $datasetClient, int $offset, int|float|string $timeoutSecs): bool
+    {
+        return $datasetClient->listItems(new DatasetListItemsOptions(offset: $offset, limit: 1), $timeoutSecs)->getItems() === [];
     }
 }

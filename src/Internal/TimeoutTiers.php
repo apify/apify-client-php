@@ -12,13 +12,10 @@ use InvalidArgumentException;
  * 'long'} for downloads/uploads/streaming. {@code 'noTimeout'} (accepted per call, not a configured
  * duration) opts a single call out of any request timeout.
  *
- * Unlike the reference client — which lowers the default duration of the {@code short}/{@code medium}
- * tiers (5s/30s) relative to v2's single 360s budget, a deliberate breaking change documented in its
- * v3 upgrade guide — every tier here defaults to this client's existing single {@code $timeoutSecs}
- * budget. A caller who never touches the new {@code timeout*Secs} constructor options therefore gets
- * byte-for-byte the same effective timeout on every call as before this feature existed; tightening a
- * tier is strictly opt-in, consistent with {@code client_requirements.md}'s rule against breaking the
- * pre-existing public interface for anything short of a bugfix.
+ * Defaults match the reference client: {@code short} 5s, {@code medium} 30s, {@code long} and the
+ * per-attempt cap {@code max} the client's overall {@code $timeoutSecs} (360s by default). Every
+ * tier is configurable on the {@see \Apify\Client\ApifyClient} constructor; a tier or per-call
+ * duration above the cap is capped at it.
  *
  * @internal
  */
@@ -39,6 +36,12 @@ final class TimeoutTiers
      */
     public const INFINITE_SECS = 0.0;
 
+    /** Default duration of the {@code short} tier, in seconds (metadata reads and writes). */
+    public const DEFAULT_SHORT_SECS = 5.0;
+
+    /** Default duration of the {@code medium} tier, in seconds (listing, batch and trigger calls). */
+    public const DEFAULT_MEDIUM_SECS = 30.0;
+
     private function __construct(
         public readonly float $shortSecs,
         public readonly float $mediumSecs,
@@ -48,9 +51,9 @@ final class TimeoutTiers
     }
 
     /**
-     * Builds the tier configuration. Every tier argument left {@code null} falls back to
-     * {@code $defaultSecs} (this client's single overall {@code $timeoutSecs}), so a client configured
-     * without any of the new options behaves exactly as it did before tiers existed.
+     * Builds the tier configuration. A tier argument left {@code null} falls back to its default:
+     * {@see DEFAULT_SHORT_SECS}, {@see DEFAULT_MEDIUM_SECS}, and, for the {@code long} tier and the
+     * per-attempt cap, {@code $defaultSecs} (this client's overall {@code $timeoutSecs}).
      */
     public static function create(
         float $defaultSecs,
@@ -60,8 +63,8 @@ final class TimeoutTiers
         ?float $maxSecs,
     ): self {
         return new self(
-            $shortSecs ?? $defaultSecs,
-            $mediumSecs ?? $defaultSecs,
+            $shortSecs ?? self::DEFAULT_SHORT_SECS,
+            $mediumSecs ?? self::DEFAULT_MEDIUM_SECS,
             $longSecs ?? $defaultSecs,
             $maxSecs ?? $defaultSecs,
         );

@@ -235,6 +235,28 @@ final class ResourceContext
     }
 
     /**
+     * Picks the timeout of a request that asks the API to hold its response with {@code waitForFinish}:
+     * the hold the caller asked for (the API holds a response for at most {@see WAIT_REQUEST_SECS}
+     * seconds) plus the round trip the method's tier allows, so the client does not abort a request the
+     * API is still holding, which for {@code start()} and {@code build()} would retry a call that
+     * creates a resource. An explicit per-call {@code $timeoutSecs} is used as given.
+     *
+     * @param int|float|string|null $timeoutSecs
+     */
+    public function resolveWaitTimeout(int|float|string|null $timeoutSecs, string $defaultTier, ?int $waitForFinishSecs): float
+    {
+        if ($timeoutSecs !== null || $waitForFinishSecs === null) {
+            return $this->resolveTimeout($timeoutSecs, $defaultTier);
+        }
+        $holdSecs = min($waitForFinishSecs, self::WAIT_REQUEST_SECS);
+        if ($holdSecs <= 0) {
+            return $this->resolveTimeout(null, $defaultTier);
+        }
+        $tierSecs = $this->http->timeoutTiers()->secondsFor($defaultTier);
+        return $this->resolveTimeout($holdSecs + $tierSecs, $defaultTier);
+    }
+
+    /**
      * GET a paginated listing and build a {@see PaginationList} with each item hydrated.
      *
      * @template T
@@ -515,11 +537,12 @@ final class ResourceContext
 
     /**
      * The largest server-side {@code waitForFinish} value that is safe to send: below the configured
-     * per-request timeout by a safety margin (or the API's 60s cap when no finite timeout is set).
+     * per-attempt timeout cap ({@code timeoutMaxSecs}) by a safety margin (or the API's 60s cap when
+     * no finite cap is set).
      */
     private function serverWaitCapSecs(): int
     {
-        $configured = (int) $this->http->requestTimeoutSecs();
+        $configured = (int) $this->http->timeoutTiers()->maxSecs;
         return $configured > 0
             ? max(0, $configured - self::WAIT_TIMEOUT_MARGIN_SECS)
             : self::WAIT_REQUEST_SECS;

@@ -19,7 +19,7 @@ Every class is under the `Apify\Client\` PSR-4 root. Use these when writing `use
 |---|---|---|
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
-| `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
+| `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunIterateDatasetItemsOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
 | `Apify\Client\Http\` | The replaceable transport, its adapters, and compressors. | `HttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor` |
 | `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException` and its status-specific subclasses (`NotFoundException`, `RateLimitException`, ...), `TransportException` |
 
@@ -97,7 +97,7 @@ A few methods return data whose shape is not modelled and is instead returned as
 JSON value — typically an associative array, though `getInput()` is typed `mixed` and returns
 whatever JSON value was stored (or accept an arbitrary value serialized to JSON):
 
-- Read: `me()->monthlyUsage(...)`, `me()->limits()`, `task($id)->getInput()`,
+- Read: `me()->monthlyUsage(...)`, `me()->limits()`, `schedule($id)->getLog()`, `task($id)->getInput()`,
   `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`. Note that
   `deleteRequestLock` returns `void` (it releases a lock and has no meaningful body), so it is not in
   this list. The request-queue lock/list/unlock/batch-delete operations
