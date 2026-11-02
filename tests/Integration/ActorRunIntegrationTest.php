@@ -185,8 +185,22 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
                 $filtered[] = $listed->getId();
             }
             self::assertNotContains($runId, $filtered);
+            // The account-wide listing, newest first so that the 50 runs it reads include this one: it shows
+            // the run without the filter and leaves it out with the filter.
+            $newestFirst = new ListOptions(limit: 50, desc: true);
+            self::assertEventuallyIterated(
+                [$runId],
+                static function () use ($client, $newestFirst, $running): array {
+                    $seen = [];
+                    foreach ($client->runs()->iterate($newestFirst, $running) as $listed) {
+                        $seen[(string) $listed->getId()] = true;
+                    }
+                    return $seen;
+                },
+                'running run (account-wide)',
+            );
             $accountWide = [];
-            foreach ($client->runs()->iterate(new ListOptions(limit: 50), $standbyOnly) as $listed) {
+            foreach ($client->runs()->iterate($newestFirst, $standbyOnly) as $listed) {
                 $accountWide[] = $listed->getId();
             }
             self::assertNotContains($runId, $accountWide);
