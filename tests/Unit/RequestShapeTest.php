@@ -155,7 +155,7 @@ final class RequestShapeTest extends TestCase
         $client = new ApifyClient(token: 't', minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
         $client->actor('me~a')->defaultBuild(120);
 
-        self::assertStringContainsString('waitForFinish=0', (string) $transport->lastRequest()->getUri());
+        self::assertStringContainsString('waitForFinish=2', (string) $transport->lastRequest()->getUri());
     }
 
     public function testRequestQueueOptionsApplyClientKey(): void

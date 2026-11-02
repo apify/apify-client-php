@@ -34,6 +34,11 @@ final class UrlNormalizer
     private const USERINFO_UNSAFE = '"#<>?`{}/:;=@[\\]^|';
 
     /** The highest code point of the space and control range, which is always percent-encoded. */
+    private const MAX_PORT = 65535;
+
+    /** Code points that may not appear in a decoded host (the WHATWG forbidden domain code points, plus {@code %}). */
+    private const FORBIDDEN_HOST_PATTERN = '/[\x00-\x20#\/:<>?@\[\\\\\]^|%\x7F]/';
+
     private const LAST_CONTROL_OR_SPACE = 0x20;
 
     /** The highest printable ASCII code point; DEL and non-ASCII bytes above it are always encoded. */
@@ -159,7 +164,7 @@ final class UrlNormalizer
                 $authority = substr($authority, 0, $colon);
             }
         }
-        if ($port !== '' && !ctype_digit($port)) {
+        if ($port !== '' && (!ctype_digit($port) || (int) $port > self::MAX_PORT)) {
             return null;
         }
         if ($authority === '') {
@@ -176,11 +181,14 @@ final class UrlNormalizer
         return $userinfo . $host;
     }
 
-    /** Lowercases a domain host and converts it to punycode when {@code intl} can. */
+    /** Lowercases a domain host and converts it to punycode when {@code intl} can; {@code ''} when it is not a valid host. */
     private static function normalizeHost(string $host): string
     {
         $decoded = rawurldecode($host);
         $lower = mb_strtolower($decoded, 'UTF-8');
+        if (preg_match(self::FORBIDDEN_HOST_PATTERN, $lower) === 1) {
+            return '';
+        }
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
             $ascii = idn_to_ascii($lower, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
             if (is_string($ascii) && $ascii !== '') {

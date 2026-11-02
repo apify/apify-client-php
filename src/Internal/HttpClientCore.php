@@ -67,12 +67,6 @@ final class HttpClientCore
         return $this->userAgent;
     }
 
-    /** The configured overall per-request timeout budget, in seconds. */
-    public function requestTimeoutSecs(): float
-    {
-        return $this->retry->timeoutSecs;
-    }
-
     /** The configured timeout tiers (short/medium/long/max). See {@see TimeoutTiers}. */
     public function timeoutTiers(): TimeoutTiers
     {

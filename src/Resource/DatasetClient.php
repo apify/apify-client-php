@@ -91,7 +91,7 @@ final class DatasetClient
     public function listItems(?DatasetListItemsOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
-        return $this->fetchItemsPage($options ?? new DatasetListItemsOptions(), $resolved)[0];
+        return DatasetItemsPage::fetch($this->http, $this->ctx, $options ?? new DatasetListItemsOptions(), $resolved)[0];
     }
 
     /**
@@ -132,7 +132,7 @@ final class DatasetClient
         $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
 
         $firstPageLimit = ResourceContext::minLimit($limit, $chunkSize);
-        [$page, $scanned] = $this->fetchItemsPage($options->withPagination($startOffset, $firstPageLimit), $resolved);
+        [$page, $scanned] = DatasetItemsPage::fetch($this->http, $this->ctx, $options->withPagination($startOffset, $firstPageLimit), $resolved);
         foreach ($page->getItems() as $item) {
             yield $item;
         }
@@ -146,7 +146,7 @@ final class DatasetClient
         // $remaining having already reached 0 (the caller's $limit is satisfied) — either ends the loop.
         while ($pageScanned > 0 && ($remaining === null || $remaining > 0)) {
             $pageLimit = ResourceContext::minLimit($remaining, $chunkSize);
-            [$page, $scanned] = $this->fetchItemsPage($options->withPagination($currentOffset, $pageLimit), $resolved);
+            [$page, $scanned] = DatasetItemsPage::fetch($this->http, $this->ctx, $options->withPagination($currentOffset, $pageLimit), $resolved);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
@@ -180,18 +180,6 @@ final class DatasetClient
     {
         $scanned = max($scannedHeader ?? 0, count($page->getItems()));
         return $requestedLimit !== null ? min($scanned, $requestedLimit) : $scanned;
-    }
-
-    /**
-     * Fetches one page of dataset items together with the {@code X-Apify-Pagination-Count} "scanned
-     * rows" count ({@code null} if the response omits the header), which {@see iterateItems()} uses to
-     * advance — see its doc comment.
-     *
-     * @return array{0:PaginationList<mixed>,1:?int}
-     */
-    private function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
-    {
-        return DatasetItemsPage::fetch($this->http, $this->ctx, $options, $timeoutSecs);
     }
 
     /**

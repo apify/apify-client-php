@@ -31,7 +31,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `dataset(): DatasetClient`, `keyValueStore(): KeyValueStoreClient`, `requestQueue(): RequestQueueClient`
   — `get()`/`delete()` on these throw instead of resolving to `null`/no-op on a 404, since there is no
   ID to pin the 404 to the run or the sub-resource.
-- `iterateDatasetItems(?RunIterateDatasetItemsOptions $options = null): Generator` — lazily iterates the items of the run's default dataset *while the run is still producing them*, and returns once the run has finished and the dataset is drained. See [below](#reading-a-dataset-while-the-run-is-running).
+- `iterateDatasetItems(?RunIterateDatasetItemsOptions $options = null, int|float|string|null $timeoutSecs = null): Generator` — lazily iterates the items of the run's default dataset *while the run is still producing them*, and returns once the run has finished and the dataset is drained. `$timeoutSecs` is the timeout of each request (default `'long'` tier), also used for the polls between pages. See [below](#reading-a-dataset-while-the-run-is-running).
 - `log(): LogClient`, `getStreamedLog(): StreamInterface` — `log()->get()` throws on a 404 for the same reason.
 
 ```php

@@ -78,6 +78,9 @@ final class UrlNormalizerTest extends TestCase
         yield 'bad port' => ['https://example.com:port/x'];
         yield 'non-special scheme' => ['mailto:Someone@Example.com'];
         yield 'empty' => [''];
+        yield 'encoded slash in host' => ['https://ex%2Fample.com/hook'];
+        yield 'encoded space in host' => ['https://exa%20mple.com/'];
+        yield 'port out of range' => ['https://example.com:70000/x'];
     }
 
     #[DataProvider('untouchedValues')]

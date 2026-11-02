@@ -30,8 +30,9 @@ final class ResourceContext
     private const WAIT_REQUEST_SECS = 60;
 
     /**
-     * Safety margin subtracted from the configured per-request timeout when choosing the server-side
+     * Largest safety margin subtracted from the per-request timeout when choosing the server-side
      * {@code waitForFinish} value, so the server responds before the client's socket timeout fires.
+     * The margin never exceeds half of the timeout, so a short timeout still gets a positive hold.
      */
     private const WAIT_TIMEOUT_MARGIN_SECS = 5;
 
@@ -86,12 +87,6 @@ final class ResourceContext
     {
         $this->requestTimeoutSecs = $timeoutSecs;
         return $this;
-    }
-
-    /** The per-context request timeout (seconds), or {@code null} to use the client-wide default. */
-    public function requestTimeoutSecs(): ?float
-    {
-        return $this->requestTimeoutSecs;
     }
 
     /** Creates a context for a collection endpoint: {@code {base}/{resourcePath}}. */
@@ -546,7 +541,8 @@ final class ResourceContext
         if ($requestTimeoutSecs <= TimeoutTiers::INFINITE_SECS) {
             return self::WAIT_REQUEST_SECS;
         }
-        return min(self::WAIT_REQUEST_SECS, max(0, (int) $requestTimeoutSecs - self::WAIT_TIMEOUT_MARGIN_SECS));
+        $margin = min((float) self::WAIT_TIMEOUT_MARGIN_SECS, $requestTimeoutSecs / 2);
+        return min(self::WAIT_REQUEST_SECS, max(0, (int) floor($requestTimeoutSecs - $margin)));
     }
 
     /**
