@@ -80,6 +80,11 @@ final class UrlNormalizerTest extends TestCase
         yield 'empty' => [''];
         yield 'encoded slash in host' => ['https://ex%2Fample.com/hook'];
         yield 'encoded space in host' => ['https://exa%20mple.com/'];
+        yield 'fullwidth at sign in host' => ["https://evil.com\u{FF20}good.com/hook"];
+        yield 'fullwidth slash in host' => ["https://ex\u{FF0F}ample.com/a"];
+        yield 'fullwidth percent in host' => ["https://ex\u{FF05}ample.com/a"];
+        yield 'text after the IPv6 literal' => ['https://[::1]x/y'];
+        yield 'not an IP literal in brackets' => ['https://[nothost]/x'];
         yield 'port out of range' => ['https://example.com:70000/x'];
     }
 

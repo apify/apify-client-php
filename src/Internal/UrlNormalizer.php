@@ -33,12 +33,13 @@ final class UrlNormalizer
     /** Characters (besides controls, space and non-ASCII) percent-encoded in the user name and password. */
     private const USERINFO_UNSAFE = '"#<>?`{}/:;=@[\\]^|';
 
-    /** The highest code point of the space and control range, which is always percent-encoded. */
+    /** The highest valid port number. */
     private const MAX_PORT = 65535;
 
-    /** Code points that may not appear in a decoded host (the WHATWG forbidden domain code points, plus {@code %}). */
+    /** Code points that may not appear in a decoded host (the WHATWG forbidden domain code points). */
     private const FORBIDDEN_HOST_PATTERN = '/[\x00-\x20#\/:<>?@\[\\\\\]^|%\x7F]/';
 
+    /** The highest code point of the space and control range, which is always percent-encoded. */
     private const LAST_CONTROL_OR_SPACE = 0x20;
 
     /** The highest printable ASCII code point; DEL and non-ASCII bytes above it are always encoded. */
@@ -155,7 +156,10 @@ final class UrlNormalizer
             if ($close !== false) {
                 $tail = substr($authority, $close + 1);
                 $authority = substr($authority, 0, $close + 1);
-                $port = str_starts_with($tail, ':') ? substr($tail, 1) : '';
+                if ($tail !== '' && !str_starts_with($tail, ':')) {
+                    return null;
+                }
+                $port = $tail === '' ? '' : substr($tail, 1);
             }
         } else {
             $colon = strrpos($authority, ':');
@@ -171,7 +175,14 @@ final class UrlNormalizer
             return null;
         }
 
-        $host = str_starts_with($authority, '[') ? strtolower($authority) : self::normalizeHost($authority);
+        if (str_starts_with($authority, '[')) {
+            $host = strtolower($authority);
+            if (preg_match('/^\[[0-9a-f:.]+\]$/', $host) !== 1) {
+                return null;
+            }
+        } else {
+            $host = self::normalizeHost($authority);
+        }
         if ($host === '') {
             return null;
         }
@@ -192,7 +203,8 @@ final class UrlNormalizer
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
             $ascii = idn_to_ascii($lower, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
             if (is_string($ascii) && $ascii !== '') {
-                return $ascii;
+                // The UTS #46 mapping turns fullwidth look-alikes into the forbidden ASCII characters.
+                return preg_match(self::FORBIDDEN_HOST_PATTERN, $ascii) === 1 ? '' : $ascii;
             }
         }
         return $lower;
