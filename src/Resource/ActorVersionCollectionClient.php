@@ -31,7 +31,7 @@ final class ActorVersionCollectionClient
      */
     public function list(int|float|string|null $timeoutSecs = null): PaginationList
     {
-        return $this->ctx->listResource('', new QueryParams(), static fn (array $d) => new ActorVersion($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        return $this->ctx->listResource('', new QueryParams(), static fn (array $d) => new ActorVersion($d), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
@@ -56,6 +56,6 @@ final class ActorVersionCollectionClient
      */
     public function create(mixed $version, int|float|string|null $timeoutSecs = null): ActorVersion
     {
-        return new ActorVersion($this->ctx->createResource(new QueryParams(), $version, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
+        return new ActorVersion($this->ctx->createResource(new QueryParams(), $version, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 }

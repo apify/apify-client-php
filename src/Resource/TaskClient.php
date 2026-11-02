@@ -120,11 +120,15 @@ final class TaskClient
      * @param mixed    $input    optionally overrides the task's stored input
      * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
      *                           {@code $options->waitForResources} start does not count toward it.
+     * @param int|float|string|null $timeoutSecs timeout of the start request and of every poll (a number of
+     *                           seconds, a tier name or {@code 'noTimeout'}); default {@code 'noTimeout'}
      */
-    public function call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun
+    public function call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        $run = $this->start($input, $options);
-        return $this->root->run((string) $run->getId())->waitForFinish($waitSecs);
+        // Like the reference client, the start request and every poll have no request timeout by default.
+        $timeoutSecs ??= TimeoutTiers::NO_TIMEOUT;
+        $run = $this->start($input, $options, $timeoutSecs);
+        return $this->root->run((string) $run->getId())->waitForFinish($waitSecs, $timeoutSecs);
     }
 
     /**

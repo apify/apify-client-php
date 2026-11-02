@@ -536,29 +536,32 @@ final class ResourceContext
     // ---- Wait-for-finish ------------------------------------------------------
 
     /**
-     * The largest server-side {@code waitForFinish} value that is safe to send: below the configured
-     * per-attempt timeout cap ({@code timeoutMaxSecs}) by a safety margin (or the API's 60s cap when
-     * no finite cap is set).
+     * The largest server-side {@code waitForFinish} value that is safe to send for a request whose
+     * timeout is {@code $requestTimeoutSecs}: below it by a safety margin, and never above the 60 seconds
+     * the API holds a response for. {@see TimeoutTiers::INFINITE_SECS} (no request timeout) allows the
+     * full 60 seconds.
      */
-    private function serverWaitCapSecs(): int
+    private static function serverWaitCapSecs(float $requestTimeoutSecs): int
     {
-        $configured = (int) $this->http->timeoutTiers()->maxSecs;
-        return $configured > 0
-            ? max(0, $configured - self::WAIT_TIMEOUT_MARGIN_SECS)
-            : self::WAIT_REQUEST_SECS;
+        if ($requestTimeoutSecs <= TimeoutTiers::INFINITE_SECS) {
+            return self::WAIT_REQUEST_SECS;
+        }
+        return min(self::WAIT_REQUEST_SECS, max(0, (int) $requestTimeoutSecs - self::WAIT_TIMEOUT_MARGIN_SECS));
     }
 
     /**
-     * Clamps a caller-supplied server-side {@code waitForFinish} value (seconds) to the server wait
-     * cap, so a synchronous get/wait never asks the server to hold the connection longer than the
-     * client's own per-request timeout. Returns {@code null} for a {@code null} input.
+     * Clamps a caller-supplied server-side {@code waitForFinish} value (seconds) so a synchronous get
+     * never asks the API to hold the connection for longer than a request can last: the value is capped
+     * at 60 seconds, and below the {@code timeoutMaxSecs} cap of a single attempt by a safety margin.
+     * Returns {@code null} for a {@code null} input. An explicit per-call timeout shorter than the hold
+     * is used as given.
      */
     public function clampServerWait(?int $waitForFinishSecs): ?int
     {
         if ($waitForFinishSecs === null) {
             return null;
         }
-        return min(max(0, $waitForFinishSecs), $this->serverWaitCapSecs());
+        return min(max(0, $waitForFinishSecs), self::serverWaitCapSecs($this->http->timeoutTiers()->maxSecs));
     }
 
     /**
@@ -571,17 +574,22 @@ final class ResourceContext
      * wait gives up and rethrows that 404 instead of polling for the rest of {@code $waitSecs} (which
      * defaults to effectively indefinite). A successful poll in between resets this grace window.
      *
+     * Each poll's request timeout is {@code $timeoutSecs} (a number of seconds, a tier name or
+     * {@code 'noTimeout'}; default {@code 'noTimeout'}), and the server-side hold of a poll stays below it.
+     *
      * @param callable(array<string,mixed>):bool $isTerminal
+     * @param int|float|string|null $timeoutSecs
      * @return array<string,mixed>
      */
-    public function waitForFinish(?int $waitSecs, string $resourceName, callable $isTerminal): array
+    public function waitForFinish(?int $waitSecs, string $resourceName, callable $isTerminal, int|float|string|null $timeoutSecs = null): array
     {
         $effectiveWaitSecs = $waitSecs !== null
             ? min(max($waitSecs, 0), self::MAX_WAIT_FOR_FINISH_SECS)
             : self::MAX_WAIT_FOR_FINISH_SECS;
         $budgetMillis = $effectiveWaitSecs * 1000;
         $start = self::nowMillis();
-        $serverWaitCap = $this->serverWaitCapSecs();
+        $pollTimeoutSecs = $this->resolveTimeout($timeoutSecs ?? TimeoutTiers::NO_TIMEOUT, TimeoutTiers::TIER_SHORT);
+        $serverWaitCap = self::serverWaitCapSecs($pollTimeoutSecs);
 
         $resource = null;
         $present = false;
@@ -597,7 +605,7 @@ final class ResourceContext
             $params->addInt('waitForFinish', $requestSecs);
 
             try {
-                $data = $this->getResourceRequired('', $params);
+                $data = $this->getResourceRequired('', $params, $pollTimeoutSecs);
                 if (is_array($data)) {
                     $resource = $data;
                     $present = true;

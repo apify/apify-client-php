@@ -27,7 +27,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `reboot(): ActorRun`
 - `resurrect(?RunResurrectOptions $options = null): ActorRun`
 - `charge(RunChargeOptions $options): void` — for pay-per-event Actors.
-- `waitForFinish(?int $waitSecs = null): ActorRun`
+- `waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun` — `$timeoutSecs` is the timeout of each poll request (default `'noTimeout'`).
 - `dataset(): DatasetClient`, `keyValueStore(): KeyValueStoreClient`, `requestQueue(): RequestQueueClient`
   — `get()`/`delete()` on these throw instead of resolving to `null`/no-op on a 404, since there is no
   ID to pin the 404 to the run or the sub-resource.

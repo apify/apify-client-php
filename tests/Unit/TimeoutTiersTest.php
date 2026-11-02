@@ -189,4 +189,76 @@ final class TimeoutTiersTest extends TestCase
 
         self::assertSame([11.0, 22.0], $transport->timeouts);
     }
+
+    private static function runBody(string $status): string
+    {
+        return Json::encode(['data' => ['id' => 'run1', 'status' => $status]]);
+    }
+
+    /** @return array<string,string> */
+    private static function queryOf(MockTransport $transport, int $index): array
+    {
+        parse_str($transport->received[$index]->getUri()->getQuery(), $query);
+        return $query;
+    }
+
+    public function testWaitForFinishPollsHaveNoRequestTimeoutByDefault(): void
+    {
+        // A raised cap must not make the poll hold the API (60s) under a shorter timeout.
+        $transport = (new MockTransport())->queueResponse(200, self::runBody('SUCCEEDED'));
+        $client = new ApifyClient(token: 't', timeoutSecs: 30, timeoutMaxSecs: 600, httpClient: $transport);
+
+        $client->run('run1')->waitForFinish();
+
+        self::assertSame([0.0], $transport->timeouts);
+        self::assertSame('60', self::queryOf($transport, 0)['waitForFinish']);
+    }
+
+    public function testWaitForFinishHonoursAnExplicitPollTimeoutAndKeepsTheHoldBelowIt(): void
+    {
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::runBody('SUCCEEDED'))
+            ->queueResponse(200, Json::encode(['data' => ['id' => 'b1', 'status' => 'SUCCEEDED']]));
+        $client = new ApifyClient(token: 't', httpClient: $transport);
+
+        $client->run('run1')->waitForFinish(120, 20);
+        $client->build('b1')->waitForFinish(120, 20);
+
+        self::assertSame([20.0, 20.0], $transport->timeouts);
+        self::assertSame('15', self::queryOf($transport, 0)['waitForFinish']);
+        self::assertSame('15', self::queryOf($transport, 1)['waitForFinish']);
+    }
+
+    public function testCallStartsAndPollsWithoutARequestTimeoutByDefault(): void
+    {
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::runBody('READY'))
+            ->queueResponse(200, self::runBody('SUCCEEDED'))
+            ->queueResponse(200, self::runBody('READY'))
+            ->queueResponse(200, self::runBody('SUCCEEDED'));
+        $client = new ApifyClient(token: 't', httpClient: $transport);
+
+        $client->actor('a1')->call();
+        $client->task('t1')->call(null, null, null, 40);
+
+        self::assertSame([0.0, 0.0, 40.0, 40.0], $transport->timeouts);
+    }
+
+    public function testLiveDatasetIterationUsesItsTimeoutForThePollsToo(): void
+    {
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::runBody('RUNNING'))
+            ->queueResponse(200, Json::encode(['data' => ['id' => 'ds1', 'itemCount' => 0]]))
+            ->queueResponse(200, self::runBody('SUCCEEDED'))
+            ->queueResponse(200, Json::encode(['data' => ['id' => 'ds1', 'itemCount' => 0]]))
+            ->queueResponse(200, '[]', ['X-Apify-Pagination-Count' => '0']);
+        $client = new ApifyClient(token: 't', httpClient: $transport);
+
+        iterator_to_array($client->run('run1')->iterateDatasetItems(null, 12), false);
+
+        // Every request, the wait-for-finish poll included, carries the iteration's timeout.
+        self::assertSame([12.0, 12.0, 12.0, 12.0, 12.0], $transport->timeouts);
+        // The poll's hold (5s poll interval) stays below its 12s timeout.
+        self::assertSame('5', self::queryOf($transport, 2)['waitForFinish']);
+    }
 }

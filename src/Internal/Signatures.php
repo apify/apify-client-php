@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Apify\Client\Internal;
 
+use InvalidArgumentException;
+
 /**
  * Apify storage-content URL signing, byte-for-byte compatible with the platform's
  * {@code @apify/utilities} implementation that the reference clients rely on.
@@ -35,6 +37,14 @@ final class Signatures
         $hex = hash_hmac('sha256', $message, $secretKey);
         $truncated = substr($hex, 0, self::HMAC_SIGNATURE_HEX_LEN);
         return self::hexToBase62($truncated);
+    }
+
+    /** Rejects a zero or negative expiry, which the signer would read as "never expires" or "already expired". */
+    public static function requirePositiveExpiry(?int $expiresInSecs): void
+    {
+        if ($expiresInSecs !== null && $expiresInSecs <= 0) {
+            throw new InvalidArgumentException('expiresInSecs must be positive (omit it for a URL that never expires)');
+        }
     }
 
     /**

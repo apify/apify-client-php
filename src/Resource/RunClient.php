@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Resource;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Internal\DatasetItemsPage;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
@@ -70,10 +71,10 @@ final class RunClient
 
     /**
      * Fetches the run, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * for the run to reach a terminal state. The value is clamped client-side to the per-request
-     * timeout budget (minus a safety margin) so the server is never asked to hold the connection
-     * longer than the client will wait; the server additionally caps the wait at 60s. Returns
-     * {@code null} if it does not exist.
+     * for the run to reach a terminal state. The API caps the wait at 60s, and the client additionally
+     * keeps it below the {@code timeoutMaxSecs} cap of a single attempt. Unless {@code $timeoutSecs} is
+     * given, the request timeout is that wait on top of the {@code short} tier. Returns {@code null}
+     * if it does not exist.
      */
     public function get(?int $waitForFinishSecs = null, int|float|string|null $timeoutSecs = null): ?ActorRun
     {
@@ -203,14 +204,16 @@ final class RunClient
 
     /**
      * Polls until the run reaches a terminal state or {@code $waitSecs} elapses ({@code null} waits
-     * indefinitely). Returns the latest run.
+     * indefinitely). Returns the latest run. {@code $timeoutSecs} is the timeout of each poll request (a
+     * number of seconds, a tier name or {@code 'noTimeout'}, the default).
      */
-    public function waitForFinish(?int $waitSecs = null): ActorRun
+    public function waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
         $data = $this->ctx->waitForFinish(
             $waitSecs,
             'run',
-            static fn (array $d): bool => (new ActorRun($d))->isTerminal()
+            static fn (array $d): bool => (new ActorRun($d))->isTerminal(),
+            $timeoutSecs
         );
         return new ActorRun($data);
     }
@@ -311,6 +314,8 @@ final class RunClient
         // mid-iteration: pin the iteration to the run the first request resolved to.
         $runClient = $run !== null && $run->getId() !== null && $run->getId() !== $this->id ? $this->root->run($run->getId()) : $this;
         $datasetClient = $runClient->dataset();
+        $itemsCtx = $runClient->datasetContext();
+        $requestTimeoutSecs = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
 
         while (true) {
             $isFinished = $run === null || $run->isTerminal();
@@ -321,7 +326,7 @@ final class RunClient
 
             while ($position < $itemCount) {
                 $pageLimit = min($pageSize, $itemCount - $position);
-                [$page] = $datasetClient->fetchItemsPage($options->toListItemsOptions($position, $pageLimit), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
+                [$page] = DatasetItemsPage::fetch($this->http, $itemsCtx, self::pageOptions($options, $position, $pageLimit), $requestTimeoutSecs);
                 foreach ($page->getItems() as $item) {
                     yield $item;
                 }
@@ -334,13 +339,13 @@ final class RunClient
             if ($isFinished) {
                 break;
             }
-            $run = $runClient->waitForFinish($pollIntervalSecs);
+            $run = $runClient->waitForFinish($pollIntervalSecs, $timeoutSecs);
         }
 
         // The run has finished but `itemCount` lags the pushed items: read on, a page at a time.
         while (true) {
             $pageLimit = $end !== null ? min($pageSize, $end - $position) : $pageSize;
-            [$page, $scanned] = $datasetClient->fetchItemsPage($options->toListItemsOptions($position, $pageLimit), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG));
+            [$page, $scanned] = DatasetItemsPage::fetch($this->http, $itemsCtx, self::pageOptions($options, $position, $pageLimit), $requestTimeoutSecs);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
@@ -348,7 +353,7 @@ final class RunClient
             // `skipEmpty` or `unwind` emptied past a lagging `itemCount` reports no scanned rows either,
             // so a plain, unfiltered one-row read confirms the dataset really has nothing left.
             $isEmpty = $page->getItems() === [] && ($scanned ?? 0) === 0;
-            if ($isEmpty && (!$options->hasRowChangingFilter() || $this->hasNoItemsAt($datasetClient, $position, $timeoutSecs))) {
+            if ($isEmpty && (!self::hasRowChangingFilter($options) || $this->hasNoItemsAt($datasetClient, $position, $timeoutSecs))) {
                 return;
             }
             $position += $pageLimit;
@@ -356,6 +361,35 @@ final class RunClient
                 return;
             }
         }
+    }
+
+    /** The dataset options reading one page of a live iteration: its item filters at the given row window. */
+    private static function pageOptions(RunIterateDatasetItemsOptions $options, int $offset, int $limit): DatasetListItemsOptions
+    {
+        return new DatasetListItemsOptions(
+            offset: $offset,
+            limit: $limit,
+            fields: $options->fields,
+            omit: $options->omit,
+            skipEmpty: $options->skipEmpty,
+            skipHidden: $options->skipHidden,
+            clean: $options->clean,
+            unwind: $options->unwind,
+        );
+    }
+
+    /** Whether a filter can drop whole rows or multiply them, so that a page's item count is not its row count. */
+    private static function hasRowChangingFilter(RunIterateDatasetItemsOptions $options): bool
+    {
+        return $options->clean === true || $options->skipEmpty === true || ($options->unwind !== null && $options->unwind !== []);
+    }
+
+    /** The context of this run's default dataset, inheriting the last-run filters pinned on this client. */
+    private function datasetContext(): ResourceContext
+    {
+        $context = ResourceContext::collection($this->http, $this->ctx->subUrl(''), 'dataset');
+        $context->baseParams = $this->ctx->baseParams->copy();
+        return $context;
     }
 
     /** Whether an unfiltered read of one row at {@code $offset} finds nothing. */

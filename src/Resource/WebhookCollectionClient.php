@@ -22,6 +22,6 @@ final class WebhookCollectionClient extends AbstractWebhookCollectionClient
      */
     public function create(mixed $webhook, int|float|string|null $timeoutSecs = null): Webhook
     {
-        return new Webhook($this->ctx->createResource(new QueryParams(), $webhook, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
+        return new Webhook($this->ctx->createResource(new QueryParams(), $webhook, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 }

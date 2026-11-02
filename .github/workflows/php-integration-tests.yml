@@ -66,7 +66,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          extensions: mbstring, json, curl, zlib
+          # intl is optional for users but loaded here so the punycode host normalization test runs.
+          extensions: mbstring, json, curl, zlib, intl
           coverage: none
           tools: composer:v2
 

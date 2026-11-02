@@ -18,8 +18,7 @@ does, by the getters, `get()` and `toArray()` alike: an empty path gets a traili
 (`https://abc.runs.apify.net` becomes `https://abc.runs.apify.net/`), the scheme and host are lowercased,
 a default port is dropped, an internationalized host becomes punycode (needs the optional `intl`
 extension) and unsafe characters are percent-encoded. A value that is not an absolute http(s)/ws(s)/ftp
-URL is kept as received. Normalize a stored URL the same way before comparing it with one of these
-fields. The `RequestQueueRequest`
+URL is kept as received, so a value compared against a stored URL has to be in that form too. The `RequestQueueRequest`
 model is also used as an input object and therefore additionally exposes setters and a constructor
 (see [Input models](#input-models)).
 

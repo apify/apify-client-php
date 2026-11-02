@@ -144,7 +144,7 @@ final class RequestQueueClient
         $params->addInt('limit', $limit);
         $this->applyClientKey($params);
         return RequestQueueHead::fromData(
-            $this->ctx->getResourceRequired('head', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+            $this->ctx->getResourceRequired('head', $params, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT))
         );
     }
 
@@ -159,7 +159,7 @@ final class RequestQueueClient
             $params,
             Json::encode($request->toArray()),
             ResourceContext::CONTENT_TYPE_JSON,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
         return new RequestQueueOperationInfo($data);
     }
@@ -482,7 +482,7 @@ final class RequestQueueClient
         $params = $this->applyClientKey(new QueryParams());
         $payload = array_map(static fn (RequestQueueRequest $r) => $r->toArray(), $requests);
         return BatchDeleteResult::fromData(
-            $this->ctx->deleteWithBody('requests/batch', $params, $payload, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+            $this->ctx->deleteWithBody('requests/batch', $params, $payload, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT))
         );
     }
 
@@ -532,7 +532,7 @@ final class RequestQueueClient
         $url = $this->ctx->mergedParams($params)
             ->applyToUrl($this->ctx->subUrl('requests/' . ResourceContext::encodePathSegment($id) . '/lock'));
         try {
-            $this->http->call('DELETE', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+            $this->http->call('DELETE', $url, timeoutSecs: $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
         } catch (ApifyApiException $e) {
             if (!HttpClientCore::isNotFound($e)) {
                 throw $e;

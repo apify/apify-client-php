@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Resource;
 
+use Apify\Client\Internal\DatasetItemsPage;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
@@ -16,7 +17,7 @@ use Apify\Client\Options\DatasetDownloadOptions;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\DownloadItemsFormat;
 use Generator;
-use Psr\Http\Message\ResponseInterface;
+use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 
 /** A client for a specific dataset (and run-nested variants). */
@@ -187,41 +188,15 @@ final class DatasetClient
     }
 
     /**
-     * Fetches one page of dataset items and parses the pagination headers. Returns the page together
-     * with the {@code X-Apify-Pagination-Count} "scanned rows" count ({@code null} if the response
-     * omits the header), which {@see iterateItems()} uses to advance — see its doc comment.
-     *
-     * @internal
+     * Fetches one page of dataset items together with the {@code X-Apify-Pagination-Count} "scanned
+     * rows" count ({@code null} if the response omits the header), which {@see iterateItems()} uses to
+     * advance — see its doc comment.
      *
      * @return array{0:PaginationList<mixed>,1:?int}
      */
-    public function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
+    private function fetchItemsPage(DatasetListItemsOptions $options, ?float $timeoutSecs = null): array
     {
-        $params = new QueryParams();
-        $options->appendTo($params);
-        $url = $this->ctx->mergedParams($params)->applyToUrl($this->ctx->subUrl('items'));
-        $response = $this->http->call('GET', $url, timeoutSecs: $timeoutSecs);
-
-        $items = Json::decode((string) $response->getBody());
-        $items = is_array($items) ? array_values($items) : [];
-        $count = count($items);
-
-        $page = PaginationList::fromItems(
-            $items,
-            $this->headerInt($response, 'X-Apify-Pagination-Total', $count),
-            $this->headerInt($response, 'X-Apify-Pagination-Offset', 0),
-            $this->headerInt($response, 'X-Apify-Pagination-Limit', $count),
-            $count,
-            // Prefer the server-reported X-Apify-Pagination-Desc header (matches the reference JS
-            // client's `_createPaginationList`); fall back to the requested option when the header
-            // is absent, e.g. against an older API version that predates it.
-            $this->headerBool($response, 'X-Apify-Pagination-Desc', $options->desc ?? false),
-        );
-
-        $scannedHeader = $response->getHeaderLine('X-Apify-Pagination-Count');
-        $scanned = $scannedHeader === '' ? null : (int) $scannedHeader;
-
-        return [$page, $scanned];
+        return DatasetItemsPage::fetch($this->http, $this->ctx, $options, $timeoutSecs);
     }
 
     /**
@@ -279,7 +254,9 @@ final class DatasetClient
             $url,
             Json::encode($items),
             ResourceContext::CONTENT_TYPE_JSON_CHARSET,
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM),
+            // A push that timed out may still have been stored, so retrying it could duplicate the items.
+            doNotRetryTimeouts: true,
         );
     }
 
@@ -306,14 +283,20 @@ final class DatasetClient
      * It fetches the dataset, and if the dataset exposes a URL-signing secret key (i.e. it is
      * private), appends an HMAC-SHA256 signature so the URL grants access without an API token.
      * {@code $expiresInSecs} optionally bounds the validity of a signed URL ({@code null} for
-     * non-expiring). {@code $format} selects the output format of the items served by the URL
+     * non-expiring); it must be positive, otherwise an {@see InvalidArgumentException} is thrown before
+     * any request is sent. {@code $format} selects the output format of the items served by the URL
      * (defaults to {@code json} when omitted). The URL is built from the configured public base URL.
+     * {@code $timeoutSecs} applies to the request that fetches the dataset (default: the {@code long} tier).
+     *
+     * @throws InvalidArgumentException if {@code $expiresInSecs} is zero or negative
      */
     public function createItemsPublicUrl(
         ?DatasetListItemsOptions $options = null,
         ?int $expiresInSecs = null,
         ?DownloadItemsFormat $format = null,
+        int|float|string|null $timeoutSecs = null,
     ): string {
+        Signatures::requirePositiveExpiry($expiresInSecs);
         $options ??= new DatasetListItemsOptions();
         $params = new QueryParams();
         $options->appendTo($params);
@@ -323,7 +306,7 @@ final class DatasetClient
         // Only compute a signature when the caller did not already supply one, otherwise the URL
         // would carry two conflicting `signature` query params (mirrors KeyValueStoreClient::createKeysPublicUrl).
         if ($options->signature === null) {
-            $dataset = $this->get();
+            $dataset = $this->get($timeoutSecs ?? TimeoutTiers::TIER_LONG);
             if ($dataset !== null) {
                 $secret = $dataset->get('urlSigningSecretKey');
                 if (is_string($secret)) {
@@ -333,17 +316,5 @@ final class DatasetClient
             }
         }
         return $params->applyToUrl($this->ctx->publicUrl('items'));
-    }
-
-    private function headerInt(ResponseInterface $response, string $name, int $fallback): int
-    {
-        $value = $response->getHeaderLine($name);
-        return $value === '' ? $fallback : (int) $value;
-    }
-
-    private function headerBool(ResponseInterface $response, string $name, bool $fallback): bool
-    {
-        $value = $response->getHeaderLine($name);
-        return $value === '' ? $fallback : $value === 'true';
     }
 }

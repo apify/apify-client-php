@@ -63,6 +63,6 @@ final class KeyValueStoreCollectionClient
      */
     public function getOrCreate(?string $name = null, ?array $schema = null, int|float|string|null $timeoutSecs = null): KeyValueStore
     {
-        return new KeyValueStore($this->ctx->getOrCreateNamed($name, $schema, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
+        return new KeyValueStore($this->ctx->getOrCreateNamed($name, $schema, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 }

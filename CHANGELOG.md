@@ -25,10 +25,21 @@
   `ActorRun::getContainerUrl()` returns `https://abc.runs.apify.net/`.
 - **Breaking:** `ScheduleClient::getLog()` returns the list of invocation entries (`message`, `level`,
   `createdAt`) the endpoint responds with, instead of the raw JSON text, and uses the `medium` tier.
+- **Breaking:** `DatasetClient::createItemsPublicUrl()` and `KeyValueStoreClient::createKeysPublicUrl()` throw
+  `InvalidArgumentException` for an `expiresInSecs` of zero or less before sending any request; leave it out
+  for a URL that never expires. `createItemsPublicUrl()`, `createKeysPublicUrl()` and `getRecordPublicUrl()`
+  take a trailing `$timeoutSecs` for the request that fetches the storage (default `long` tier).
+- `DatasetClient::pushItems()` no longer retries a request that timed out, since the API may already have stored
+  the items.
+- Aligned the default timeout tier of individual methods with the reference client: `short` for
+  `ActorClient::validateInput()`, `BuildClient::abort()`, the Actor version and env-var collection calls, the
+  storage collections' `getOrCreate()`, the schedule and webhook `create()`, and the request-queue `listHead()`,
+  `addRequest()`, `batchDeleteRequests()` and `deleteRequestLock()`; `long` for the key-value store `update()`
+  and `recordExists()`; `medium` for `DatasetClient::pushItems()`.
+- `RunClient::waitForFinish()`, `BuildClient::waitForFinish()`, and `call()` on Actors and tasks take an
+  optional `$timeoutSecs`; polls and the start request of `call()` have no request timeout by default.
 - Documented that `KeyValueStoreClient::getRecord()` never parses a record and that `setRecord()` sends its
   value as given, also under `application/json`.
-- Integration tests wait up to 90 seconds for a just-created resource to show up in a listing, to ride out
-  replica lag.
 
 ## 0.11.1
 

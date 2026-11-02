@@ -55,10 +55,8 @@ final class ScheduleClient
      */
     public function getLog(int|float|string|null $timeoutSecs = null): array
     {
-        $data = $this->ctx->getResourceRequired('log', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
-        if (!is_array($data)) {
-            return [];
-        }
-        return array_values(array_filter($data, is_array(...)));
+        /** @var list<array<string,mixed>> $entries */
+        $entries = $this->ctx->getResourceRequired('log', new QueryParams(), $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM));
+        return $entries;
     }
 }

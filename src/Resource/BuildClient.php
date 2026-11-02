@@ -24,15 +24,15 @@ final class BuildClient
 
     /**
      * Fetches the build, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * for the build to finish before responding. The value is clamped client-side to the per-request
-     * timeout budget (minus a safety margin) so the server is never asked to hold the connection
-     * longer than the client will wait; the server additionally caps the wait at 60s. Returns
-     * {@code null} if it does not exist.
+     * for the build to finish before responding. The API caps the wait at 60s, and the client
+     * additionally keeps it below the {@code timeoutMaxSecs} cap of a single attempt. Unless
+     * {@code $timeoutSecs} is given, the request timeout is that wait on top of the {@code short} tier.
+     * Returns {@code null} if it does not exist.
      */
     public function get(?int $waitForFinishSecs = null, int|float|string|null $timeoutSecs = null): ?Build
     {
         $params = new QueryParams();
-        // Clamp to the client's per-request timeout so a short custom timeout doesn't abort the call.
+        // Keep the server-side wait below the cap of a single attempt, so the API never holds longer than a request can last.
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinishSecs));
         $data = $this->ctx->getResource('', $params, $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT, $waitForFinishSecs));
         return is_array($data) ? new Build($data) : null;
@@ -42,7 +42,7 @@ final class BuildClient
     public function abort(int|float|string|null $timeoutSecs = null): Build
     {
         return new Build(
-            $this->ctx->postWithBody('abort', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM))
+            $this->ctx->postWithBody('abort', new QueryParams(), null, '', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT))
         );
     }
 
@@ -54,14 +54,16 @@ final class BuildClient
 
     /**
      * Polls until the build reaches a terminal state or {@code $waitSecs} elapses ({@code null} waits
-     * indefinitely). Returns the latest build.
+     * indefinitely). Returns the latest build. {@code $timeoutSecs} is the timeout of each poll request (a
+     * number of seconds, a tier name or {@code 'noTimeout'}, the default).
      */
-    public function waitForFinish(?int $waitSecs = null): Build
+    public function waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): Build
     {
         $data = $this->ctx->waitForFinish(
             $waitSecs,
             'build',
-            static fn (array $d): bool => (new Build($d))->isTerminal()
+            static fn (array $d): bool => (new Build($d))->isTerminal(),
+            $timeoutSecs
         );
         return new Build($data);
     }

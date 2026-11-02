@@ -60,6 +60,6 @@ final class RequestQueueCollectionClient
      */
     public function getOrCreate(?string $name = null, int|float|string|null $timeoutSecs = null): RequestQueue
     {
-        return new RequestQueue($this->ctx->getOrCreateNamed($name, null, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)));
+        return new RequestQueue($this->ctx->getOrCreateNamed($name, null, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 }

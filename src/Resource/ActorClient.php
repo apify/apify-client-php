@@ -103,11 +103,15 @@ final class ActorClient
      *                           string of bytes sent exactly as given — see {@see start()}
      * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
      *                           {@code $options->waitForResources} start does not count toward it.
+     * @param int|float|string|null $timeoutSecs timeout of the start request and of every poll (a number of
+     *                           seconds, a tier name or {@code 'noTimeout'}); default {@code 'noTimeout'}
      */
-    public function call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null): ActorRun
+    public function call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        $run = $this->start($input, $options);
-        return $this->root->run((string) $run->getId())->waitForFinish($waitSecs);
+        // Like the reference client, the start request and every poll have no request timeout by default.
+        $timeoutSecs ??= TimeoutTiers::NO_TIMEOUT;
+        $run = $this->start($input, $options, $timeoutSecs);
+        return $this->root->run((string) $run->getId())->waitForFinish($waitSecs, $timeoutSecs);
     }
 
     /**
@@ -132,7 +136,7 @@ final class ActorClient
             $params,
             $body,
             $options->contentTypeOrDefault(),
-            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_MEDIUM)
+            $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)
         );
         return is_array($result) && ($result['valid'] ?? false) === true;
     }
@@ -170,7 +174,7 @@ final class ActorClient
     public function defaultBuild(?int $waitForFinish = null, int|float|string|null $timeoutSecs = null): BuildClient
     {
         $params = new QueryParams();
-        // Clamp the server-side wait below the per-request timeout, consistent with run/build get().
+        // Keep the server-side wait below the cap of a single attempt, consistent with run/build get().
         $params->addInt('waitForFinish', $this->ctx->clampServerWait($waitForFinish));
         $data = $this->ctx->getResourceRequired('builds/default', $params, $this->ctx->resolveWaitTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT, $waitForFinish));
         $build = new Build(is_array($data) ? $data : []);

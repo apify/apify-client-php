@@ -180,7 +180,7 @@ final class UrlNormalizer
     private static function normalizeHost(string $host): string
     {
         $decoded = rawurldecode($host);
-        $lower = function_exists('mb_strtolower') ? mb_strtolower($decoded, 'UTF-8') : strtolower($decoded);
+        $lower = mb_strtolower($decoded, 'UTF-8');
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
             $ascii = idn_to_ascii($lower, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
             if (is_string($ascii) && $ascii !== '') {

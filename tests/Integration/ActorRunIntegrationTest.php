@@ -55,6 +55,30 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
         $client->run((string) $run->getId())->keyValueStore()->getRecord('OUTPUT');
     }
 
+    public function testReadRunStoragesAndLogById(): void
+    {
+        $client = $this->requireClient();
+        $run = $client->actor('apify/hello-world')->call(null, null, 120);
+        $runClient = $client->run((string) $run->getId());
+
+        $dataset = $runClient->dataset()->get();
+        self::assertNotNull($dataset);
+        self::assertSame($run->getDefaultDatasetId(), $dataset->getId());
+        self::assertNotNull($runClient->dataset()->getStatistics());
+
+        $store = $runClient->keyValueStore()->get();
+        self::assertNotNull($store);
+        self::assertSame($run->getDefaultKeyValueStoreId(), $store->getId());
+
+        $queue = $runClient->requestQueue()->get();
+        self::assertNotNull($queue);
+        self::assertSame($run->getDefaultRequestQueueId(), $queue->getId());
+
+        $log = $client->log((string) $run->getId())->get();
+        self::assertNotNull($log);
+        self::assertNotSame('', $log);
+    }
+
     public function testIterateDatasetItemsOfAFinishedRunYieldsEveryItem(): void
     {
         $client = $this->requireClient();
@@ -68,32 +92,64 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
         self::assertSame($expected, $live);
     }
 
-    public function testIterateDatasetItemsOfARunPushingItemsReadsThemWhileItRuns(): void
+    public function testIterateDatasetItemsReadsItemsWhileTheRunIsStillRunning(): void
     {
         $client = $this->requireClient();
-        $actor = $client->actor('apify/hello-world');
-        $run = $actor->start();
-        $items = iterator_to_array($client->run((string) $run->getId())->iterateDatasetItems(new RunIterateDatasetItemsOptions(pollIntervalSecs: 1)), false);
+        // An Actor that pushes one item every ten seconds, three times, straight through the API
+        // (the Actor runtime provides the token, the dataset ID and the public API base URL).
+        $script = <<<'JS'
+            const base = (process.env.APIFY_API_PUBLIC_BASE_URL || 'https://api.apify.com').replace(/\/$/, '');
+            const url = `${base}/v2/datasets/${process.env.APIFY_DEFAULT_DATASET_ID}/items?token=${process.env.APIFY_TOKEN}`;
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            (async () => {
+                for (let n = 1; n <= 3; n++) {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ n }),
+                    });
+                    if (!response.ok) throw new Error(`push failed: ${response.status}`);
+                    await sleep(10000);
+                }
+            })();
+            JS;
+        $definition = self::minimalActor(self::uniqueName('live'));
+        $definition['versions'][0]['sourceFiles'][1]['content'] = $script;
+        $actor = $client->actors()->create($definition);
+        try {
+            $actorClient = $client->actor((string) $actor->getId());
+            $build = $actorClient->build('0.0');
+            self::assertSame('SUCCEEDED', $client->build((string) $build->getId())->waitForFinish(300)->getStatus());
 
-        // The iteration only returns once the run has finished and the dataset is drained, so it has
-        // seen everything the run pushed.
-        $finished = $client->run((string) $run->getId())->get();
-        self::assertNotNull($finished);
-        self::assertTrue($finished->isTerminal());
-        // The dataset's `itemCount` lags the pushed items by a few seconds, so compare with a read of the items.
-        $all = iterator_to_array($client->run((string) $run->getId())->dataset()->iterateItems(), false);
-        self::assertGreaterThanOrEqual(1, count($items));
-        self::assertSame($all, $items);
+            $run = $actorClient->start();
+            $runClient = $client->run((string) $run->getId());
+            $statusWhenReceived = [];
+            $items = [];
+            foreach ($runClient->iterateDatasetItems(new RunIterateDatasetItemsOptions(pollIntervalSecs: 1)) as $item) {
+                $items[] = $item['n'];
+                $statusWhenReceived[] = $runClient->get()?->getStatus();
+            }
+
+            self::assertSame([1, 2, 3], $items);
+            // The first item reached the caller while the Actor was still sleeping before its last push.
+            self::assertContains($statusWhenReceived[0], ['READY', 'RUNNING']);
+            self::assertTrue($runClient->get()?->isTerminal());
+        } finally {
+            $client->actor((string) $actor->getId())->delete();
+        }
     }
 
     public function testRunsListAcceptsTheDeploymentFilter(): void
     {
         $client = $this->requireClient();
         $filter = new RunListOptions(status: ['RUNNING'], deployment: ['SINGLE_TENANT']);
-        $page = $client->runs()->list(new ListOptions(limit: 5), $filter);
-        self::assertLessThanOrEqual(5, count($page->getItems()));
-        $page = $client->actor('apify/hello-world')->runs()->list(new ListOptions(limit: 5), $filter);
-        self::assertLessThanOrEqual(5, count($page->getItems()));
+        // `hello-world` runs are not Actor Standby runs and none is running, so a deployment filter that the API
+        // applies leaves nothing, where the same listing without it returns the finished runs.
+        $client->actor('apify/hello-world')->call(null, null, 120);
+        $unfiltered = new RunListOptions(status: ['SUCCEEDED']);
+        self::assertNotEmpty($client->runs()->list(new ListOptions(limit: 5), $unfiltered)->getItems());
+        self::assertSame([], $client->runs()->list(new ListOptions(limit: 5), $filter)->getItems());
+        self::assertSame([], $client->actor('apify/hello-world')->runs()->list(new ListOptions(limit: 5), $filter)->getItems());
     }
 
     public function testRunUrlFieldsAreNormalized(): void

@@ -33,7 +33,7 @@ foreach ($client->tasks()->iterate(new ListOptions(), 50) as $t) {
 - `start(mixed $input = null, ?TaskStartOptions $options = null): ActorRun` — `$options->waitForResources`
   retries a start the API rejects for lack of account resources; see the Actor docs' `start()` for the
   full behavior.
-- `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null): ActorRun`
+- `call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun`
 - `getInput(): mixed` (throws if the task itself does not exist — a 404 here cannot mean anything
   else), `updateInput(mixed $input): mixed`
 - `lastRun(?LastRunOptions $options = null): RunClient`

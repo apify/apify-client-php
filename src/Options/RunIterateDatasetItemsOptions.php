@@ -41,25 +41,4 @@ final class RunIterateDatasetItemsOptions
         public readonly ?int $pollIntervalSecs = null,
     ) {
     }
-
-    /** The item filters as dataset listing options for the given page, ready to send. @internal */
-    public function toListItemsOptions(int $offset, int $limit): DatasetListItemsOptions
-    {
-        return new DatasetListItemsOptions(
-            offset: $offset,
-            limit: $limit,
-            fields: $this->fields,
-            omit: $this->omit,
-            skipEmpty: $this->skipEmpty,
-            skipHidden: $this->skipHidden,
-            clean: $this->clean,
-            unwind: $this->unwind,
-        );
-    }
-
-    /** Whether any filter can drop whole rows or multiply them, so a page's item count is not its row count. @internal */
-    public function hasRowChangingFilter(): bool
-    {
-        return $this->clean === true || $this->skipEmpty === true || ($this->unwind !== null && $this->unwind !== []);
-    }
 }

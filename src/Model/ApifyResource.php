@@ -17,8 +17,7 @@ use Apify\Client\Internal\UrlNormalizer;
  * {@code format: uri}) are normalized to the WHATWG URL serialization when the model is built, the same
  * way the reference client does: a trailing slash is added to an empty path, the scheme and host are
  * lowercased, a default port is dropped and unsafe characters are percent-encoded. A value that is not
- * an absolute http(s)/ws(s)/ftp URL is kept as received. Compare a field against a stored URL after
- * normalizing the stored one the same way.
+ * an absolute http(s)/ws(s)/ftp URL is kept as received.
  */
 abstract class ApifyResource
 {
