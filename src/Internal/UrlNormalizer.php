@@ -213,8 +213,9 @@ final class UrlNormalizer
         }
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
             $info = [];
-            // IDNA_CHECK_BIDI is left off: ICU applies the RFC 5893 rules more strictly than WHATWG parsers do,
-            // so it would leave hosts such as `١.com` unnormalized that `new URL()` accepts.
+            // IDNA_CHECK_BIDI is off: Node's `new URL()` accepts hosts that ICU's RFC 5893 check rejects (such as
+            // `١.com`), and ICU flags both cases with the same error, so a host that Node rejects is punycoded
+            // instead, the smaller divergence.
             $flags = IDNA_NONTRANSITIONAL_TO_ASCII | IDNA_CHECK_CONTEXTJ;
             $ascii = idn_to_ascii($lower, $flags, INTL_IDNA_VARIANT_UTS46, $info);
             if ($ascii === false && (($info['errors'] ?? -1) & ~self::IGNORED_IDNA_ERRORS) === 0) {
