@@ -51,6 +51,9 @@ final class UrlNormalizerTest extends TestCase
         yield 'fragment without path' => ['https://example.com#f', 'https://example.com/#f'];
         yield 'empty segments are kept' => ['https://example.com//a//b', 'https://example.com//a//b'];
         yield 'backslash is a slash' => ['https://example.com/a\\b', 'https://example.com/a/b'];
+        yield 'hyphens in an internationalized host' => ["https://AB--c.b\u{00FC}cher.example/x", 'https://ab--c.xn--bcher-kva.example/x'];
+        yield 'leading hyphen in an internationalized host' => ["https://-a.b\u{00FC}cher.example/x", 'https://-a.xn--bcher-kva.example/x'];
+        yield 'empty label in an internationalized host' => ["https://a..b\u{00FC}cher.example/x", 'https://a..xn--bcher-kva.example/x'];
         yield 'websocket scheme' => ['wss://Example.com:443', 'wss://example.com/'];
     }
 
@@ -85,6 +88,9 @@ final class UrlNormalizerTest extends TestCase
         yield 'fullwidth percent in host' => ["https://ex\u{FF05}ample.com/a"];
         yield 'text after the IPv6 literal' => ['https://[::1]x/y'];
         yield 'not an IP literal in brackets' => ['https://[nothost]/x'];
+        yield 'replacement character in host' => ["https://example.com\u{FFFD}/"];
+        yield 'bidi violation in host' => ["https://\u{0661}.\u{05D0}b\u{00FC}/"];
+        yield 'zero width joiner in host' => ["https://a\u{200D}b\u{00FC}.com/"];
         yield 'port out of range' => ['https://example.com:70000/x'];
     }
 

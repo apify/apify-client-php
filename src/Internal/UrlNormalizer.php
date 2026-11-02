@@ -33,6 +33,16 @@ final class UrlNormalizer
     /** Characters (besides controls, space and non-ASCII) percent-encoded in the user name and password. */
     private const USERINFO_UNSAFE = '"#<>?`{}/:;=@[\\]^|';
 
+    /** An IPv6 literal in a host: the brackets around hexadecimal digits, colons and dots. */
+    private const IPV6_LITERAL_PATTERN = '/^\[[0-9a-f:.]+\]$/';
+
+    /**
+     * The IDNA error bits that WHATWG URL parsing ignores (it turns {@code CheckHyphens} and
+     * {@code VerifyDnsLength} off): empty label, label too long, domain too long, leading hyphen,
+     * trailing hyphen and hyphens in positions 3 and 4.
+     */
+    private const IGNORED_IDNA_ERRORS = 0x3F;
+
     /** The highest valid port number. */
     private const MAX_PORT = 65535;
 
@@ -177,7 +187,7 @@ final class UrlNormalizer
 
         if (str_starts_with($authority, '[')) {
             $host = strtolower($authority);
-            if (preg_match('/^\[[0-9a-f:.]+\]$/', $host) !== 1) {
+            if (preg_match(self::IPV6_LITERAL_PATTERN, $host) !== 1) {
                 return null;
             }
         } else {
@@ -201,11 +211,17 @@ final class UrlNormalizer
             return '';
         }
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
-            $ascii = idn_to_ascii($lower, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
-            if (is_string($ascii) && $ascii !== '') {
-                // The UTS #46 mapping turns fullwidth look-alikes into the forbidden ASCII characters.
-                return preg_match(self::FORBIDDEN_HOST_PATTERN, $ascii) === 1 ? '' : $ascii;
+            $info = [];
+            $flags = IDNA_NONTRANSITIONAL_TO_ASCII | IDNA_CHECK_BIDI | IDNA_CHECK_CONTEXTJ;
+            $ascii = idn_to_ascii($lower, $flags, INTL_IDNA_VARIANT_UTS46, $info);
+            if ($ascii === false && ($info['errors'] ?? -1) !== 0 && (($info['errors'] ?? -1) & ~self::IGNORED_IDNA_ERRORS) === 0) {
+                $ascii = $info['result'] ?? false;
             }
+            // The UTS #46 mapping turns fullwidth look-alikes into the forbidden ASCII characters.
+            if (!is_string($ascii) || $ascii === '' || preg_match(self::FORBIDDEN_HOST_PATTERN, $ascii) === 1) {
+                return '';
+            }
+            return $ascii;
         }
         return $lower;
     }
