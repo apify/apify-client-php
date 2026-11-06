@@ -109,6 +109,37 @@ final class DatasetIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testListItemsCountReportsTheScannedRowsWhenAFilterDropsItems(): void
+    {
+        $client = $this->requireClient();
+        $ds = $client->datasets()->getOrCreate(self::uniqueName('ds-count'));
+        try {
+            $dataset = $client->dataset((string) $ds->getId());
+            $dataset->pushItems([['n' => 1], new \stdClass(), ['n' => 3], new \stdClass(), ['n' => 5]]);
+
+            // The listing reads the item count of the dataset, which lags a fresh push, so wait for it.
+            $page = null;
+            for ($attempt = 0; $attempt < 30; $attempt++) {
+                $page = $dataset->listItems(new DatasetListItemsOptions(skipEmpty: true));
+                if ($page->getCount() >= 5) {
+                    break;
+                }
+                sleep(2);
+            }
+
+            self::assertNotNull($page);
+            self::assertSame([1, 3, 5], array_column($page->getItems(), 'n'));
+            // `count` is the five rows scanned, not the three items returned.
+            self::assertSame(5, $page->getCount());
+
+            // The iterator steps by the scanned rows, so it neither repeats nor skips an item.
+            $iterated = iterator_to_array($dataset->iterateItems(new DatasetListItemsOptions(skipEmpty: true), 2), false);
+            self::assertSame([1, 3, 5], array_column($iterated, 'n'));
+        } finally {
+            $client->dataset((string) $ds->getId())->delete();
+        }
+    }
+
     public function testDatasetCrudFlow(): void
     {
         $client = $this->requireClient();

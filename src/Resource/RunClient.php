@@ -327,7 +327,7 @@ final class RunClient
 
             while ($position < $itemCount) {
                 $pageLimit = min($pageSize, $itemCount - $position);
-                [$page] = DatasetItemsPage::fetch($this->http, $itemsCtx, self::pageOptions($options, $position, $pageLimit), $requestTimeoutSecs);
+                $page = DatasetItemsPage::fetch($this->http, $itemsCtx, self::pageOptions($options, $position, $pageLimit), $requestTimeoutSecs);
                 foreach ($page->getItems() as $item) {
                     yield $item;
                 }
@@ -346,14 +346,14 @@ final class RunClient
         // The run has finished but `itemCount` lags the pushed items: read on, a page at a time.
         while (true) {
             $pageLimit = $end !== null ? min($pageSize, $end - $position) : $pageSize;
-            [$page, $scanned] = DatasetItemsPage::fetch($this->http, $itemsCtx, self::pageOptions($options, $position, $pageLimit), $requestTimeoutSecs);
+            $page = DatasetItemsPage::fetch($this->http, $itemsCtx, self::pageOptions($options, $position, $pageLimit), $requestTimeoutSecs);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
             // Only an empty page marks the end, as filters can shorten a full one. A page that `clean`,
             // `skipEmpty` or `unwind` emptied past a lagging `itemCount` reports no scanned rows either,
             // so a plain, unfiltered one-row read confirms the dataset really has nothing left.
-            $isEmpty = $page->getItems() === [] && ($scanned ?? 0) === 0;
+            $isEmpty = $page->getCount() === 0;
             if ($isEmpty && (!self::hasRowChangingFilter($options) || $this->hasNoItemsAt($datasetClient, $position, $timeoutSecs))) {
                 return;
             }

@@ -9,6 +9,7 @@ use Apify\Client\Http\GuzzleHttpClient;
 use Apify\Client\Http\GzipHttpCompressor;
 use Apify\Client\Http\HttpClientInterface;
 use Apify\Client\Http\HttpCompressorInterface;
+use Apify\Client\Internal\Compression;
 use Apify\Client\Internal\HttpClientCore;
 use Apify\Client\Internal\Platform;
 use Apify\Client\Internal\RetryConfig;
@@ -376,15 +377,7 @@ final class ApifyClient
      */
     private static function resolveCompressor(string|HttpCompressorInterface|null $compression): ?HttpCompressorInterface
     {
-        return match (true) {
-            $compression === null => null,
-            $compression instanceof HttpCompressorInterface => $compression,
-            $compression === 'brotli' => new BrotliHttpCompressor(),
-            $compression === 'gzip' => new GzipHttpCompressor(),
-            default => throw new RuntimeException(
-                sprintf('ApifyClient: unknown compression "%s"; expected "brotli", "gzip", or a HttpCompressorInterface', $compression)
-            ),
-        };
+        return Compression::resolveCompressor($compression, 'ApifyClient');
     }
 
     /**

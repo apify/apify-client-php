@@ -18,4 +18,14 @@ final class ActorVersion extends ApifyResource
     {
         return $this->getString('sourceType');
     }
+
+    /**
+     * The Actor's directory inside the uploaded source, as a path relative to the upload root, for a
+     * {@code SOURCE_FILES} or {@code TARBALL} version, or {@code null} when the upload root is the Actor's
+     * directory. On a {@code TARBALL} version, only users with write access to the Actor get it.
+     */
+    public function getActorPath(): ?string
+    {
+        return $this->getString('actorPath');
+    }
 }

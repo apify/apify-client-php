@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Apify\Client\Internal;
 
+use Apify\Client\Http\BrotliHttpCompressor;
+use Apify\Client\Http\GzipHttpCompressor;
+use Apify\Client\Http\HttpCompressorInterface;
+use RuntimeException;
+
 /**
  * Optional request-body compression, matching the reference JS client's behaviour.
  *
@@ -209,6 +214,26 @@ final class Compression
         }
 
         return static fn (string $body) => gzencode($body);
+    }
+
+    /**
+     * Resolves a {@code compression} option ({@code 'brotli'}, {@code 'gzip'} or a custom compressor) to a
+     * concrete compressor, or {@code null} to keep the default best-effort choice.
+     *
+     * @param string $option the name of the option's owner, for the error message
+     * @throws RuntimeException if the option is an unknown algorithm name
+     */
+    public static function resolveCompressor(string|HttpCompressorInterface|null $compression, string $option): ?HttpCompressorInterface
+    {
+        return match (true) {
+            $compression === null => null,
+            $compression instanceof HttpCompressorInterface => $compression,
+            $compression === 'brotli' => new BrotliHttpCompressor(),
+            $compression === 'gzip' => new GzipHttpCompressor(),
+            default => throw new RuntimeException(
+                sprintf('%s: unknown compression "%s"; expected "brotli", "gzip", or a HttpCompressorInterface', $option, $compression)
+            ),
+        };
     }
 
     private function __construct()

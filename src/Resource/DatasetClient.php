@@ -84,14 +84,18 @@ final class DatasetClient
      * Lists items from the dataset, each decoded to a PHP value (associative array for objects).
      *
      * The dataset items endpoint returns a bare JSON array (not a data envelope) and reports
-     * pagination via {@code X-Apify-Pagination-*} headers, surfaced in the returned page.
+     * pagination via {@code X-Apify-Pagination-*} headers, surfaced in the returned page. The page's
+     * {@see PaginationList::getCount()} is the number of dataset rows the API scanned for it, or the number
+     * of items returned when that is larger: filters ({@code clean}, {@code skipEmpty}) can leave it above
+     * the number of items. The next page starts at {@code offset + min(count, limit)}; the cap matters only
+     * with {@code unwind}, which can return more items than the rows scanned.
      *
      * @return PaginationList<mixed>
      */
     public function listItems(?DatasetListItemsOptions $options = null, int|float|string|null $timeoutSecs = null): PaginationList
     {
         $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
-        return DatasetItemsPage::fetch($this->http, $this->ctx, $options ?? new DatasetListItemsOptions(), $resolved)[0];
+        return DatasetItemsPage::fetch($this->http, $this->ctx, $options ?? new DatasetListItemsOptions(), $resolved);
     }
 
     /**
@@ -100,7 +104,9 @@ final class DatasetClient
      *
      * The options' {@code limit} caps the total number of items yielded across all pages ({@code null}
      * = all), {@code offset} is the starting offset, and {@code $chunkSize} is the per-page size
-     * ({@code null} = the server default). All other {@see DatasetListItemsOptions} fields (field
+     * ({@code null} = the server default). Dataset items have no default limit, so without {@code $chunkSize}
+     * (and without a {@code limit}) the first request loads the whole dataset in one response: pass
+     * {@code $chunkSize} to iterate a large dataset. All other {@see DatasetListItemsOptions} fields (field
      * selection, filtering, ordering) are applied to every page.
      *
      * Item-dropping filters ({@code skipEmpty}, and {@code clean} which implies it) and {@code unwind}
@@ -132,12 +138,12 @@ final class DatasetClient
         $resolved = $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG);
 
         $firstPageLimit = ResourceContext::minLimit($limit, $chunkSize);
-        [$page, $scanned] = DatasetItemsPage::fetch($this->http, $this->ctx, $options->withPagination($startOffset, $firstPageLimit), $resolved);
+        $page = DatasetItemsPage::fetch($this->http, $this->ctx, $options->withPagination($startOffset, $firstPageLimit), $resolved);
         foreach ($page->getItems() as $item) {
             yield $item;
         }
 
-        $pageScanned = self::scannedRows($page, $scanned, $firstPageLimit);
+        $pageScanned = self::scannedRows($page, $firstPageLimit);
         $currentOffset = $startOffset + $pageScanned;
         // Items still to yield, or null for "unbounded" (no $limit given).
         $remaining = ($limit !== null && $limit > 0) ? $limit - $pageScanned : null;
@@ -146,11 +152,11 @@ final class DatasetClient
         // $remaining having already reached 0 (the caller's $limit is satisfied) — either ends the loop.
         while ($pageScanned > 0 && ($remaining === null || $remaining > 0)) {
             $pageLimit = ResourceContext::minLimit($remaining, $chunkSize);
-            [$page, $scanned] = DatasetItemsPage::fetch($this->http, $this->ctx, $options->withPagination($currentOffset, $pageLimit), $resolved);
+            $page = DatasetItemsPage::fetch($this->http, $this->ctx, $options->withPagination($currentOffset, $pageLimit), $resolved);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
-            $pageScanned = self::scannedRows($page, $scanned, $pageLimit);
+            $pageScanned = self::scannedRows($page, $pageLimit);
             $currentOffset += $pageScanned;
             if ($remaining !== null) {
                 $remaining -= $pageScanned;
@@ -159,9 +165,8 @@ final class DatasetClient
     }
 
     /**
-     * The number of rows a page advances the offset by: the larger of its scanned-count header (if
-     * present) and its returned item count, capped at the limit requested for it ({@code null} =
-     * uncapped).
+     * The number of rows a page advances the offset by: the page's count (the scanned rows, or the returned
+     * item count when that is larger), capped at the limit requested for it ({@code null} = uncapped).
      *
      * Unlike {@see \Apify\Client\Internal\ResourceContext}'s plain {@code advancedBy()} (which has no
      * such cap — see its docblock), this one is load-bearing whenever {@code unwind} is set:
@@ -169,16 +174,16 @@ final class DatasetClient
      * item count can legitimately exceed the number of rows the API scanned to produce it (the reverse
      * of {@code skipEmpty}/{@code clean}, which only ever drop rows). The server never scans more rows
      * for a page than that page's requested limit, so the true row advance can never exceed it either;
-     * capping the {@code max()} above at the requested limit keeps an unwound page's inflated item count
-     * (or, if the scanned-count header is also missing, its unwind-inflated fallback) from overstating
+     * capping the count at the requested limit keeps an unwound page's inflated item count
+     * (or, if the scanned-count header is missing, its unwind-inflated fallback) from overstating
      * the real advance, which would otherwise skip whatever rows lie between the true (smaller) advance
      * and the inflated one.
      *
      * @param PaginationList<mixed> $page
      */
-    private static function scannedRows(PaginationList $page, ?int $scannedHeader, ?int $requestedLimit): int
+    private static function scannedRows(PaginationList $page, ?int $requestedLimit): int
     {
-        $scanned = max($scannedHeader ?? 0, count($page->getItems()));
+        $scanned = $page->getCount();
         return $requestedLimit !== null ? min($scanned, $requestedLimit) : $scanned;
     }
 

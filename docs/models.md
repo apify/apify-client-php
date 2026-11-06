@@ -34,6 +34,7 @@ model is also used as an input object and therefore additionally exposes setters
 | `getTitle(): ?string` | Human-readable title. |
 | `getDescription(): ?string` | Free-text description. |
 | `isPublic(): ?bool` | Whether the Actor is public. |
+| `getStandbyUrl(): ?string` | URL for sending requests to the Actor in Standby mode (a Server Actor), or `null` if Standby mode is not enabled. |
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
 
@@ -72,6 +73,7 @@ model is also used as an input object and therefore additionally exposes setters
 |---|---|
 | `getVersionNumber(): ?string` | The version number (e.g. `0.0`). |
 | `getSourceType(): ?string` | Source type (e.g. `SOURCE_FILES`, `GIT_REPO`). |
+| `getActorPath(): ?string` | The Actor's directory inside the uploaded source of a `SOURCE_FILES` or `TARBALL` version, or `null` when the upload root is the Actor's directory. |
 
 ### `Task`
 | Getter | Description |

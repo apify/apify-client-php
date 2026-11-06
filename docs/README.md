@@ -20,7 +20,7 @@ Every class is under the `Apify\Client\` PSR-4 root. Use these when writing `use
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
 | `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunIterateDatasetItemsOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
-| `Apify\Client\Http\` | The replaceable transport, its adapters, and compressors. | `HttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor` |
+| `Apify\Client\Http\` | The replaceable transport, its adapters, and compressors. | `HttpClientInterface`, `NoRedirectHttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor` |
 | `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException` and its status-specific subclasses (`NotFoundException`, `RateLimitException`, ...), `TransportException` |
 
 For example, to add requests to a queue you would import the model and (optionally) the batch options:
@@ -132,6 +132,16 @@ $builds = $client->builds()->list(new ListOptions(limit: 50, desc: true));
 `list` methods return a `PaginationList`, which is iterable and countable and exposes `getTotal()`,
 `getOffset()`, `getLimit()`, `getCount()`, `isDesc()` and `getItems()`. Within-storage listers
 (`listKeys`, `listHead`) return their own page/head containers instead.
+
+On a page of `DatasetClient::listItems()`, `getCount()` is the number of dataset rows the API scanned for the
+page, or the number of items returned when that is larger. Filters such as `skipEmpty` or `clean` can leave it
+above `count($page->getItems())`. The next page starts at `offset + min(count, limit)`; the cap matters only with
+`unwind`, which can return more items than the rows scanned.
+
+The `iterate*()` helpers take a `$chunkSize`, the number of entries requested per API call. Without it, each call
+gets the API's default page size, capped by the remaining `limit`. Dataset items have no default limit, so
+iterating `iterateItems()` without `$chunkSize` loads the whole dataset, or all `limit` items, in one response.
+Pass `$chunkSize` to iterate a large dataset.
 
 ```php
 $page = $client->actors()->list(new ActorListOptions(limit: 5));
