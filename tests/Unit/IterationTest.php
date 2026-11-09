@@ -45,6 +45,19 @@ final class IterationTest extends TestCase
     }
 
     /**
+     * Builds a list-page envelope whose {@code count} differs from the number of items, as the API reports
+     * when it drops entries after counting them.
+     *
+     * @param list<array<string,mixed>> $items
+     */
+    private static function pageWithCount(array $items, int $count, int $offset): string
+    {
+        return Json::encode(['data' => [
+            'items' => $items, 'total' => 100, 'offset' => $offset, 'limit' => $count, 'count' => $count, 'desc' => false,
+        ]]);
+    }
+
+    /**
      * @param int ...$ids
      * @return list<array<string,mixed>>
      */
@@ -130,14 +143,11 @@ final class IterationTest extends TestCase
     {
         // The Store counts Actors before it drops some (for example, hidden ones), so a page can carry fewer
         // items than its `count`, or none. The iterator steps by the count: no repeats, no early end.
-        $withCount = static fn (array $items, int $count, int $offset): string => Json::encode(['data' => [
-            'items' => $items, 'total' => 100, 'offset' => $offset, 'limit' => $count, 'count' => $count, 'desc' => false,
-        ]]);
         $transport = (new MockTransport())
-            ->queueResponse(200, $withCount(self::actors(1, 2), 4, 0))
-            ->queueResponse(200, $withCount([], 3, 4))
-            ->queueResponse(200, $withCount(self::actors(3), 1, 7))
-            ->queueResponse(200, $withCount([], 0, 8));
+            ->queueResponse(200, self::pageWithCount(self::actors(1, 2), 4, 0))
+            ->queueResponse(200, self::pageWithCount([], 3, 4))
+            ->queueResponse(200, self::pageWithCount(self::actors(3), 1, 7))
+            ->queueResponse(200, self::pageWithCount([], 0, 8));
         $ids = [];
         foreach ($this->client($transport)->store()->iterate() as $item) {
             $ids[] = $item->getId();
@@ -153,12 +163,9 @@ final class IterationTest extends TestCase
     public function testStorePageCountIsCappedAtTheRequestedLimit(): void
     {
         // A count above the limit asked for the page cannot advance the offset past it.
-        $withCount = static fn (array $items, int $count, int $offset): string => Json::encode(['data' => [
-            'items' => $items, 'total' => 100, 'offset' => $offset, 'limit' => 2, 'count' => $count, 'desc' => false,
-        ]]);
         $transport = (new MockTransport())
-            ->queueResponse(200, $withCount(self::actors(1), 50, 0))
-            ->queueResponse(200, $withCount(self::actors(2), 50, 2));
+            ->queueResponse(200, self::pageWithCount(self::actors(1), 50, 0))
+            ->queueResponse(200, self::pageWithCount(self::actors(2), 50, 2));
         $ids = [];
         foreach ($this->client($transport)->store()->iterate(new StoreListOptions(limit: 4), 2) as $item) {
             $ids[] = $item->getId();

@@ -140,8 +140,6 @@ final class ActorServerClient
         $options->appendTo($params);
         [$body, $contentType] = self::encodeBody($options->body);
         $extraHeaders = $options->headers ?? [];
-        // A Content-Type the caller sets in `headers` wins over the one implied by the body: the HTTP core
-        // applies the extra headers last, and judges compressibility on the effective type.
 
         $policy = new RequestPolicy(
             compression: Compression::resolveCompressor($options->compression, 'ActorServerRequestOptions') ?? false,

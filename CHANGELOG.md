@@ -6,7 +6,7 @@
 - Added `ActorClient::server()` for Server Actors (formerly Actor Standby): `request()`, `getUrl()` and `getOpenApiSpec()`.
 - Added `NoRedirectHttpClientInterface`, implemented by `GuzzleHttpClient` and needed by `request()`.
 - **Breaking:** `PaginationList::getCount()` of a dataset items page is the scanned rows, or the items returned when larger.
-- Every iterator now steps by the page's `count`, so Store and dataset filters neither repeat nor skip entries.
+- Offset iterators, dataset items included, step by the page's `count`, so Store and dataset filters neither repeat nor skip entries.
 - Documented the page size of iteration without `$chunkSize`.
 
 ## 0.12.0
