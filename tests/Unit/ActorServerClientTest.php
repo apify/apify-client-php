@@ -334,6 +334,30 @@ final class ActorServerClientTest extends TestCase
         self::assertSame($large, gzdecode((string) $gzip->getBody()));
     }
 
+    public function testACallerContentTypeThatIsAlreadyCompressedKeepsTheBodyUncompressed(): void
+    {
+        $png = str_repeat("\x89PNG", 800);
+        $transport = $this->serverTransport()->queueResponse(200, 'a');
+
+        $this->client($transport)->actor('a1')->server()->request('/', new ActorServerRequestOptions(method: 'POST', body: $png, headers: ['content-type' => 'image/png'], compression: 'gzip'));
+
+        self::assertFalse($transport->lastRequest()->hasHeader('Content-Encoding'));
+        self::assertSame($png, (string) $transport->lastRequest()->getBody());
+        self::assertSame('image/png', $transport->lastRequest()->getHeaderLine('Content-Type'));
+    }
+
+    public function testACompressedBodyDropsTheCallerContentLength(): void
+    {
+        $large = str_repeat('{"key":"value"},', 400);
+        $transport = $this->serverTransport()->queueResponse(200, 'a');
+
+        $this->client($transport)->actor('a1')->server()->request('/', new ActorServerRequestOptions(method: 'POST', body: $large, headers: ['content-length' => (string) strlen($large), 'Content-Type' => 'application/json'], compression: 'gzip'));
+
+        $sent = $transport->lastRequest();
+        self::assertSame('gzip', $sent->getHeaderLine('Content-Encoding'));
+        self::assertFalse($sent->hasHeader('Content-Length'));
+    }
+
     public function testTheClientWideCompressionDoesNotApplyToServerRequests(): void
     {
         $large = str_repeat('{"key":"value"},', 400);
@@ -458,13 +482,15 @@ final class ActorServerClientTest extends TestCase
             ->queueResponse(200, '{"a":[1,2]}', ['Content-Type' => 'application/vnd.api+json; charset=utf-8'])
             ->queueResponse(200, 'hello', ['Content-Type' => 'text/plain'])
             ->queueResponse(200, "\x00\x01", ['Content-Type' => 'application/octet-stream'])
-            ->queueResponse(200, '');
+            ->queueResponse(200, '')
+            ->queueResponse(200, '{"a":1}' . "\n", ['Content-Type' => 'application/json-seq']);
         $server = $this->client($transport)->actor('a1')->server();
 
         self::assertSame(['a' => [1, 2]], $server->request('/1')->getData());
         self::assertSame('hello', $server->request('/2')->getData());
         self::assertSame("\x00\x01", $server->request('/3')->getData());
         self::assertSame('', $server->request('/4')->getData());
+        self::assertSame('{"a":1}' . "\n", $server->request('/5')->getData());
     }
 
     public function testGetDataThrowsForAnInvalidJsonSuccessBodyAndReturnsRawBytesForAnErrorBody(): void

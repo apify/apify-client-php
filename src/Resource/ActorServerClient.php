@@ -140,8 +140,8 @@ final class ActorServerClient
         $options->appendTo($params);
         [$body, $contentType] = self::encodeBody($options->body);
         $extraHeaders = $options->headers ?? [];
-        // A Content-Type the caller sets wins over the one implied by the body.
-        $contentType = self::hasHeader($extraHeaders, 'Content-Type') ? '' : $contentType;
+        // A Content-Type the caller sets in `headers` wins over the one implied by the body: the HTTP core
+        // applies the extra headers last, and judges compressibility on the effective type.
 
         $policy = new RequestPolicy(
             compression: Compression::resolveCompressor($options->compression, 'ActorServerRequestOptions') ?? false,
@@ -243,16 +243,5 @@ final class ActorServerClient
             return [$body, ''];
         }
         return [Json::encode($body), ResourceContext::CONTENT_TYPE_JSON];
-    }
-
-    /** @param array<string,string> $headers */
-    private static function hasHeader(array $headers, string $name): bool
-    {
-        foreach (array_keys($headers) as $key) {
-            if (strcasecmp($key, $name) === 0) {
-                return true;
-            }
-        }
-        return false;
     }
 }

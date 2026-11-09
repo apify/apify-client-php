@@ -175,7 +175,7 @@ final class HttpClientCore
     {
         if ($body === null
             || self::hasHeader($extraHeaders, 'Content-Encoding')
-            || !Compression::isCompressibleContentType($contentType)
+            || !Compression::isCompressibleContentType(self::headerValue($extraHeaders, 'Content-Type') ?? $contentType)
         ) {
             return [$body, $extraHeaders];
         }
@@ -190,8 +190,7 @@ final class HttpClientCore
             if ($compressedBody === null) {
                 return [$body, $extraHeaders];
             }
-            $extraHeaders['Content-Encoding'] = $compressor->contentEncoding();
-            return [$compressedBody, $extraHeaders];
+            return [$compressedBody, self::withContentEncoding($extraHeaders, $compressor->contentEncoding())];
         }
 
         $compressed = Compression::maybeCompress($body);
@@ -200,8 +199,25 @@ final class HttpClientCore
         }
 
         [$encoding, $compressedBody] = $compressed;
-        $extraHeaders['Content-Encoding'] = $encoding;
-        return [$compressedBody, $extraHeaders];
+        return [$compressedBody, self::withContentEncoding($extraHeaders, $encoding)];
+    }
+
+    /**
+     * Marks a body as compressed and drops any caller-set {@code Content-Length}, which describes the
+     * uncompressed body; the transport computes the real one.
+     *
+     * @param array<string,string> $headers
+     * @return array<string,string>
+     */
+    private static function withContentEncoding(array $headers, string $encoding): array
+    {
+        foreach (array_keys($headers) as $name) {
+            if (strcasecmp($name, 'Content-Length') === 0) {
+                unset($headers[$name]);
+            }
+        }
+        $headers['Content-Encoding'] = $encoding;
+        return $headers;
     }
 
     /**
@@ -211,12 +227,22 @@ final class HttpClientCore
      */
     private static function hasHeader(array $headers, string $name): bool
     {
-        foreach (array_keys($headers) as $key) {
+        return self::headerValue($headers, $name) !== null;
+    }
+
+    /**
+     * Case-insensitive lookup of a header value, {@code null} if the header is not set.
+     *
+     * @param array<string,string> $headers
+     */
+    private static function headerValue(array $headers, string $name): ?string
+    {
+        foreach ($headers as $key => $value) {
             if (strcasecmp($key, $name) === 0) {
-                return true;
+                return $value;
             }
         }
-        return false;
+        return null;
     }
 
     /** Opens a live streaming response (single attempt, no retry). Used by log streaming. */

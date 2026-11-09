@@ -9,7 +9,7 @@ use Apify\Client\Options\DatasetListItemsOptions;
 
 /**
  * Reads one page of dataset items. The page's count is the number of rows the API scanned to produce
- * it. Shared by {@see \Apify\Client\Resource\DatasetClient} and {@see \Apify\Client\Resource\RunClient}.
+ * it, or the number of items returned when that is larger. Shared by {@see \Apify\Client\Resource\DatasetClient} and {@see \Apify\Client\Resource\RunClient}.
  *
  * @internal
  */

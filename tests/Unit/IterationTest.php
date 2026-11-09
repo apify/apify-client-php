@@ -126,6 +126,47 @@ final class IterationTest extends TestCase
         self::assertStringContainsString('limit=1', $uris[2]);
     }
 
+    public function testStorePagesStepByTheCountEvenWhenTheApiDroppedItems(): void
+    {
+        // The Store counts Actors before it drops some (for example, hidden ones), so a page can carry fewer
+        // items than its `count`, or none. The iterator steps by the count: no repeats, no early end.
+        $withCount = static fn (array $items, int $count, int $offset): string => Json::encode(['data' => [
+            'items' => $items, 'total' => 100, 'offset' => $offset, 'limit' => $count, 'count' => $count, 'desc' => false,
+        ]]);
+        $transport = (new MockTransport())
+            ->queueResponse(200, $withCount(self::actors(1, 2), 4, 0))
+            ->queueResponse(200, $withCount([], 3, 4))
+            ->queueResponse(200, $withCount(self::actors(3), 1, 7))
+            ->queueResponse(200, $withCount([], 0, 8));
+        $ids = [];
+        foreach ($this->client($transport)->store()->iterate() as $item) {
+            $ids[] = $item->getId();
+        }
+        self::assertSame(['a1', 'a2', 'a3'], $ids);
+        self::assertSame(4, $transport->callCount());
+        $uris = array_map(static fn ($r) => (string) $r->getUri(), $transport->received);
+        self::assertStringContainsString('offset=4', $uris[1]);
+        self::assertStringContainsString('offset=7', $uris[2]);
+        self::assertStringContainsString('offset=8', $uris[3]);
+    }
+
+    public function testStorePageCountIsCappedAtTheRequestedLimit(): void
+    {
+        // A count above the limit asked for the page cannot advance the offset past it.
+        $withCount = static fn (array $items, int $count, int $offset): string => Json::encode(['data' => [
+            'items' => $items, 'total' => 100, 'offset' => $offset, 'limit' => 2, 'count' => $count, 'desc' => false,
+        ]]);
+        $transport = (new MockTransport())
+            ->queueResponse(200, $withCount(self::actors(1), 50, 0))
+            ->queueResponse(200, $withCount(self::actors(2), 50, 2));
+        $ids = [];
+        foreach ($this->client($transport)->store()->iterate(new StoreListOptions(limit: 4), 2) as $item) {
+            $ids[] = $item->getId();
+        }
+        self::assertSame(['a1', 'a2'], $ids);
+        self::assertStringContainsString('offset=2', (string) $transport->received[1]->getUri());
+    }
+
     public function testLimitCapStopsBeforeExhaustingPages(): void
     {
         // limit=2 with a big first page: only 2 items are yielded and no second request is made.

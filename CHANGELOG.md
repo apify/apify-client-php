@@ -2,25 +2,12 @@
 
 ## 0.13.0
 
-- Synced with Apify OpenAPI spec `v2-2026-11-04T151257Z`. `ActorVersion::getActorPath()` reads the new `actorPath`
-  of a `SOURCE_FILES` or `TARBALL` Actor version (the Actor's directory inside a monorepo upload); version create and
-  update bodies take it as any other field. An update that sends `sourceType`, `sourceFiles` or `tarballUrl` without
-  `actorPath` removes the stored path. `Actor::getStandbyUrl()` reads the Actor's `standbyUrl`.
-- Added `ActorClient::server()`, which returns an `ActorServerClient` for Server Actors (formerly Actor Standby):
-  `request()` sends an HTTP request to the Actor's server, `getUrl()` returns the server URL and `getOpenApiSpec()`
-  returns its web server schema. `request()` takes `ActorServerRequestOptions` and returns an `ActorServerResponse`.
-  It carries the token in the `X-Apify-Authorization` header, returns any status of the server, retries only 429 and
-  503, never retries a transport error, and returns a redirect as it is.
-- Added `NoRedirectHttpClientInterface`, implemented by `GuzzleHttpClient`: a transport that can return a redirect as
-  it is. `ActorServerClient::request()` throws `ApifyClientException` before sending anything when the configured
-  transport does not implement it, as `Psr18HttpClient` does not.
-- **Breaking:** `PaginationList::getCount()` of a `DatasetClient::listItems()` page is the number of dataset rows the
-  API scanned (`X-Apify-Pagination-Count`), or the number of items returned when that is larger, instead of always the
-  number of items returned. With `skipEmpty` or `clean` it can be larger than `count($page->getItems())`. The next page
-  starts at `offset + min(count, limit)`.
-- Documented the page size of iteration without `$chunkSize`: each call gets the API's default page size, capped by the
-  remaining `limit`. Dataset items have no default limit, so `iterateItems()` without `$chunkSize` loads the whole
-  dataset, or all `limit` items, in one response.
+- Synced with Apify OpenAPI spec `v2-2026-11-06T140128Z`: `ActorVersion::getActorPath()` and `Actor::getStandbyUrl()`.
+- Added `ActorClient::server()` for Server Actors (formerly Actor Standby): `request()`, `getUrl()` and `getOpenApiSpec()`.
+- Added `NoRedirectHttpClientInterface`, implemented by `GuzzleHttpClient` and needed by `request()`.
+- **Breaking:** `PaginationList::getCount()` of a dataset items page is the scanned rows, or the items returned when larger.
+- Every iterator now steps by the page's `count`, so Store and dataset filters neither repeat nor skip entries.
+- Documented the page size of iteration without `$chunkSize`.
 
 ## 0.12.0
 

@@ -39,7 +39,7 @@ final class TaskCollectionClient
     /**
      * Lazily iterates over the account's tasks, fetching pages on demand. The options' {@code limit}
      * caps the total number of tasks yielded across all pages ({@code null} = all); {@code $chunkSize}
-     * is the per-page size ({@code null} = the server default).
+     * is the per-page size ({@code null} = the API's default page size).
      *
      * @return Generator<int,Task>
      */

@@ -13,7 +13,7 @@ use Psr\Http\Message\ResponseInterface;
  *
  * {@see \Apify\Client\Resource\ActorServerClient::request()} needs it: that request carries the API token,
  * which must never follow a redirect to a host the Actor's code picked. A transport that does not implement
- * this interface can still be used for everything else, but {@code request()} fails before it sends anything.
+ * this interface can still be used for everything else, but {@code request()} fails before it sends anything to the Actor's server.
  * {@see GuzzleHttpClient} implements it. {@see Psr18HttpClient} does not, since a PSR-18 client decides on
  * its own whether to follow redirects.
  */

@@ -39,7 +39,7 @@ final class KeyValueStoreCollectionClient
     /**
      * Lazily iterates over key-value stores, fetching pages on demand. The options' {@code limit}
      * caps the total number of stores yielded across all pages ({@code null} = all); {@code $chunkSize}
-     * is the per-page size ({@code null} = the server default).
+     * is the per-page size ({@code null} = the API's default page size).
      *
      * @return Generator<int,KeyValueStore>
      */

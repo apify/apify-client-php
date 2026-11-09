@@ -16,7 +16,7 @@ use Psr\Http\Message\StreamInterface;
  */
 final class ActorServerResponse
 {
-    private const JSON_CONTENT_TYPE_PATTERN = '#^application/(?:[\w.+-]+\+)?json\b#i';
+    private const JSON_CONTENT_TYPE_PATTERN = '#^application/(?:[\w.+-]+\+)?json(?:\s*;|\s*$)#i';
 
     /** @internal */
     public function __construct(private ResponseInterface $response)

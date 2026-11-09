@@ -81,7 +81,7 @@ request body is sent uncompressed unless the `compression` option is set.
 
 The default `GuzzleHttpClient` can return a redirect as it is. A custom [`HttpClientInterface`](../README.md) must also
 implement `NoRedirectHttpClientInterface` to be used for `request()`, which otherwise throws `ApifyClientException`
-before it sends anything. `Psr18HttpClient` does not implement it, since a PSR-18 client decides on its own whether to
+before it sends anything to the Actor's server. `Psr18HttpClient` does not implement it, since a PSR-18 client decides on its own whether to
 follow redirects.
 
 `ActorServerResponse` offers `getStatusCode()`, `isSuccessful()`, `getHeaders()`, `getHeaderLine($name)`, `getBody()`

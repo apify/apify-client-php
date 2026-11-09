@@ -151,6 +151,9 @@ $psr18 = new \GuzzleHttp\Client(['timeout' => 120]); // any Psr\Http\Message Cli
 $client = new ApifyClient(token: 'my-api-token', httpClient: new Psr18HttpClient($psr18));
 ```
 
+`ActorClient::server()->request()` needs a transport that can return a redirect as it is, so it throws with `Psr18HttpClient`
+or any custom transport that does not also implement `NoRedirectHttpClientInterface`. See [Server Actors](docs/actors.md).
+
 ## Error handling
 
 Methods that fetch a single resource by ID return `null` when the resource does not exist (rather
