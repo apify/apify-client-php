@@ -103,7 +103,7 @@ final class KeyValueStoreClient
      * The options' {@code limit} caps the total number of keys yielded across all pages ({@code null}
      * or {@code 0} = all); {@code exclusiveStartKey} starts the listing after a given key; {@code prefix} and
      * {@code collection} restrict which keys are listed. {@code $chunkSize} caps how many keys are
-     * requested per page ({@code null} = the remaining total cap, or the server default when
+     * requested per page ({@code null} = the remaining total cap, or the API's default page size when
      * unbounded) — the two are independent, matching the offset/limit collection iterators.
      *
      * @return Generator<int,KeyValueStoreKey>

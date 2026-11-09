@@ -115,6 +115,19 @@ For `actor()->lastRun()` / `task()->lastRun()`.
 | `status` | `?string` | Restrict to the last run with this status (e.g. `SUCCEEDED`). |
 | `origin` | `?string` | Restrict to the last run started via this origin. |
 
+## Server Actors
+
+### `ActorServerRequestOptions`
+For `actor($id)->server()->request()`.
+| Field | Type | Description |
+|---|---|---|
+| `method` | `?string` | HTTP method (default `GET`). |
+| `params` | `array<string,mixed>\|null` | Query parameters, converted as for API calls: `null` values are left out, booleans are sent as `1`/`0` and a list is joined with commas. |
+| `headers` | `array<string,string>\|null` | Additional headers, `Authorization` included. They reach the Actor's server as they are. |
+| `body` | `mixed` | The request body: an array (or any other JSON-serializable value) is sent as JSON, a string as it is. |
+| `compression` | `string\|HttpCompressorInterface\|null` | `'brotli'`, `'gzip'` or a custom compressor for the request body. Unset sends the body uncompressed, since the Actor's server may not decode a compressed body. |
+| `stream` | `bool` | Leave the response body unread, so it can be consumed incrementally with `ActorServerResponse::getBodyStream()`. The connection stays open until the body is read to the end or closed. |
+
 ## Running Actors and tasks
 
 ### `ActorStartOptions`

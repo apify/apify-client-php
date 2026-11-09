@@ -29,6 +29,8 @@ final class ActorClient
 {
     private ResourceContext $ctx;
 
+    private ?ActorServerClient $serverClient = null;
+
     /** @internal */
     public function __construct(
         private ApifyClient $root,
@@ -217,5 +219,19 @@ final class ActorClient
     public function webhooks(): NestedWebhookCollectionClient
     {
         return new NestedWebhookCollectionClient($this->http, $this->ctx->subUrl(''));
+    }
+
+    /**
+     * Returns a client for the server interface of this Actor.
+     *
+     * A Server Actor (formerly Actor Standby) runs a web server, its server interface, that is called over
+     * HTTP without starting a run for each call. Every call returns the same client, so the server URL it
+     * fetches is reused.
+     *
+     * @see https://docs.apify.com/platform/actors/running/standby
+     */
+    public function server(): ActorServerClient
+    {
+        return $this->serverClient ??= new ActorServerClient($this->http, $this->baseUrl, $this->id);
     }
 }

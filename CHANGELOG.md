@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0
+
+- Synced with Apify OpenAPI spec `v2-2026-11-06T140128Z`: `ActorVersion::getActorPath()` and `Actor::getStandbyUrl()`.
+- Added `ActorClient::server()` for Server Actors (formerly Actor Standby): `request()`, `getUrl()` and `getOpenApiSpec()`.
+- Added `NoRedirectHttpClientInterface`, implemented by `GuzzleHttpClient` and needed by `request()`.
+- **Breaking:** `PaginationList::getCount()` of a dataset items page is the scanned rows, or the items returned when larger.
+- Offset iterators, dataset items included, step by the page's `count`, so Store and dataset filters neither repeat nor skip entries.
+- Documented the page size of iteration without `$chunkSize`.
+
 ## 0.12.0
 
 - Synced with Apify OpenAPI spec `v2-2026-11-01T214220Z`. Response models return the new fields as

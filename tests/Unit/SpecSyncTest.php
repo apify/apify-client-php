@@ -6,6 +6,7 @@ namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\Json;
+use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\RunListOptions;
 use Apify\Client\Options\StoreListOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -156,5 +157,91 @@ final class SpecSyncTest extends TestCase
         self::assertNotNull($request);
         self::assertSame('r1', $request->getId());
         self::assertNull($request->get('handledAt'));
+    }
+
+    /** @return iterable<string,array{array<string,string>,int}> */
+    public static function datasetPageCounts(): iterable
+    {
+        yield 'scanned rows above the items returned (skipEmpty/clean)' => [['X-Apify-Pagination-Count' => '5'], 5];
+        yield 'items returned above the scanned rows (a lagging item count)' => [['X-Apify-Pagination-Count' => '1'], 3];
+        yield 'equal' => [['X-Apify-Pagination-Count' => '3'], 3];
+        yield 'header missing' => [[], 3];
+    }
+
+    /** @param array<string,string> $headers */
+    #[DataProvider('datasetPageCounts')]
+    public function testDatasetItemsPageCountIsTheScannedRowsOrTheItemsReturnedWhicheverIsLarger(array $headers, int $expected): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode([['n' => 0], ['n' => 1], ['n' => 2]]), $headers);
+
+        $page = $this->client($transport)->dataset('ds')->listItems();
+
+        self::assertCount(3, $page->getItems());
+        self::assertSame($expected, $page->getCount());
+    }
+
+    public function testDatasetIterationStepsByTheScannedRowsCappedAtTheRequestedLimit(): void
+    {
+        // Page 1 scans 3 rows and returns 1 item (the filter dropped two). Page 2 is an unwound page that
+        // returns 4 items for the 2 rows it was asked for, so the step is capped at its limit of 2.
+        $transport = (new MockTransport())
+            ->queueResponse(200, Json::encode([['n' => 0]]), ['X-Apify-Pagination-Count' => '3'])
+            ->queueResponse(200, Json::encode([['n' => 3], ['n' => 3], ['n' => 4], ['n' => 4]]), ['X-Apify-Pagination-Count' => '2'])
+            ->queueResponse(200, Json::encode([]), ['X-Apify-Pagination-Count' => '0']);
+
+        $items = iterator_to_array($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(limit: 5), 3), false);
+
+        self::assertCount(5, $items);
+        self::assertStringContainsString('offset=3', (string) $transport->received[1]->getUri());
+        self::assertStringContainsString('limit=2', (string) $transport->received[1]->getUri());
+        self::assertSame(2, $transport->callCount());
+    }
+
+    public function testActorVersionActorPathIsSentOnCreateAndUpdateAndReadBack(): void
+    {
+        $created = ['versionNumber' => '0.1', 'sourceType' => 'SOURCE_FILES', 'actorPath' => 'actors/typescript-actor'];
+        $transport = (new MockTransport())
+            ->queueResponse(201, Json::encode(['data' => $created]))
+            ->queueResponse(200, Json::encode(['data' => ['versionNumber' => '0.1', 'sourceType' => 'SOURCE_FILES', 'actorPath' => null]]))
+            ->queueResponse(200, Json::encode(['data' => ['versionNumber' => '0.1', 'sourceType' => 'GIT_REPO']]));
+        $actor = $this->client($transport)->actor('a1');
+
+        $version = $actor->versions()->create($created);
+        self::assertSame($created, Json::decode(MockTransport::readBody($transport->lastRequest())));
+        self::assertSame('actors/typescript-actor', $version->getActorPath());
+
+        // A null actorPath removes the stored path, so it is sent as an explicit null.
+        $updated = $actor->version('0.1')->update(['actorPath' => null]);
+        self::assertSame('{"actorPath":null}', MockTransport::readBody($transport->lastRequest()));
+        self::assertSame('PUT', $transport->lastRequest()->getMethod());
+        self::assertNull($updated->getActorPath());
+
+        self::assertNull($actor->version('0.1')->update(['buildTag' => 'beta'])->getActorPath());
+    }
+
+    public function testActorStandbyUrlAndTheStandbyFieldsAreReadAsReceived(): void
+    {
+        $standby = ['isEnabled' => true, 'tenancy' => 'MULTI_TENANT', 'isConsoleAuthEnabled' => false, 'isTokenlessEnabled' => null];
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => [
+            'id' => 'a1',
+            'standbyUrl' => 'https://jane--my-actor.apify.actor',
+            'actorStandby' => $standby,
+        ]]));
+
+        $actor = $this->client($transport)->actor('a1')->get();
+
+        self::assertNotNull($actor);
+        self::assertSame('https://jane--my-actor.apify.actor', $actor->getStandbyUrl());
+        self::assertSame($standby, $actor->get('actorStandby'));
+    }
+
+    public function testActorWithoutStandbyHasNoStandbyUrl(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'a1', 'standbyUrl' => null]]));
+
+        $actor = $this->client($transport)->actor('a1')->get();
+
+        self::assertNotNull($actor);
+        self::assertNull($actor->getStandbyUrl());
     }
 }

@@ -18,7 +18,7 @@ use Psr\Http\Message\ResponseInterface;
  * are returned as normal responses ({@code http_errors} disabled); only connection/timeout failures
  * are thrown as {@see TransportException}.
  */
-final class GuzzleHttpClient implements HttpClientInterface
+final class GuzzleHttpClient implements NoRedirectHttpClientInterface
 {
     /** Connection-establishment timeout (distinct from the per-request timeout the client applies). */
     private const CONNECT_TIMEOUT_SECS = 30.0;
@@ -32,20 +32,25 @@ final class GuzzleHttpClient implements HttpClientInterface
 
     public function send(RequestInterface $request, float $timeoutSecs): ResponseInterface
     {
-        return $this->doSend($request, $timeoutSecs, false);
+        return $this->doSend($request, $timeoutSecs, false, true);
     }
 
     public function sendStreaming(RequestInterface $request, float $timeoutSecs): ResponseInterface
     {
-        return $this->doSend($request, $timeoutSecs, true);
+        return $this->doSend($request, $timeoutSecs, true, true);
     }
 
-    private function doSend(RequestInterface $request, float $timeoutSecs, bool $stream): ResponseInterface
+    public function sendWithoutRedirects(RequestInterface $request, float $timeoutSecs, bool $stream = false): ResponseInterface
+    {
+        return $this->doSend($request, $timeoutSecs, $stream, false);
+    }
+
+    private function doSend(RequestInterface $request, float $timeoutSecs, bool $stream, bool $followRedirects): ResponseInterface
     {
         try {
             return $this->client->send($request, [
                 'http_errors' => false,
-                'allow_redirects' => true,
+                'allow_redirects' => $followRedirects,
                 'connect_timeout' => self::CONNECT_TIMEOUT_SECS,
                 'timeout' => $timeoutSecs,
                 'stream' => $stream,

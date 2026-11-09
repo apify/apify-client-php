@@ -90,6 +90,34 @@ final class ActorIntegrationTest extends IntegrationTestCase
         }
     }
 
+    public function testActorVersionActorPathIsStoredAndRemoved(): void
+    {
+        $client = $this->requireClient();
+        $created = $client->actors()->create(self::minimalActor(self::uniqueName('actor-path')));
+        try {
+            $actor = $client->actor((string) $created->getId());
+            $version = $actor->versions()->create([
+                'versionNumber' => '0.1',
+                'sourceType' => 'SOURCE_FILES',
+                'buildTag' => 'latest',
+                'sourceFiles' => [],
+                'actorPath' => 'actors/typescript-actor',
+            ]);
+            self::assertSame('actors/typescript-actor', $version->getActorPath());
+            self::assertSame('actors/typescript-actor', $actor->version('0.1')->get()?->getActorPath());
+
+            // An update of other fields keeps the path.
+            $kept = $actor->version('0.1')->update(['buildTag' => 'beta']);
+            self::assertSame('actors/typescript-actor', $kept->getActorPath());
+
+            // An upload without `actorPath` removes it.
+            $removed = $actor->version('0.1')->update(['sourceType' => 'SOURCE_FILES', 'sourceFiles' => []]);
+            self::assertNull($removed->getActorPath());
+        } finally {
+            $client->actor((string) $created->getId())->delete();
+        }
+    }
+
     public function testIterateActors(): void
     {
         $client = $this->requireClient();

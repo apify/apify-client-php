@@ -6,6 +6,7 @@ namespace Apify\Client\Tests\Unit;
 
 use Apify\Client\Exception\TransportException;
 use Apify\Client\Http\HttpClientInterface;
+use Apify\Client\Http\NoRedirectHttpClientInterface;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -14,15 +15,22 @@ use RuntimeException;
 /**
  * A scripted {@see HttpClientInterface} for offline unit tests. Each queued entry is either a
  * {@see ResponseInterface} to return or a {@see TransportException} to throw, consumed in order.
- * All received requests are recorded for assertions.
+ * All received requests are recorded for assertions, together with whether each one was sent streaming
+ * and whether it was sent with redirects disabled.
  */
-final class MockTransport implements HttpClientInterface
+final class MockTransport implements NoRedirectHttpClientInterface
 {
     /** @var list<ResponseInterface|TransportException> */
     private array $queue = [];
 
     /** @var list<RequestInterface> */
     public array $received = [];
+
+    /** @var list<bool> Whether each received request was sent with redirects disabled, in order. */
+    public array $withoutRedirects = [];
+
+    /** @var list<bool> Whether each received request was sent streaming, in order. */
+    public array $streamed = [];
 
     /** @var list<float> The per-request timeout (seconds) each call was made with, in order. */
     public array $timeouts = [];
@@ -92,8 +100,15 @@ final class MockTransport implements HttpClientInterface
 
     public function send(RequestInterface $request, float $timeoutSecs): ResponseInterface
     {
+        return $this->record($request, $timeoutSecs, false, false);
+    }
+
+    private function record(RequestInterface $request, float $timeoutSecs, bool $stream, bool $withoutRedirects): ResponseInterface
+    {
         $this->received[] = $request;
         $this->timeouts[] = $timeoutSecs;
+        $this->streamed[] = $stream;
+        $this->withoutRedirects[] = $withoutRedirects;
         if ($this->queue === []) {
             throw new RuntimeException('MockTransport queue is empty');
         }
@@ -106,6 +121,11 @@ final class MockTransport implements HttpClientInterface
 
     public function sendStreaming(RequestInterface $request, float $timeoutSecs): ResponseInterface
     {
-        return $this->send($request, $timeoutSecs);
+        return $this->record($request, $timeoutSecs, true, false);
+    }
+
+    public function sendWithoutRedirects(RequestInterface $request, float $timeoutSecs, bool $stream = false): ResponseInterface
+    {
+        return $this->record($request, $timeoutSecs, $stream, true);
     }
 }

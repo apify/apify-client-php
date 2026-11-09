@@ -136,7 +136,7 @@ final class RequestQueueClient
 
     /**
      * Returns the requests at the head (front) of the queue, up to {@code $limit} ({@code null} for
-     * the server default).
+     * the API's default limit).
      */
     public function listHead(?int $limit = null, int|float|string|null $timeoutSecs = null): RequestQueueHead
     {

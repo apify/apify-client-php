@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Internal;
 
 use Apify\Client\Exception\ApifyApiException;
+use Apify\Client\Exception\ApifyClientException;
 use Apify\Client\Exception\ConflictException;
 use Apify\Client\Exception\ForbiddenException;
 use Apify\Client\Exception\InvalidRequestException;
@@ -15,6 +16,7 @@ use Apify\Client\Exception\TransportException;
 use Apify\Client\Exception\UnauthorizedException;
 use Apify\Client\Http\HttpClientInterface;
 use Apify\Client\Http\HttpCompressorInterface;
+use Apify\Client\Http\NoRedirectHttpClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -77,6 +79,10 @@ final class HttpClientCore
      * Sends a request with auth, User-Agent and the retry policy applied.
      *
      * @param array<string,string> $extraHeaders
+     * @param RequestPolicy|null   $policy       per-request deviations from the defaults of a call to the API
+     *                                           ({@code null} keeps them)
+     *
+     * @throws ApifyClientException if the policy forbids following redirects and the transport cannot comply
      */
     public function call(
         string $method,
@@ -85,10 +91,23 @@ final class HttpClientCore
         string $contentType = '',
         ?float $timeoutSecs = null,
         bool $doNotRetryTimeouts = false,
-        array $extraHeaders = []
+        array $extraHeaders = [],
+        ?RequestPolicy $policy = null
     ): ResponseInterface {
+        $policy ??= new RequestPolicy();
+        // Refuse before sending anything: a transport that follows redirects would hand the token to another host.
+        if (!$policy->followRedirects && !$this->transport instanceof NoRedirectHttpClientInterface) {
+            throw new ApifyClientException(sprintf(
+                'The HTTP client %s cannot disable redirects, which this request needs to keep the API token from following one. Use a client that implements %s, such as the default GuzzleHttpClient.',
+                $this->transport::class,
+                NoRedirectHttpClientInterface::class
+            ));
+        }
+
         // Compress the body once, up front, so every retry reuses the already-compressed payload.
-        [$body, $extraHeaders] = $this->maybeCompressBody($body, $contentType, $extraHeaders);
+        if ($policy->compression !== false) {
+            [$body, $extraHeaders] = $this->maybeCompressBody($body, $contentType, $extraHeaders, $policy->compression ?? $this->compressor);
+        }
 
         $delayMillis = $this->retry->minDelayMillis;
         $maxAttempts = $this->retry->maxRetries + 1;
@@ -104,18 +123,25 @@ final class HttpClientCore
                     $body,
                     $contentType,
                     $extraHeaders,
-                    $this->attemptTimeout($baseTimeout, $attempt)
+                    $this->attemptTimeout($baseTimeout, $attempt),
+                    $policy
                 );
                 $status = $response->getStatusCode();
                 if ($status < self::MAX_SUCCESS_STATUS) {
                     return $response;
                 }
+                $retryable = self::isStatusRetryable($status, $policy->retryStatusCodes);
+                // The caller handles the error response itself once no retry follows, so its body stays unread.
+                if (!$policy->throwOnErrorStatus && (!$retryable || $attempt === $maxAttempts)) {
+                    return $response;
+                }
                 $lastError = self::buildApiError($status, (string) $response->getBody(), $attempt, $method, $path);
-                $retryable = self::isStatusRetryable($status);
+                $response->getBody()->close();
             } catch (TransportException $e) {
                 $lastError = $e;
-                // Network/timeout failures are retryable, unless the caller opted out of retrying timeouts.
-                $retryable = !($doNotRetryTimeouts && $e->isTimeout());
+                // Network/timeout failures are retryable, unless the caller opted out of retrying timeouts or
+                // of retrying transport errors at all.
+                $retryable = $policy->retryTransportErrors && !($doNotRetryTimeouts && $e->isTimeout());
             }
 
             if (!$retryable || $attempt === $maxAttempts) {
@@ -137,34 +163,34 @@ final class HttpClientCore
      * double-compressed. A body whose {@code $contentType} already carries its own compression (media,
      * archives, fonts, ...) is left uncompressed too — see {@see Compression::isCompressibleContentType()}.
      *
-     * Uses the configured {@see $compressor} when one was given to the constructor (the {@code
-     * compression} option of {@see \Apify\Client\ApifyClient}); otherwise falls back to the client's
+     * Uses {@code $compressor} when one is given: the one the caller configured on the constructor (the
+     * {@code compression} option of {@see \Apify\Client\ApifyClient}) or a per-request one; otherwise falls back to the client's
      * default best-effort choice ({@see Compression::maybeCompress()}: brotli, falling back to gzip).
      *
      * @param array<string,string> $extraHeaders
+     * @param HttpCompressorInterface|null $compressor the compressor to use, {@code null} for the default choice
      * @return array{0: string|null, 1: array<string,string>}
      */
-    private function maybeCompressBody(?string $body, string $contentType, array $extraHeaders): array
+    private function maybeCompressBody(?string $body, string $contentType, array $extraHeaders, ?HttpCompressorInterface $compressor): array
     {
         if ($body === null
             || self::hasHeader($extraHeaders, 'Content-Encoding')
-            || !Compression::isCompressibleContentType($contentType)
+            || !Compression::isCompressibleContentType(self::headerValue($extraHeaders, 'Content-Type') ?? $contentType)
         ) {
             return [$body, $extraHeaders];
         }
 
-        if ($this->compressor !== null) {
+        if ($compressor !== null) {
             // A configured compressor has no built-in size gate of its own (unlike
             // Compression::maybeCompress() below), so it is applied here.
             if (strlen($body) < Compression::MIN_COMPRESS_BYTES) {
                 return [$body, $extraHeaders];
             }
-            $compressedBody = $this->compressor->compress($body);
+            $compressedBody = $compressor->compress($body);
             if ($compressedBody === null) {
                 return [$body, $extraHeaders];
             }
-            $extraHeaders['Content-Encoding'] = $this->compressor->contentEncoding();
-            return [$compressedBody, $extraHeaders];
+            return [$compressedBody, self::withContentEncoding($extraHeaders, $compressor->contentEncoding())];
         }
 
         $compressed = Compression::maybeCompress($body);
@@ -173,8 +199,25 @@ final class HttpClientCore
         }
 
         [$encoding, $compressedBody] = $compressed;
-        $extraHeaders['Content-Encoding'] = $encoding;
-        return [$compressedBody, $extraHeaders];
+        return [$compressedBody, self::withContentEncoding($extraHeaders, $encoding)];
+    }
+
+    /**
+     * Marks a body as compressed and drops any caller-set {@code Content-Length}, which describes the
+     * uncompressed body; the transport computes the real one.
+     *
+     * @param array<string,string> $headers
+     * @return array<string,string>
+     */
+    private static function withContentEncoding(array $headers, string $encoding): array
+    {
+        foreach (array_keys($headers) as $name) {
+            if (strcasecmp($name, 'Content-Length') === 0) {
+                unset($headers[$name]);
+            }
+        }
+        $headers['Content-Encoding'] = $encoding;
+        return $headers;
     }
 
     /**
@@ -184,18 +227,28 @@ final class HttpClientCore
      */
     private static function hasHeader(array $headers, string $name): bool
     {
-        foreach (array_keys($headers) as $key) {
+        return self::headerValue($headers, $name) !== null;
+    }
+
+    /**
+     * Case-insensitive lookup of a header value, {@code null} if the header is not set.
+     *
+     * @param array<string,string> $headers
+     */
+    private static function headerValue(array $headers, string $name): ?string
+    {
+        foreach ($headers as $key => $value) {
             if (strcasecmp($key, $name) === 0) {
-                return true;
+                return $value;
             }
         }
-        return false;
+        return null;
     }
 
     /** Opens a live streaming response (single attempt, no retry). Used by log streaming. */
     public function stream(string $url): ResponseInterface
     {
-        $request = $this->buildRequest('GET', $url, null, '', []);
+        $request = $this->buildRequest('GET', $url, null, '', [], RequestPolicy::AUTHORIZATION_HEADER);
         return $this->transport->sendStreaming($request, $this->retry->timeoutSecs);
     }
 
@@ -203,18 +256,20 @@ final class HttpClientCore
      * Builds a fully-prepared PSR-7 request with auth, User-Agent, content type and extra headers.
      *
      * @param array<string,string> $extraHeaders
+     * @param string               $authorizationHeader the header that carries the token
      */
     private function buildRequest(
         string $method,
         string $url,
         ?string $body,
         string $contentType,
-        array $extraHeaders
+        array $extraHeaders,
+        string $authorizationHeader
     ): RequestInterface {
         $request = $this->requestFactory->createRequest($method, $url)
             ->withHeader('User-Agent', $this->userAgent);
         if ($this->token !== null && $this->token !== '') {
-            $request = $request->withHeader('Authorization', 'Bearer ' . $this->token);
+            $request = $request->withHeader($authorizationHeader, 'Bearer ' . $this->token);
         }
         if ($contentType !== '') {
             $request = $request->withHeader('Content-Type', $contentType);
@@ -237,10 +292,17 @@ final class HttpClientCore
         ?string $body,
         string $contentType,
         array $extraHeaders,
-        float $timeoutSecs
+        float $timeoutSecs,
+        RequestPolicy $policy
     ): ResponseInterface {
-        $request = $this->buildRequest($method, $url, $body, $contentType, $extraHeaders);
-        return $this->transport->send($request, $timeoutSecs);
+        $request = $this->buildRequest($method, $url, $body, $contentType, $extraHeaders, $policy->authorizationHeader);
+        // `call()` has already checked that a transport asked not to follow redirects can do that.
+        if (!$policy->followRedirects && $this->transport instanceof NoRedirectHttpClientInterface) {
+            return $this->transport->sendWithoutRedirects($request, $timeoutSecs, $policy->stream);
+        }
+        return $policy->stream
+            ? $this->transport->sendStreaming($request, $timeoutSecs)
+            : $this->transport->send($request, $timeoutSecs);
     }
 
     /**
@@ -264,8 +326,17 @@ final class HttpClientCore
         return min($scaled, $cap);
     }
 
-    private static function isStatusRetryable(int $status): bool
+    /**
+     * Whether a response status is retried: the statuses a request lists itself, or by default rate limits
+     * (429) and server errors (5xx).
+     *
+     * @param list<int>|null $retryStatusCodes
+     */
+    private static function isStatusRetryable(int $status, ?array $retryStatusCodes): bool
     {
+        if ($retryStatusCodes !== null) {
+            return in_array($status, $retryStatusCodes, true);
+        }
         return $status === self::RATE_LIMIT_EXCEEDED || $status >= self::MIN_SERVER_ERROR;
     }
 

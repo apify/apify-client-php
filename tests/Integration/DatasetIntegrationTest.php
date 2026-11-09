@@ -64,16 +64,8 @@ final class DatasetIntegrationTest extends IntegrationTestCase
             $dataset = $client->dataset((string) $ds->getId());
             $dataset->pushItems([['n' => 0], ['n' => 1], ['n' => 2], ['n' => 3], ['n' => 4]]);
 
-            // The dataset's item total is computed asynchronously and can briefly lag a write.
-            // iterateItems() pages by the reported total (matching the reference client), so wait for
-            // the count to settle before iterating; otherwise a stale total would stop it early.
-            $deadline = microtime(true) + 30.0;
-            while (
-                $dataset->listItems(new DatasetListItemsOptions())->getTotal() < 5
-                && microtime(true) < $deadline
-            ) {
-                usleep(500_000);
-            }
+            // The dataset's item count lags a write, so wait for it to settle before iterating.
+            self::waitForDatasetItemCount($dataset, 5);
 
             $values = [];
             // chunkSize=2 across 5 items => three pages (2, 2, 1).
@@ -104,6 +96,28 @@ final class DatasetIntegrationTest extends IntegrationTestCase
 
             self::assertSame($buffered, $streamed);
             self::assertStringContainsString('n', $buffered);
+        } finally {
+            $client->dataset((string) $ds->getId())->delete();
+        }
+    }
+
+    public function testListItemsCountReportsTheScannedRowsWhenAFilterDropsItems(): void
+    {
+        $client = $this->requireClient();
+        $ds = $client->datasets()->getOrCreate(self::uniqueName('ds-count'));
+        try {
+            $dataset = $client->dataset((string) $ds->getId());
+            $dataset->pushItems([['n' => 1], new \stdClass(), ['n' => 3], new \stdClass(), ['n' => 5]]);
+
+            self::waitForDatasetItemCount($dataset, 5);
+            $page = $dataset->listItems(new DatasetListItemsOptions(skipEmpty: true));
+            self::assertSame([1, 3, 5], array_column($page->getItems(), 'n'));
+            // `count` is the five rows scanned, not the three items returned.
+            self::assertSame(5, $page->getCount());
+
+            // The iterator steps by the scanned rows, so it neither repeats nor skips an item.
+            $iterated = iterator_to_array($dataset->iterateItems(new DatasetListItemsOptions(skipEmpty: true), 2), false);
+            self::assertSame([1, 3, 5], array_column($iterated, 'n'));
         } finally {
             $client->dataset((string) $ds->getId())->delete();
         }

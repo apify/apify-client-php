@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Apify\Client\Tests\Integration;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Options\DatasetListItemsOptions;
+use Apify\Client\Resource\DatasetClient;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -102,6 +104,21 @@ abstract class IntegrationTestCase extends TestCase
         // instead of relying on an early return, which PHPUnit flags as a "risky" no-assertion test.
         foreach ($expectedIds as $id) {
             self::assertArrayHasKey($id, $seen, "iterate() did not yield $label $id after retrying");
+        }
+    }
+
+    /**
+     * Waits until the dataset reports at least {@code $expectedItems} items. The dataset's item count,
+     * which its total and its scanned-rows count come from, is computed asynchronously and lags a fresh
+     * push. It re-reads as often as {@see assertEventuallyIterated()} does.
+     */
+    protected static function waitForDatasetItemCount(DatasetClient $dataset, int $expectedItems): void
+    {
+        for ($attempt = 1; $attempt <= self::LISTING_MAX_ATTEMPTS; $attempt++) {
+            if ($dataset->listItems(new DatasetListItemsOptions())->getTotal() >= $expectedItems) {
+                return;
+            }
+            sleep(self::LISTING_RETRY_DELAY_SECS);
         }
     }
 

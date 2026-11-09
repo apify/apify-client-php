@@ -45,7 +45,7 @@ final class RunCollectionClient
     /**
      * Lazily iterates over runs, fetching pages on demand and applying the run-specific filters to
      * every page. The options' {@code limit} caps the total number of runs yielded across all pages
-     * ({@code null} = all); {@code $chunkSize} is the per-page size ({@code null} = the server default).
+     * ({@code null} = all); {@code $chunkSize} is the per-page size ({@code null} = the API's default page size).
      *
      * @return Generator<int,ActorRun>
      */

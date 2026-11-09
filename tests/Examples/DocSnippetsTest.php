@@ -82,6 +82,7 @@ final class DocSnippetsTest extends TestCase
             'Apify\Client\Options\ActorListOptions',
             'Apify\Client\Options\ActorStartOptions',
             'Apify\Client\Options\ActorBuildOptions',
+            'Apify\Client\Options\ActorServerRequestOptions',
             'Apify\Client\Options\ListOptions',
             'Apify\Client\Options\StorageListOptions',
             'Apify\Client\Options\StoreListOptions',

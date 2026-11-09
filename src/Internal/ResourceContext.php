@@ -270,14 +270,16 @@ final class ResourceContext
      * Ports the reference client's paginated iterator ({@code _listPaginatedFromCallback}):
      * {@code $limit} caps the TOTAL number of items yielded across all pages ({@code null} = no cap,
      * i.e. all items), while {@code $chunkSize} caps how many items are requested per page
-     * ({@code null} = the server default). The two are independent — {@code $limit} is never reused
-     * as the page size. {@code $startOffset} is the offset of the first page.
+     * ({@code null} = the API's default page size, capped by the remaining {@code $limit}). The two are
+     * independent: {@code $limit} is never reused as the page size. {@code $startOffset} is the offset
+     * of the first page.
      *
-     * The next offset and the stop condition follow the number of items a page returned (capped at
-     * what that page's request asked for) — never the listing's reported {@code total}, which can grow
-     * while the iteration runs (e.g. a resource collection gaining entries). With no {@code $limit},
-     * the loop therefore always ends with one request that finds no more items, matching the
-     * reference client exactly.
+     * The next offset and the stop condition follow the page's {@see PaginationList::getCount()} (or
+     * the items it returned when larger), capped at the limit requested for that page, never the
+     * listing's reported {@code total}, which can grow while the iteration runs. A page whose
+     * filtered-out entries were still counted (the Store, dataset filters) therefore neither repeats
+     * entries nor ends the iteration early. With no {@code $limit} the loop always ends with one
+     * request that advances by nothing, matching the reference client.
      *
      * @template T
      * @param callable(int,?int):PaginationList<T> $fetchPage receives (offset, pageLimit) and returns that page
@@ -285,57 +287,49 @@ final class ResourceContext
      */
     public static function paginateOffset(int $startOffset, ?int $limit, ?int $chunkSize, callable $fetchPage): Generator
     {
-        // First page: request min(limit, chunkSize) items. A null/0 on either side means "unbounded",
-        // so the other bound wins (mirrors the reference client's minForLimitParam).
-        $firstPageLimit = self::minLimit($limit, $chunkSize);
-        $page = $fetchPage($startOffset, $firstPageLimit);
-        foreach ($page->getItems() as $item) {
-            yield $item;
-        }
-
-        $pageCount = self::advancedBy($page);
-        $currentOffset = $startOffset + $pageCount;
+        $currentOffset = $startOffset;
         // Items still to yield, or null for "unbounded" (no $limit given).
-        $remaining = ($limit !== null && $limit > 0) ? $limit - $pageCount : null;
-
-        // Two distinct ways to stop: a page that returns nothing (the listing is exhausted), or
-        // $remaining having already reached 0 (the caller's $limit is satisfied) — either ends the loop.
-        while ($pageCount > 0 && ($remaining === null || $remaining > 0)) {
+        $remaining = ($limit !== null && $limit > 0) ? $limit : null;
+        do {
+            // A null/0 on either bound means "unbounded", so the other bound wins (mirrors the
+            // reference client's minForLimitParam).
             $pageLimit = self::minLimit($remaining, $chunkSize);
             $page = $fetchPage($currentOffset, $pageLimit);
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
-            $pageCount = self::advancedBy($page);
-            $currentOffset += $pageCount;
+            $advance = self::advancedBy($page, $pageLimit);
+            $currentOffset += $advance;
             if ($remaining !== null) {
-                $remaining -= $pageCount;
+                $remaining -= $advance;
             }
-        }
+            // Two distinct ways to stop: a page that advances by nothing (the listing is exhausted), or
+            // $remaining having reached 0 (the caller's $limit is satisfied).
+        } while ($advance > 0 && ($remaining === null || $remaining > 0));
     }
 
     /**
-     * How far a page advances the offset: the number of items it returned. Every endpoint still using
-     * this generic loop honors the {@code limit} it was sent — unlike the dataset-items endpoint (see
-     * {@see \Apify\Client\Resource\DatasetClient::scannedRows()}), none of them has an {@code unwind}-
-     * like transform that can make a page return more items than its requested limit, and an endpoint
-     * that ignores {@code offset}/{@code limit} entirely (env vars, Actor versions) bypasses this loop
-     * rather than going through it — so the returned count never needs capping to the requested limit.
+     * How far a page advances the offset: its count or the items it returned, whichever is larger,
+     * capped at the limit requested for it ({@code null} = uncapped).
+     *
+     * The count can exceed the returned items because the API drops entries after counting them (Store
+     * Actors, the dataset {@code skipEmpty} and {@code clean} filters). The items can exceed the count
+     * with {@code unwind}, which returns one item per unwound element. The server never walks more
+     * entries than the requested limit, so the cap keeps such an inflated item count from skipping the
+     * entries between the real and the inflated advance.
      *
      * @template T
      * @param PaginationList<T> $page
      */
-    private static function advancedBy(PaginationList $page): int
+    private static function advancedBy(PaginationList $page, ?int $requestedLimit): int
     {
-        return count($page->getItems());
+        $advance = max($page->getCount(), count($page->getItems()));
+        return $requestedLimit !== null ? min($advance, $requestedLimit) : $advance;
     }
 
     /**
      * Returns the smaller of two optional positive bounds, treating {@code null} or {@code 0} as
      * "unbounded" (the API treats {@code limit=0} as unset). Mirrors the reference minForLimitParam.
-     *
-     * Public so {@see \Apify\Client\Resource\DatasetClient::iterateItems()} can reuse it for its own
-     * scanned-count-aware pagination loop.
      *
      * @internal
      */

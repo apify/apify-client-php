@@ -100,7 +100,13 @@ final class PaginationList implements IteratorAggregate, \Countable
         return $this->limit;
     }
 
-    /** Number of items actually returned in this page. */
+    /**
+     * Number of entries on this page. On a page from {@see \Apify\Client\Resource\DatasetClient::listItems()}
+     * it is the number of dataset rows the API scanned for it, or the number of items returned when that is
+     * larger: filters ({@code clean}, {@code skipEmpty}) can leave it above the number of items. The next
+     * page starts at {@code offset + min(count, limit)}; the cap matters only with {@code unwind}, which can
+     * return more items than the rows scanned.
+     */
     public function getCount(): int
     {
         return $this->count;

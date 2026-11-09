@@ -40,7 +40,7 @@ final class StoreCollectionClient
      * Lazily iterates over Store Actors matching the options, fetching pages on demand.
      *
      * The options' {@code limit} caps the total number of Actors yielded across all pages ({@code
-     * null} = all); {@code $chunkSize} is the per-page size ({@code null} = the server default).
+     * null} = all); {@code $chunkSize} is the per-page size ({@code null} = the API's default page size).
      *
      * @return Generator<int,ActorStoreListItem>
      */

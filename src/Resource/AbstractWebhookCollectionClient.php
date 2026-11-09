@@ -46,7 +46,7 @@ abstract class AbstractWebhookCollectionClient
     /**
      * Lazily iterates over webhooks, fetching pages on demand. The options' {@code limit} caps the
      * total number of webhooks yielded across all pages ({@code null} = all); {@code $chunkSize} is
-     * the per-page size ({@code null} = the server default).
+     * the per-page size ({@code null} = the API's default page size).
      *
      * @return Generator<int,Webhook>
      */
