@@ -61,7 +61,7 @@ final class IterationTest extends TestCase
      */
     private static function actors(int ...$ids): array
     {
-        return array_map(static fn (int $id): array => ['id' => "a$id", 'name' => "actor$id"], $ids);
+        return array_values(array_map(static fn (int $id): array => ['id' => "a$id", 'name' => "actor$id"], $ids));
     }
 
     public function testSinglePageThenEmptyPageEndsIteration(): void

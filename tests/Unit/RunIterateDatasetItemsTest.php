@@ -42,13 +42,13 @@ final class RunIterateDatasetItemsTest extends TestCase
         return ['X-Apify-Pagination-Count' => (string) $count];
     }
 
-    /** @return list<array<int|string,array<mixed>|string>> the query of every request, in order */
+    /** @return list<array<int|string,string>> the query and path of every request, in order */
     private static function queries(MockTransport $transport): array
     {
         $queries = [];
         foreach ($transport->received as $request) {
             parse_str($request->getUri()->getQuery(), $query);
-            $queries[] = $query + ['path' => $request->getUri()->getPath()];
+            $queries[] = array_filter($query, 'is_string') + ['path' => $request->getUri()->getPath()];
         }
         return $queries;
     }
