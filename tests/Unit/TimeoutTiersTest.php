@@ -193,7 +193,7 @@ final class TimeoutTiersTest extends TestCase
         return Json::encode(['data' => ['id' => 'run1', 'status' => $status]]);
     }
 
-    /** @return array<string,string> */
+    /** @return array<int|string,array<mixed>|string> */
     private static function queryOf(MockTransport $transport, int $index): array
     {
         parse_str($transport->received[$index]->getUri()->getQuery(), $query);

@@ -42,7 +42,7 @@ final class RunIterateDatasetItemsTest extends TestCase
         return ['X-Apify-Pagination-Count' => (string) $count];
     }
 
-    /** @return list<array<string,string>> the offset/limit query of every request, in order */
+    /** @return list<array<int|string,array<mixed>|string>> the query of every request, in order */
     private static function queries(MockTransport $transport): array
     {
         $queries = [];

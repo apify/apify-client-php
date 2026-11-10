@@ -57,7 +57,7 @@ final class IterationTest extends TestCase
 
     /**
      * @param int ...$ids
-     * @return list<array<string,mixed>>
+     * @return list<array<string,string>>
      */
     private static function actors(int ...$ids): array
     {

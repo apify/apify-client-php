@@ -55,7 +55,10 @@ final class AmbiguousNotFoundTest extends TestCase
         ];
     }
 
-    /** @dataProvider statusClassProvider */
+    /**
+     * @param class-string $expectedClass
+     * @dataProvider statusClassProvider
+     */
     public function testBuildApiErrorReturnsStatusSpecificSubclass(int $status, string $expectedClass): void
     {
         $error = HttpClientCore::buildApiError($status, $this->notFoundBody('x'), 1, 'GET', '/x');

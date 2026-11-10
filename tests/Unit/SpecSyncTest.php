@@ -23,7 +23,7 @@ final class SpecSyncTest extends TestCase
         return new ApifyClient(token: 't', minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
     }
 
-    /** @return array<string,string> */
+    /** @return array<int|string,array<mixed>|string> */
     private static function queryOf(MockTransport $transport): array
     {
         parse_str($transport->lastRequest()->getUri()->getQuery(), $query);
