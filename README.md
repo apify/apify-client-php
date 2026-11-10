@@ -118,7 +118,7 @@ $client = new ApifyClient(token: 'my-api-token', compression: new GzipHttpCompre
 $client = new ApifyClient(token: 'my-api-token', compression: new ZstdHttpCompressor(quality: 19));
 ```
 
-Brotli and zstd need their PECL extensions. Choosing one without its extension throws `RuntimeException`
+Brotli and zstd need their PECL extensions, and gzip needs `zlib`. Choosing a codec without its extension throws `RuntimeException`
 when the client is created. A custom algorithm is an `Apify\Client\Http\HttpCompressorInterface`
 implementation: `contentEncoding(): string` and `compress(string $body): ?string`, which returns `null` to send
 the body as it is.

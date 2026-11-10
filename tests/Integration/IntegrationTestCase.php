@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Tests\Integration;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Http\HttpClientInterface;
 use Apify\Client\Http\HttpCompressorInterface;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Resource\DatasetClient;
@@ -45,8 +46,10 @@ abstract class IntegrationTestCase extends TestCase
     private const LISTING_RETRY_DELAY_SECS = 3;
 
     /** Returns a configured client, or skips the test if {@code APIFY_TOKEN} is unset. */
-    protected function requireClient(string|HttpCompressorInterface|null $compression = null): ApifyClient
-    {
+    protected function requireClient(
+        string|HttpCompressorInterface|null $compression = null,
+        ?HttpClientInterface $httpClient = null,
+    ): ApifyClient {
         $token = getenv('APIFY_TOKEN');
         if ($token === false || $token === '') {
             self::markTestSkipped('skipping: APIFY_TOKEN is not set');
@@ -55,6 +58,7 @@ abstract class IntegrationTestCase extends TestCase
         return new ApifyClient(
             token: $token,
             baseUrl: self::resolveBaseUrl($apiUrl === false ? null : $apiUrl),
+            httpClient: $httpClient,
             compression: $compression,
         );
     }

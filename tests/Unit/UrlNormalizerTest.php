@@ -17,8 +17,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests of the WHATWG URL normalization of the {@code format: uri} response fields. The expectations are what {@code
- * new URL(x).href} returns.
+ * Tests of the WHATWG URL normalization of the {@code format: uri} response fields. The expectations are what
+ * {@code new URL(x).href} returns.
  */
 final class UrlNormalizerTest extends TestCase
 {

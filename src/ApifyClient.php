@@ -44,7 +44,7 @@ use RuntimeException;
 
 /**
  * The entry point to the Apify API. Create it with an API token, then get a resource client from one of
- * its accessors, for example {@see actor()}, {@see dataset()} or {@see run()}.
+ * its accessors, for example {@see actor()}, {@see dataset()}, or {@see run()}.
  *
  * Requests go through an {@see HttpClientInterface}, by default {@see GuzzleHttpClient}. Pass another one as
  * {@code httpClient}.

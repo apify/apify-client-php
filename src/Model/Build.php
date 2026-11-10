@@ -22,8 +22,8 @@ final class Build extends ApifyResource
     }
 
     /**
-     * The build status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code
-     * TIMED-OUT}, {@code ABORTING}, or {@code ABORTED}.
+     * The build status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT},
+     * {@code TIMED-OUT}, {@code ABORTING}, or {@code ABORTED}.
      */
     public function getStatus(): ?string
     {

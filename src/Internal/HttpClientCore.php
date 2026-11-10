@@ -167,19 +167,9 @@ final class HttpClientCore
             return [$body, $extraHeaders];
         }
 
-        if ($compressor !== null) {
-            // Compression::maybeCompress() applies the size gate itself, a configured compressor does not.
-            if (strlen($body) < Compression::MIN_COMPRESS_BYTES) {
-                return [$body, $extraHeaders];
-            }
-            $compressedBody = $compressor->compress($body);
-            if ($compressedBody === null) {
-                return [$body, $extraHeaders];
-            }
-            return [$compressedBody, self::withContentEncoding($extraHeaders, $compressor->contentEncoding())];
-        }
-
-        $compressed = Compression::maybeCompress($body);
+        $compressed = $compressor !== null
+            ? Compression::compressWith($body, [$compressor])
+            : Compression::maybeCompress($body);
         if ($compressed === null) {
             return [$body, $extraHeaders];
         }

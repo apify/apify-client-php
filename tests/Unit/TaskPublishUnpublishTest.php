@@ -10,7 +10,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Offline tests of {@see \Apify\Client\Resource\TaskClient::publish()} and
- * {@see \Apify\Client\Resource\TaskClient::unpublish()}. Both wrap {@see \Apify\Client\Resource\TaskClient::update()}, so the tests check the request they send.
+ * {@see \Apify\Client\Resource\TaskClient::unpublish()}. Both wrap
+ * {@see \Apify\Client\Resource\TaskClient::update()}, so the tests check the request they send.
  */
 final class TaskPublishUnpublishTest extends TestCase
 {

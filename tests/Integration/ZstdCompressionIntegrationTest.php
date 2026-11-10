@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Apify\Client\Tests\Integration;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Http\GuzzleHttpClient;
+use Apify\Client\Http\HttpClientInterface;
 use Apify\Client\Http\ZstdHttpCompressor;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Sends zstd-compressed request bodies to the live API. Skipped without the PECL {@code zstd} extension, which
@@ -13,7 +17,10 @@ use Apify\Client\Http\ZstdHttpCompressor;
  */
 final class ZstdCompressionIntegrationTest extends IntegrationTestCase
 {
-    /** A JSON body well above the compression threshold. High-entropy padding keeps it large after compression. */
+    /** @var list<string> the {@code Content-Encoding} of every request that was sent, in order */
+    private array $encodings = [];
+
+    /** A JSON body above the compression threshold. Random padding keeps it from being small to begin with. */
     private static function largeJson(): string
     {
         $json = json_encode(['hello' => 'world', 'padding' => bin2hex(random_bytes(2048))]);
@@ -26,7 +33,25 @@ final class ZstdCompressionIntegrationTest extends IntegrationTestCase
         if (!ZstdHttpCompressor::isAvailable()) {
             self::markTestSkipped('the PECL zstd extension is not loaded');
         }
-        return $this->requireClient('zstd');
+        $encodings = &$this->encodings;
+        $recorder = new class (new GuzzleHttpClient(), $encodings) implements HttpClientInterface {
+            /** @param list<string> $encodings */
+            public function __construct(private HttpClientInterface $inner, private array &$encodings)
+            {
+            }
+
+            public function send(RequestInterface $request, float $timeoutSecs): ResponseInterface
+            {
+                $this->encodings[] = $request->getHeaderLine('Content-Encoding');
+                return $this->inner->send($request, $timeoutSecs);
+            }
+
+            public function sendStreaming(RequestInterface $request, float $timeoutSecs): ResponseInterface
+            {
+                return $this->inner->sendStreaming($request, $timeoutSecs);
+            }
+        };
+        return $this->requireClient('zstd', $recorder);
     }
 
     public function testKeyValueStoreRecordIsStoredFromAZstdBody(): void
@@ -42,6 +67,7 @@ final class ZstdCompressionIntegrationTest extends IntegrationTestCase
             $record = $kvs->getRecord('OUTPUT');
             self::assertNotNull($record);
             self::assertSame($json, $record->getValue());
+            self::assertContains('zstd', $this->encodings);
         } finally {
             $client->keyValueStore((string) $store->getId())->delete();
         }
@@ -61,6 +87,7 @@ final class ZstdCompressionIntegrationTest extends IntegrationTestCase
             $stored = $items->listItems()->getItems();
             self::assertSame([1, 2], array_column($stored, 'n'));
             self::assertSame($padding, $stored[0]['padding']);
+            self::assertContains('zstd', $this->encodings);
         } finally {
             $client->dataset((string) $dataset->getId())->delete();
         }

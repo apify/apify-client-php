@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Apify\Client\Model;
 
 /**
- * Requests from the head of a queue, locked for exclusive processing. Returned by {@see
- * \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
+ * Requests from the head of a queue, locked for exclusive processing. Returned by
+ * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
  */
 final class LockedRequestQueueHead
 {

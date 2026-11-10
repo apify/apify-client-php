@@ -46,8 +46,8 @@ final class DatasetListItemsOptions
     }
 
     /**
-     * A copy with a new {@code offset} and {@code limit} and the same other fields. Used by {@see
-     * \Apify\Client\Resource\DatasetClient::iterateItems()}.
+     * A copy with a new {@code offset} and {@code limit} and the same other fields. Used by
+     * {@see \Apify\Client\Resource\DatasetClient::iterateItems()}.
      */
     public function withPagination(?int $offset, ?int $limit): self
     {

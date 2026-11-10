@@ -1,9 +1,7 @@
-# Level 6 checks the native and PHPDoc types of the typed public surface. Level 7 adds partly wrong union types,
-# level 8 method calls and property reads on nullable values, and level 9 strict handling of `mixed`. The client
-# exposes `mixed` on purpose at the API boundary (JSON input, record values, `toArray()`), which only level 9
-# would flag. The code has not been checked against levels 7 and 8.
+# Level 8 checks types, nullable access, and union types. Level 9 adds strict `mixed` handling, which the client
+# does not use, since it exposes `mixed` on purpose at the API boundary (JSON input, record values, `toArray()`).
 parameters:
-    level: 6
+    level: 8
     paths:
         - src
         - tests
