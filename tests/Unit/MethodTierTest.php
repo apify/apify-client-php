@@ -11,11 +11,7 @@ use Apify\Client\Model\RequestQueueRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Pins the default timeout tier of the methods whose tier differs from the one a reader might expect,
- * to the tier the reference client assigns them. The default tiers last 5s (short), 30s (medium) and
- * 360s (long).
- */
+/** Pins the default timeout tier of the methods whose tier is easy to get wrong: short 5 s, medium 30 s, long 360 s. */
 final class MethodTierTest extends TestCase
 {
     private const SHORT = 5.0;

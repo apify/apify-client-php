@@ -11,11 +11,9 @@ use Apify\Client\Options\LastRunOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Offline tests proving that the {@code status}/{@code origin} filters pinned by a last-run accessor
- * are inherited by the run's nested storage and log accessors, so every request resolves the same
- * (correct) run. This mirrors the reference JS client, where sub-resource clients inherit the
- * parent's params. Without this, e.g. {@code actor.lastRun(SUCCEEDED).dataset().listItems()} would
- * silently read the default dataset of the wrong run.
+ * Offline tests that the status and origin filters of a last-run accessor reach the nested storage and log
+ * accessors, so every request resolves the same run. Otherwise
+ * {@code actor.lastRun(SUCCEEDED).dataset().listItems()} could read the dataset of another run.
  */
 final class LastRunParamsTest extends TestCase
 {

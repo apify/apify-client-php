@@ -31,19 +31,15 @@ use InvalidArgumentException;
 final class RequestQueueClient
 {
     /**
-     * The API limit on requests per batch call. {@see batchAddRequests()} splits larger input into
-     * chunks of this size; {@see batchDeleteRequests()} instead rejects input larger than this
-     * up front (a delete is idempotent, so the caller can simply call it again per chunk).
+     * The API limit on requests per batch call. {@see batchAddRequests()} splits larger input into chunks of
+     * this size, {@see batchDeleteRequests()} rejects it.
      */
     private const MAX_REQUESTS_PER_BATCH = 25;
 
-    /**
-     * The API's maximum accepted request payload size (9 MiB). Batches are additionally split so no
-     * single batch call exceeds this, matching the reference client's {@code splitIntoJsonArrayBatches}.
-     */
+    /** The API's maximum request payload size, 9 MiB. Batches are split to stay under it. */
     private const MAX_PAYLOAD_SIZE_BYTES = 9 * 1024 * 1024;
 
-    /** Safety margin (0.01%) subtracted from the payload limit, matching the reference client. */
+    /** A margin of 0.01% subtracted from the payload limit. */
     private const PAYLOAD_SAFETY_BUFFER_PERCENT = 0.0001;
 
     private function __construct(
@@ -56,9 +52,7 @@ final class RequestQueueClient
     /**
      * @internal
      *
-     * The per-queue {@code $options->timeoutSecs}, if given, is recorded on {@code $ctx} ({@see
-     * ResourceContext::withTimeout()}): every call this client makes resolves its timeout tier through
-     * {@see ResourceContext::resolveTimeout()}, which additionally caps the resolved value at it.
+     * The {@code timeoutSecs} of {@code $options} caps the timeout of every call of the client.
      */
     public static function forId(
         HttpClientCore $http,
@@ -72,9 +66,10 @@ final class RequestQueueClient
     }
 
     /**
-     * Creates a client for a run's default request queue (nested path only, no ID). Any
-     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
-     * accessor) become base params so every request resolves the correct run's queue. @internal
+     * A client for the default request queue of a run, which has no ID. The {@code $inheritedParams}, such as
+     * the status filter of a last-run accessor, are sent with every request.
+     *
+     * @internal
      */
     public static function nested(HttpClientCore $http, string $base, string $subPath, ?QueryParams $inheritedParams = null): self
     {
@@ -86,9 +81,8 @@ final class RequestQueueClient
     }
 
     /**
-     * Returns a copy of the client that identifies its requests with {@code $clientKey}. A stable
-     * client key is required to operate on locks the client itself created, and lets the API detect
-     * whether multiple clients access a queue.
+     * A copy of the client that sends {@code $clientKey}. A stable key is needed to operate on the locks the
+     * client created, and lets the API detect several clients on one queue.
      */
     public function withClientKey(string $clientKey): self
     {
@@ -104,10 +98,8 @@ final class RequestQueueClient
     }
 
     /**
-     * Fetches the queue metadata, or {@code null} if it does not exist.
-     *
-     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::requestQueue()}),
-     * a 404 is rethrown instead, since it could mean either the parent resource or the queue is gone.
+     * Fetches the queue, or returns {@code null} if it does not exist. A client without an ID, such as
+     * {@see \Apify\Client\Resource\RunClient::requestQueue()}, rethrows the 404.
      */
     public function get(int|float|string|null $timeoutSecs = null): ?RequestQueue
     {
@@ -116,28 +108,22 @@ final class RequestQueueClient
     }
 
     /**
-     * Updates the queue metadata (e.g. name) and returns the updated object.
+     * Updates the queue, for example its name.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): RequestQueue
     {
         return new RequestQueue($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /**
-     * Deletes the queue. A not-found is a no-op, unless this client was obtained without an ID (e.g.
-     * {@see \Apify\Client\Resource\RunClient::requestQueue()}), in which case it is rethrown.
-     */
+    /** Deletes the queue. A missing queue is ignored, unless the client has no ID. */
     public function delete(int|float|string|null $timeoutSecs = null): void
     {
         $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
-    /**
-     * Returns the requests at the head (front) of the queue, up to {@code $limit} ({@code null} for
-     * the API's default limit).
-     */
+    /** Returns up to {@code $limit} requests from the head of the queue ({@code null} for the API's default). */
     public function listHead(?int $limit = null, int|float|string|null $timeoutSecs = null): RequestQueueHead
     {
         $params = new QueryParams();
@@ -175,10 +161,7 @@ final class RequestQueueClient
         return is_array($data) ? RequestQueueRequest::fromArray($data) : null;
     }
 
-    /**
-     * Updates an existing request (identified by its ID field) and returns the operation info. If
-     * {@code $forefront} is true, the request is moved to the front of the queue.
-     */
+    /** Updates a request, identified by its ID. With {@code $forefront}, it moves to the front of the queue. */
     public function updateRequest(RequestQueueRequest $request, bool $forefront = false, int|float|string|null $timeoutSecs = null): RequestQueueOperationInfo
     {
         $params = new QueryParams();
@@ -212,10 +195,7 @@ final class RequestQueueClient
         }
     }
 
-    /**
-     * Atomically returns and locks up to {@code $limit} requests from the head of the queue for
-     * {@code $lockSecs} seconds.
-     */
+    /** Returns up to {@code $limit} requests from the head of the queue and locks them for {@code $lockSecs} seconds. */
     public function listAndLockHead(int $lockSecs, ?int $limit = null, int|float|string|null $timeoutSecs = null): LockedRequestQueueHead
     {
         $params = new QueryParams();
@@ -227,23 +207,19 @@ final class RequestQueueClient
     }
 
     /**
-     * Adds multiple requests to the queue. If {@code $forefront} is true, they are added to the front.
+     * Adds requests to the queue, at the front with {@code $forefront}.
      *
-     * The input is automatically split into chunks of at most 25 requests (the API count limit) that
-     * additionally respect the API's ~9 MiB payload-size limit (large {@code userData} batches are
-     * split so they do not 413). Requests the API returns as unprocessed in a successful response
-     * (typically rate-limited) are retried with exponential backoff; the per-chunk results are merged.
+     * The input is split into batches of at most 25 requests and 9 MiB. Requests the API reports as
+     * unprocessed, typically because of rate limiting, are retried with exponential backoff, and the results
+     * of the batches are merged.
      *
-     * Every request must carry a non-empty {@code uniqueKey}: the retry loop correlates the server's
-     * per-request results by uniqueKey (and the API deduplicates by it), so a request without one
-     * cannot be tracked. Consistent with the reference client, this method does not throw on API
-     * errors: if a batch call fails and the transport did not retry, that chunk's not-yet-processed
-     * requests are returned in {@see BatchAddResult::getUnprocessedRequests()} (earlier chunks'
-     * results are still returned). Invalid input (empty uniqueKey, oversized request) is rejected up
-     * front with {@see InvalidArgumentException} before any call.
+     * Every request needs a non-empty {@code uniqueKey}, which the retries use to track it. The method does
+     * not throw on API errors: when a batch fails, its requests that are not yet processed are returned in
+     * {@see BatchAddResult::getUnprocessedRequests()}, together with the results of the earlier batches.
+     * Invalid input is rejected before any call.
      *
      * @param list<RequestQueueRequest> $requests
-     * @throws InvalidArgumentException if any request has an empty uniqueKey or is individually too large
+     * @throws InvalidArgumentException if a request has an empty uniqueKey or is too large
      */
     public function batchAddRequests(
         array $requests,
@@ -258,14 +234,8 @@ final class RequestQueueClient
         $payloadSizeLimitBytes = self::MAX_PAYLOAD_SIZE_BYTES
             - (int) ceil(self::MAX_PAYLOAD_SIZE_BYTES * self::PAYLOAD_SAFETY_BUFFER_PERCENT);
 
-        // Serialize every request once, up front: the byte lengths (which include the two extra bytes
-        // each item costs in the batch body - a comma or the closing bracket after it) decide the chunk
-        // boundaries below, and the same JSON strings are joined into each chunk's body, so nothing is
-        // re-encoded when the chunk is sent. Matches the reference client's `splitIntoJsonArrayBatches`.
-        //
-        // Both the empty-uniqueKey check and the per-request oversized check must run here (not inside
-        // the send loop): otherwise an oversized request in the middle of a large batch would only be
-        // discovered after earlier chunks had already been POSTed, leaving the queue partially mutated.
+        // Serialized once: the sizes decide the batch boundaries and the JSON is reused to build each body.
+        // Validated before the first call, so a failure cannot leave the queue partly updated.
         $serialized = [];
         foreach ($requests as $i => $request) {
             $uniqueKey = $request->getUniqueKey();
@@ -275,9 +245,7 @@ final class RequestQueueClient
                 );
             }
             $json = Json::encode($request->toArray());
-            // +2 for the opening and closing brackets a batch of this one request alone would need
-            // (`[` + json + `]`), matching the reference client's exact accounting: an item that only
-            // just fits as the sole member of its own batch must still be accepted.
+            // A request alone in a batch needs the brackets as well. Such a request still fits.
             if (strlen($json) + 2 > $payloadSizeLimitBytes) {
                 throw new InvalidArgumentException(sprintf(
                     'batchAddRequests: the request at index %d exceeds the maximum payload size (%d bytes)',
@@ -298,15 +266,11 @@ final class RequestQueueClient
     }
 
     /**
-     * Splits pre-serialized requests into consecutive batches of at most {@code $maxCount} items, each
-     * fitting a JSON array body (items joined by commas between brackets) of at most
-     * {@code $maxByteLength} bytes. Ports the reference client's {@code splitIntoJsonArrayBatches}.
+     * Splits serialized requests into batches of at most {@code $maxCount} items and {@code $maxByteLength}
+     * bytes as a JSON array.
      *
-     * Every item's {@code bytes} already includes the one extra byte it costs as either a separating
-     * comma or the batch's closing bracket, so only the opening bracket's byte is added here.
-     * {@see batchAddRequests()} pre-validates each item against a two-byte-larger bound (both the
-     * opening and closing bracket a lone-item batch would need), so an item that fits only as the sole
-     * member of its own batch is still accepted here, not rejected by this narrower one-byte margin.
+     * The {@code bytes} of an item include its trailing comma or closing bracket, so only the opening bracket
+     * is added here.
      *
      * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $items
      * @return list<list<array{request: RequestQueueRequest, json: string, bytes: int}>>
@@ -349,11 +313,8 @@ final class RequestQueueClient
             try {
                 $response = $this->batchAddChunk($remaining, $forefront, $timeoutSecs);
             } catch (ApifyApiException) {
-                // Matches the JS reference (which mandates consistent error handling): when the HTTP
-                // call fails and the transport did not (or was told not to) retry, the requests not yet
-                // processed in THIS chunk are reported as unprocessed and we stop — keeping the method's
-                // non-throwing contract so a multi-chunk call still returns every earlier chunk's
-                // already-merged results instead of aborting the whole operation.
+                // The requests of this batch that are not yet processed are reported as unprocessed, so the
+                // results of the earlier batches are kept.
                 $unprocessed = array_column(self::itemsNotYetProcessed($chunk, $processed), 'request');
                 break;
             }
@@ -376,9 +337,7 @@ final class RequestQueueClient
     }
 
     /**
-     * Sends one already-serialized chunk. The chunk's {@code json} strings — each already validated
-     * and encoded once in {@see batchAddRequests()} — are joined directly into the batch body, so
-     * nothing here is JSON-encoded a second time, including on a retry of the same chunk.
+     * Sends one serialized batch. Its JSON is joined into the body as it is, also on a retry.
      *
      * @param list<array{request: RequestQueueRequest, json: string, bytes: int}> $chunk
      */
@@ -431,29 +390,22 @@ final class RequestQueueClient
         if ($minDelayMillis <= 0) {
             return;
         }
-        // (1 + random) * 2^attempt * minDelay — exponential backoff with jitter, matching the reference.
+        // Exponential backoff with jitter: (1 + random) * 2^attempt * minDelay.
         $factor = (1 + mt_rand() / mt_getrandmax()) * (2 ** $attempt);
         $delayMillis = (int) floor($factor * $minDelayMillis);
         usleep($delayMillis * 1000);
     }
 
     /**
-     * Deletes multiple requests in a single call. Each entry identifies a request to delete: set
-     * either {@see RequestQueueRequest::setId()} or {@see RequestQueueRequest::setUniqueKey()} (other
-     * fields, if present, are ignored by the API).
+     * Deletes requests in one call. Each one is identified by its {@see RequestQueueRequest::setId()} or
+     * {@see RequestQueueRequest::setUniqueKey()}.
      *
-     * Unlike {@see batchAddRequests()}, this does not chunk oversized input: the API caps a single
-     * batch at 25 requests (matching the reference client), so a larger input is rejected up front
-     * rather than silently split (a delete is idempotent, so callers can simply call this again per
-     * chunk).
-     *
-     * Every entry must identify the request to delete via a non-empty {@see RequestQueueRequest::setId()}
-     * or {@see RequestQueueRequest::setUniqueKey()}, matching the reference client's validation:
-     * an identifier-less entry is rejected up front rather than forwarded to the API.
+     * Input above the limit of 25 requests is rejected instead of split. A delete can simply be repeated per
+     * batch.
      *
      * @param list<RequestQueueRequest> $requests
-     * @throws InvalidArgumentException if {@code $requests} is empty, exceeds the per-call limit, or
-     *         any entry is missing a non-empty id or uniqueKey
+     * @throws InvalidArgumentException if {@code $requests} is empty, above the limit, or has an entry
+     *         without an id and a uniqueKey
      */
     public function batchDeleteRequests(array $requests, int|float|string|null $timeoutSecs = null): BatchDeleteResult
     {
@@ -486,9 +438,7 @@ final class RequestQueueClient
         );
     }
 
-    /**
-     * Lists the queue's requests with pagination.
-     */
+    /** Lists the requests of the queue. */
     public function listRequests(?ListRequestsOptions $options = null, int|float|string|null $timeoutSecs = null): RequestQueueRequestsPage
     {
         $options ??= new ListRequestsOptions();
@@ -501,10 +451,7 @@ final class RequestQueueClient
         );
     }
 
-    /**
-     * Extends the lock on a request by {@code $lockSecs} seconds. If {@code $forefront} is true, the
-     * request is moved to the front when its lock expires.
-     */
+    /** Extends the lock of a request by {@code $lockSecs} seconds. With {@code $forefront}, it moves to the front when the lock expires. */
     public function prolongRequestLock(
         string $id,
         int $lockSecs,
@@ -520,10 +467,7 @@ final class RequestQueueClient
         return RequestLockInfo::fromData(Json::decodeData((string) $response->getBody()));
     }
 
-    /**
-     * Releases the lock on a request. If {@code $forefront} is true, the request is moved to the
-     * front of the queue.
-     */
+    /** Releases the lock of a request. With {@code $forefront}, it moves to the front of the queue. */
     public function deleteRequestLock(string $id, bool $forefront = false, int|float|string|null $timeoutSecs = null): void
     {
         $params = new QueryParams();
@@ -550,13 +494,11 @@ final class RequestQueueClient
     }
 
     /**
-     * Lazily iterates over the queue's requests, transparently following pagination.
+     * Lazily yields the requests of the queue, following the pages.
      *
-     * With no options it fetches pages of up to {@see PaginateRequestsOptions::DEFAULT_MAX_PAGE_LIMIT}
-     * requests until the queue is exhausted. The options mirror the reference client: {@code limit}
-     * caps the total number of requests yielded across all pages, {@code maxPageLimit} caps the page
-     * size, {@code exclusiveStartId}/{@code cursor} choose the starting point (first page only), and
-     * {@code filter} restricts to locked/pending requests.
+     * Without options, the pages hold up to {@see PaginateRequestsOptions::DEFAULT_MAX_PAGE_LIMIT} requests.
+     * {@code limit} caps the total, {@code maxPageLimit} the page size, {@code exclusiveStartId} and
+     * {@code cursor} set the start of the first page, and {@code filter} selects locked or pending requests.
      *
      * @return Generator<int,RequestQueueRequest>
      */
@@ -566,9 +508,7 @@ final class RequestQueueClient
         $options->validate();
 
         $maxPageLimit = $options->maxPageLimit ?? PaginateRequestsOptions::DEFAULT_MAX_PAGE_LIMIT;
-        // Total cap across all pages. null or 0 means "iterate all" (the API treats limit=0 as
-        // unset). Normalizing 0 -> null here matches iterateKeys and the offset paginator's minLimit
-        // convention, and stops a per-page limit=0 from short-circuiting the iteration after one page.
+        // A limit of 0 means no limit, as for the API.
         $limit = ($options->limit !== null && $options->limit > 0) ? $options->limit : null;
         $nextCursor = $options->cursor;
         $nextExclusiveStartId = $options->exclusiveStartId; // used for the first page only

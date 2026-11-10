@@ -7,39 +7,23 @@ namespace Apify\Client\Internal;
 use Apify\Client\Http\BrotliHttpCompressor;
 use Apify\Client\Http\GzipHttpCompressor;
 use Apify\Client\Http\HttpCompressorInterface;
+use Apify\Client\Http\ZstdHttpCompressor;
 use RuntimeException;
 
 /**
- * Optional request-body compression, matching the reference JS client's behaviour.
+ * Request-body compression: brotli when the PECL {@code brotli} extension is loaded, gzip otherwise.
  *
- * Large request bodies are compressed before being sent, saving bandwidth on uploads (Actor inputs,
- * key-value-store records, dataset item batches, ...). Brotli ({@code Content-Encoding: br}) is
- * preferred when available and gzip ({@code Content-Encoding: gzip}) is used as a fallback — the same
- * codec choice, brotli quality (6), and size threshold (1024 bytes) as the reference client's
- * {@code maybeCompressValue}. The API accepts br/gzip/deflate as request {@code Content-Encoding}
- * (see apify-docs #2750), so preferring brotli is valid.
- *
- * In PHP, brotli lives in the optional PECL {@code brotli} extension, which is frequently absent,
- * while gzip ({@code gzencode}) ships with the standard {@code zlib} extension. We therefore prefer
- * brotli only when the extension is loaded and fall back to gzip otherwise. Compression is
- * best-effort: if neither codec is available (or a payload is too small), the body is sent
- * unchanged rather than raising an error.
+ * Compression is best-effort. A body is sent unchanged when it is small, already compressed, or no codec is
+ * available.
  *
  * @internal
  */
 final class Compression
 {
-    /**
-     * Minimum body size (in bytes) worth compressing. Below this the CPU cost and the few bytes of
-     * codec framing outweigh the savings, so the body is left uncompressed. Matches the reference
-     * client's {@code MIN_COMPRESS_BYTES}.
-     */
+    /** Minimum body size in bytes worth compressing. */
     public const MIN_COMPRESS_BYTES = 1024;
 
-    /**
-     * Brotli quality level. Level 6 mirrors the reference client and trades a little ratio for much
-     * faster compression than the brotli default (11).
-     */
+    /** Brotli quality level, faster than the brotli default of 11. */
     private const BROTLI_QUALITY = 6;
 
     /** Media type prefixes whose payloads already carry their own compression. */
@@ -68,7 +52,7 @@ final class Compression
         'font/woff2',
     ];
 
-    /** Uncompressed media types that sit under an already-compressed prefix, so compressing them still pays off. */
+    /** Raw media types under an already-compressed prefix, which are still worth compressing. */
     private const COMPRESSIBLE_TYPES = [
         'audio/aiff',
         'audio/basic',
@@ -88,19 +72,12 @@ final class Compression
         'image/x-ms-bmp',
     ];
 
-    /** Structured syntax suffixes marking a media type as text even under an already-compressed prefix. */
+    /** Structured syntax suffixes that mark a media type as text, whatever its prefix. */
     private const COMPRESSIBLE_SUFFIXES = ['+json', '+xml'];
 
     /**
-     * Decides whether a request body with the given {@code Content-Type} is worth compressing, matching
-     * the reference client's {@code isCompressibleContentType}.
-     *
-     * Images, audio, video and archives already carry their own compression; running them through
-     * brotli or gzip burns CPU, holds a second full copy of the body in memory, and usually produces
-     * output slightly larger than the input. Formats that are raw despite such a media type (e.g.
-     * {@code image/bmp}, {@code audio/wav}) are still compressed, as are structured-syntax subtypes
-     * such as {@code image/svg+xml}. A body with no content type, or {@code application/octet-stream}
-     * (the catch-all for unknown binary data and {@code setRecord()}'s fallback), is assumed compressible.
+     * Whether a request body with the given {@code Content-Type} is worth compressing. Media and archives are
+     * not, since they carry their own compression. A missing content type counts as compressible.
      */
     public static function isCompressibleContentType(?string $contentType): bool
     {
@@ -108,7 +85,7 @@ final class Compression
             return true;
         }
 
-        // Content-Type is case-insensitive and may carry parameters, e.g. "text/plain; charset=utf-8".
+        // Drop parameters such as "; charset=utf-8".
         $mediaType = strtolower(trim(explode(';', $contentType, 2)[0]));
 
         if (in_array($mediaType, self::COMPRESSIBLE_TYPES, true)) {
@@ -132,14 +109,10 @@ final class Compression
     }
 
     /**
-     * Returns {@code [encoding, compressedBody]} when {@code $body} should be sent compressed, or
-     * {@code null} to send it unchanged. {@code $encoding} is the value for the
-     * {@code Content-Encoding} header ({@code 'br'} or {@code 'gzip'}).
+     * Compresses {@code $body} with the best available codec.
      *
-     * Only byte payloads at least {@see MIN_COMPRESS_BYTES} long are compressed. PHP strings are
-     * byte strings, so {@code strlen()} already measures the encoded size.
-     *
-     * @return array{0: string, 1: string}|null
+     * @return array{0: string, 1: string}|null the {@code Content-Encoding} value and the compressed body, or
+     *                                          {@code null} to send the body unchanged
      */
     public static function maybeCompress(string $body): ?array
     {
@@ -147,16 +120,11 @@ final class Compression
     }
 
     /**
-     * Size gate plus codec selection, split out from {@see maybeCompress} so both the brotli and the
-     * gzip path can be exercised by tests regardless of which extensions the host PHP build loaded.
+     * Applies the size gate and picks the first codec that succeeds, brotli before gzip. Split out of
+     * {@see maybeCompress()} so tests can run each codec whatever extensions are loaded.
      *
-     * Brotli ({@code br}) is preferred over gzip when its encoder is available; each encoder returns
-     * the compressed bytes as a string, or a non-string on failure, in which case the next codec is
-     * tried. Returns {@code null} when the body is below {@see MIN_COMPRESS_BYTES} or no codec
-     * succeeds. A {@code null} encoder means that codec is unavailable and is skipped.
-     *
-     * @param (callable(string): mixed)|null $brotli brotli encoder, or {@code null} when the PECL brotli extension is absent
-     * @param (callable(string): mixed)|null $gzip   gzip encoder, or {@code null} when zlib is absent
+     * @param (callable(string): mixed)|null $brotli brotli encoder, or {@code null} when unavailable
+     * @param (callable(string): mixed)|null $gzip   gzip encoder, or {@code null} when unavailable
      * @return array{0: string, 1: string}|null
      */
     public static function compressWith(string $body, ?callable $brotli, ?callable $gzip): ?array
@@ -183,8 +151,7 @@ final class Compression
     }
 
     /**
-     * The brotli encoder for this build, or {@code null} when the PECL {@code brotli} extension is not
-     * loaded. Frequently absent, since brotli is not part of PHP's standard distribution.
+     * The brotli encoder, or {@code null} when the PECL {@code brotli} extension is not loaded.
      *
      * @return (callable(string): mixed)|null
      */
@@ -194,16 +161,13 @@ final class Compression
             return null;
         }
 
-        // Called indirectly: brotli_compress only exists when the PECL brotli extension is loaded, so
-        // a direct call would be an unresolved reference for static analysis on the (common) PHP
-        // builds without the extension.
+        // Called by name, so static analysis does not flag builds without the extension.
         $brotliCompress = 'brotli_compress';
         return static fn (string $body) => $brotliCompress($body, self::BROTLI_QUALITY);
     }
 
     /**
-     * The gzip encoder for this build, or {@code null} when {@code gzencode} (zlib) is unavailable.
-     * Ships with PHP's standard {@code zlib} extension, so it is the near-universal fallback.
+     * The gzip encoder, or {@code null} when zlib is not loaded.
      *
      * @return (callable(string): mixed)|null
      */
@@ -217,8 +181,7 @@ final class Compression
     }
 
     /**
-     * Resolves a {@code compression} option ({@code 'brotli'}, {@code 'gzip'} or a custom compressor) to a
-     * concrete compressor, or {@code null} to keep the default best-effort choice.
+     * Resolves a {@code compression} option to a compressor, or {@code null} for the default choice.
      *
      * @param string $option the name of the option's owner, for the error message
      * @throws RuntimeException if the option is an unknown algorithm name
@@ -230,8 +193,9 @@ final class Compression
             $compression instanceof HttpCompressorInterface => $compression,
             $compression === 'brotli' => new BrotliHttpCompressor(),
             $compression === 'gzip' => new GzipHttpCompressor(),
+            $compression === 'zstd' => new ZstdHttpCompressor(),
             default => throw new RuntimeException(
-                sprintf('%s: unknown compression "%s"; expected "brotli", "gzip", or a HttpCompressorInterface', $option, $compression)
+                sprintf('%s: unknown compression "%s"; expected "brotli", "gzip", "zstd", or a HttpCompressorInterface', $option, $compression)
             ),
         };
     }

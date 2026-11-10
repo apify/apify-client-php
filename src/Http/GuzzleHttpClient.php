@@ -12,11 +12,8 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * The default {@see HttpClientInterface}, backed by Guzzle.
- *
- * The per-attempt timeout is applied to each request by the orchestrating client. Non-2xx statuses
- * are returned as normal responses ({@code http_errors} disabled); only connection/timeout failures
- * are thrown as {@see TransportException}.
+ * The default {@see HttpClientInterface}, backed by Guzzle. Error statuses are returned as responses. Connection
+ * failures and timeouts throw {@see TransportException}.
  */
 final class GuzzleHttpClient implements NoRedirectHttpClientInterface
 {

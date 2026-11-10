@@ -1,11 +1,9 @@
 # Apify PHP client documentation
 
-This directory documents the public API of the Apify PHP client, organized by resource. Each page
-lists the available methods with their parameters and short, runnable snippets. For an overview,
-configuration and error handling, see the [top-level README](../README.md).
+The public API of the Apify PHP client by resource, with the parameters of each method and short snippets.
+For configuration and error handling, see the [README](../README.md).
 
-All snippets assume a configured client and that the client types are imported from their namespaces
-(e.g. `use Apify\Client\ApifyClient;`, `use Apify\Client\Options\ActorListOptions;`):
+The snippets assume a client and imported types, for example `use Apify\Client\ApifyClient;`:
 
 ```php
 $client = new ApifyClient('my-api-token');
@@ -13,17 +11,17 @@ $client = new ApifyClient('my-api-token');
 
 ### Namespaces
 
-Every class is under the `Apify\Client\` PSR-4 root. Use these when writing `use` statements:
+All classes are under the `Apify\Client\` root:
 
 | Namespace | Contains | Examples |
 |---|---|---|
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
-| `Apify\Client\Options\` | Option objects (all the `*Options` classes) **and** enums. | e.g. `ActorListOptions`, `ActorStartOptions`, `TaskStartOptions`, `RunListOptions`, `RunIterateDatasetItemsOptions`, `RunResurrectOptions`, `StorageListOptions`, `StoreListOptions`, `DatasetListItemsOptions`, `ListKeysOptions`, `GetRecordOptions`, `ListRequestsOptions`, `BatchAddRequestsOptions`, `PaginateRequestsOptions`, `LogOptions`, `DownloadItemsFormat` — see [options reference](options.md) for the full list |
-| `Apify\Client\Http\` | The replaceable transport, its adapters, and compressors. | `HttpClientInterface`, `NoRedirectHttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor` |
+| `Apify\Client\Options\` | The `*Options` classes and enums. | `ActorListOptions`, `ActorStartOptions`, `RunListOptions`, `StorageListOptions`, `DatasetListItemsOptions`, `DownloadItemsFormat`, and the others in the [options reference](options.md) |
+| `Apify\Client\Http\` | The transport, its adapters and the compressors. | `HttpClientInterface`, `NoRedirectHttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor`, `ZstdHttpCompressor` |
 | `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException` and its status-specific subclasses (`NotFoundException`, `RateLimitException`, ...), `TransportException` |
 
-For example, to add requests to a queue you would import the model and (optionally) the batch options:
+To add requests to a queue, import the model and the batch options:
 
 ```php
 use Apify\Client\ApifyClient;
@@ -31,22 +29,16 @@ use Apify\Client\Model\RequestQueueRequest;
 use Apify\Client\Options\BatchAddRequestsOptions;
 ```
 
-The streaming-log accessors (`LogClient::stream()` and `RunClient::getStreamedLog()`) return the
-PSR-7 `Psr\Http\Message\StreamInterface` (from the `psr/http-message` package), not an
-`Apify\Client\` type — import it as `use Psr\Http\Message\StreamInterface;`.
+`LogClient::stream()` and `RunClient::getStreamedLog()` return a PSR-7 `Psr\Http\Message\StreamInterface`.
 
-Methods that fetch a single resource by ID return `null` when the resource does not exist, rather
-than throwing. A resource client obtained without an ID (e.g. `RunClient::dataset()`) throws instead,
-since a 404 there cannot be pinned to the parent or the sub-resource. API failures are thrown as
-`ApifyApiException` or a status-specific subclass (see [error handling](../README.md#error-handling)).
+A method that fetches one resource by ID returns `null` if it does not exist. A client obtained without an ID,
+such as `RunClient::dataset()`, throws instead. See [error handling](../README.md#error-handling).
 
 ## ApifyClient methods
 
-`ApifyClient` is the entry point: construct one, then call an accessor to get a sub-client for a
-specific resource or collection. Single-resource accessors take an ID (or, where the API allows it,
-a name) and return that resource's client; collection accessors take no arguments and return a
-collection client for listing and creating. Method detail lives on the linked [resource
-pages](#resource-pages); the signatures below are the entry points.
+An accessor returns the client of a resource or collection. A resource accessor takes an ID, or a name where the
+API allows it. A collection accessor takes no arguments and lists and creates. The methods of each client are on
+the [resource pages](#resource-pages).
 
 | Method | Returns | Notes |
 |---|---|---|
@@ -80,11 +72,9 @@ pages](#resource-pages); the signatures below are the entry points.
 
 ## Models and unmodeled data (`toArray`)
 
-Response models expose the commonly-used fields as typed getters (e.g. `$actor->getId()`). The
-[models reference](models.md) lists every model and its getters. The API returns more fields than are
-modelled; every model also exposes `toArray()`, which returns the full raw object, so nothing the API
-returns is lost. For example a `Schedule`'s `actions`/`isExclusive`, or the private account details
-of `me()`, are available via `toArray()`:
+A response model has getters for common fields, for example `$actor->getId()`, listed in the
+[models reference](models.md). `toArray()` returns the whole object, including fields without a getter, such as
+the `actions` of a `Schedule` or the private account details of `me()`:
 
 ```php
 $schedule = $client->schedule('SCHEDULE_ID')->get();
@@ -93,35 +83,30 @@ $actions = $schedule?->toArray()['actions'] ?? null;
 
 ## Raw JSON values
 
-A few methods return data whose shape is not modelled and is instead returned as a decoded
-JSON value — typically an associative array, though `getInput()` is typed `mixed` and returns
-whatever JSON value was stored (or accept an arbitrary value serialized to JSON):
+Some methods return a decoded JSON value instead of a model, usually an associative array. `getInput()` returns
+whatever JSON value was stored.
 
 - Read: `me()->monthlyUsage(...)`, `me()->limits()`, `schedule($id)->getLog()`, `task($id)->getInput()`,
-  `build($id)->getOpenApiDefinition()`, `dataset($id)->getStatistics()`. Note that
-  `deleteRequestLock` returns `void` (it releases a lock and has no meaningful body), so it is not in
-  this list. The request-queue lock/list/unlock/batch-delete operations
-  (`listRequests`, `listAndLockHead`, `prolongRequestLock`, `unlockRequests`, `batchDeleteRequests`)
-  return typed models (see [Models](models.md)), not raw JSON.
-- Write: definition/`update`/`create` arguments accept any JSON-serializable value — typically an
+  `build($id)->getOpenApiDefinition()` and `dataset($id)->getStatistics()`. The request queue operations
+  `listRequests`, `listAndLockHead`, `prolongRequestLock`, `unlockRequests` and `batchDeleteRequests` return
+  [models](models.md).
+- Write: the definition arguments of `update` and `create` accept any JSON-serializable value, usually an
   associative array.
 
 ## Options objects
 
-Option objects use named constructor arguments; an unset field means "use the API default". Pass only
-the arguments you need:
+Option objects take named constructor arguments. An unset field uses the API default:
 
 ```php
 $options = new ActorListOptions(my: true, limit: 10);
 $page = $client->actors()->list($options);
 ```
 
-The [options reference](options.md) lists every option class and all of its fields.
+The [options reference](options.md) lists the fields of every option class.
 
 ## Common list options — `ListOptions`
 
-Most `list` methods (builds, runs, tasks, schedules, webhooks, Actor versions) take the shared
-`ListOptions`, which carries the standard pagination/ordering controls: `offset`, `limit`, `desc`.
+Most `list` methods take `ListOptions`: `offset`, `limit` and `desc`.
 
 ```php
 $builds = $client->builds()->list(new ListOptions(limit: 50, desc: true));
@@ -129,19 +114,16 @@ $builds = $client->builds()->list(new ListOptions(limit: 50, desc: true));
 
 ## Pagination — `PaginationList`
 
-`list` methods return a `PaginationList`, which is iterable and countable and exposes `getTotal()`,
-`getOffset()`, `getLimit()`, `getCount()`, `isDesc()` and `getItems()`. Within-storage listers
-(`listKeys`, `listHead`) return their own page/head containers instead.
+`list` methods return a `PaginationList`, which is iterable and countable and has `getTotal()`, `getOffset()`,
+`getLimit()`, `getCount()`, `isDesc()` and `getItems()`. `listKeys` and `listHead` return their own page types.
 
-On a page of `DatasetClient::listItems()`, `getCount()` is the number of dataset rows the API scanned for the
-page, or the number of items returned when that is larger. Filters such as `skipEmpty` or `clean` can leave it
-above `count($page->getItems())`. The next page starts at `offset + min(count, limit)`; the cap matters only with
-`unwind`, which can return more items than the rows scanned.
+For `DatasetClient::listItems()`, `getCount()` is the number of rows the API scanned, or the number of items
+when that is larger. Filters such as `skipEmpty` and `clean` can leave it above the number of items. The next
+page starts at `offset + min(count, limit)`.
 
-The `iterate*()` helpers take a `$chunkSize`, the number of entries requested per API call. Without it, each call
-gets the API's default page size, capped by the remaining `limit`. Dataset items have no default limit, so
-iterating `iterateItems()` without `$chunkSize` loads the whole dataset, or all `limit` items, in one response.
-Pass `$chunkSize` to iterate a large dataset.
+The `iterate*()` helpers take a `$chunkSize`, the number of entries per API call. Without it, a call gets the
+API's default page size, capped by the remaining `limit`. Dataset items have no default limit, so
+`iterateItems()` without `$chunkSize` loads the whole dataset in one response.
 
 ```php
 $page = $client->actors()->list(new ActorListOptions(limit: 5));
@@ -152,9 +134,8 @@ foreach ($page as $actor) {
 
 ## Setting single-resource status
 
-`$client->setStatusMessage(string $message, bool $isTerminal = false)` updates the status message of
-the current Actor run (identified by the `ACTOR_RUN_ID` environment variable); it only works from
-inside a run and throws otherwise. Returns the updated run.
+`$client->setStatusMessage(string $message, bool $isTerminal = false)` sets the status message of the run in
+the `ACTOR_RUN_ID` environment variable and returns the run. It throws outside a run.
 
 ## Resource pages
 

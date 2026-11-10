@@ -13,10 +13,8 @@ use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 
 /**
- * A scripted {@see HttpClientInterface} for offline unit tests. Each queued entry is either a
- * {@see ResponseInterface} to return or a {@see TransportException} to throw, consumed in order.
- * All received requests are recorded for assertions, together with whether each one was sent streaming
- * and whether it was sent with redirects disabled.
+ * A scripted {@see HttpClientInterface} for offline tests. Queued responses or {@see TransportException}s are
+ * returned in order. Requests are recorded, with whether each was streaming and without redirects.
  */
 final class MockTransport implements NoRedirectHttpClientInterface
 {
@@ -50,10 +48,7 @@ final class MockTransport implements NoRedirectHttpClientInterface
         return $this;
     }
 
-    /**
-     * Queues a fully-constructed response as-is, e.g. one built with a non-seekable body, instead of
-     * the plain string body {@see queueResponse()} always wraps in a seekable stream.
-     */
+    /** Queues a response as it is, for example one with a non-seekable body. */
     public function queueRawResponse(ResponseInterface $response): self
     {
         $this->queue[] = $response;
@@ -68,11 +63,7 @@ final class MockTransport implements NoRedirectHttpClientInterface
         return $this->received[count($this->received) - 1];
     }
 
-    /**
-     * Reads a recorded request's body as a string, transparently decompressing it when the client
-     * applied request compression (a {@code Content-Encoding} header). Tests that assert on the body
-     * shape use this so they stay agnostic to whether the payload went out compressed.
-     */
+    /** Reads the body of a recorded request, decompressing it when it carries a {@code Content-Encoding}. */
     public static function readBody(RequestInterface $request): string
     {
         $raw = (string) $request->getBody();

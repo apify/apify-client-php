@@ -14,11 +14,9 @@ use Apify\Client\Options\StoreListOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Hermetic tests for the lazy-iteration helpers, driven entirely by a scripted transport. They
- * exercise the paging/termination logic — over-reported total, total-cap vs. page-size split, cursor
- * threading, and (matching the reference client) that the stop condition never consults a listing's
- * reported {@code total}: with no explicit {@code limit}, the loop always ends only once a page scans
- * no rows, so a resource that keeps growing during the iteration is not cut off at its starting size.
+ * Tests of the lazy iterators with a scripted transport: over-reported total, total cap against page size,
+ * cursor threading, and that the loop never stops on the reported {@code total}, so a resource that grows
+ * during the iteration is not cut off.
  */
 final class IterationTest extends TestCase
 {
@@ -220,10 +218,8 @@ final class IterationTest extends TestCase
 
     public function testDatasetIterateItemsAdvancesByScannedCountNotItemCount(): void
     {
-        // With skipEmpty active, the API can scan more rows than it returns as items. The iterator
-        // must advance (and terminate) by the scanned count (`X-Apify-Pagination-Count`), not by the
-        // item count — otherwise it would re-request offset=2 (items returned so far) instead of
-        // offset=3 (rows actually scanned), re-scanning row 2 and duplicating item 'n'=2.
+        // With skipEmpty, the API can scan more rows than it returns. The iterator must advance by the scanned
+        // count (`X-Apify-Pagination-Count`), else it re-requests row 2 and duplicates item 'n'=2.
         $transport = (new MockTransport())
             // Page 1 scans rows 0-2 (3 rows) but one is empty and skipped, so only 2 items come back.
             ->queueResponse(200, Json::encode([['n' => 0], ['n' => 1]]), [
@@ -258,12 +254,9 @@ final class IterationTest extends TestCase
 
     public function testDatasetIterateItemsCapsScannedCountWhenUnwindInflatesItemsPastTheRequestedLimit(): void
     {
-        // With unwind active, a page can return MORE items than rows it scanned (the opposite of
-        // skipEmpty). Here the scanned-count header is also missing (e.g. stripped by a proxy), so the
-        // iterator falls back to the (unwind-inflated) item count — which must be capped at the
-        // requested per-page limit (2), since the server never scans more rows per page than that.
-        // Without the cap, the iterator would advance by the raw item count (6) instead of the real row
-        // count (2), overshooting to offset=6 and skipping rows 2-3's items entirely.
+        // With unwind, a page can return more items than the rows it scanned. The scanned-count header is
+        // missing too, so the item count is capped at the requested limit (2). Without the cap, the iterator
+        // would advance by 6 and skip rows 2-3.
         $transport = (new MockTransport())
             // Page 1: rows 0-1 (2 rows, matching the requested limit), each unwound into 3 items.
             ->queueResponse(200, Json::encode([['n' => 0], ['n' => 1], ['n' => 2], ['n' => 3], ['n' => 4], ['n' => 5]]), [

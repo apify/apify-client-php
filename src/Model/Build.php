@@ -21,11 +21,7 @@ final class Build extends ApifyResource
         return $this->getString('actId');
     }
 
-    /**
-     * The current build status. One of the eight {@code ActorJobStatus} values: {@code READY},
-     * {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code TIMED-OUT},
-     * {@code ABORTING}, {@code ABORTED}.
-     */
+    /** The build status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code TIMED-OUT}, {@code ABORTING} or {@code ABORTED}. */
     public function getStatus(): ?string
     {
         return $this->getString('status');
@@ -49,11 +45,7 @@ final class Build extends ApifyResource
         return $this->getString('buildNumber');
     }
 
-    /**
-     * Digest of the built Docker image manifest, without the {@code sha256:} prefix, or
-     * {@code null} if unavailable. Compare the digests of two builds to tell whether their image
-     * contents differ.
-     */
+    /** The digest of the Docker image manifest without the {@code sha256:} prefix, or {@code null}. It differs between builds with different image contents. */
     public function getImageDigest(): ?string
     {
         return $this->getString('imageDigest');

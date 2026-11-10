@@ -13,10 +13,7 @@ use Apify\Client\Model\WebhookDispatch;
 use Apify\Client\Options\ListOptions;
 use Generator;
 
-/**
- * A client for a webhook dispatch collection: the account-wide collection ({@code GET
- * /v2/webhook-dispatches}) or dispatches nested under a webhook.
- */
+/** A client for a webhook dispatch collection: all dispatches of the account, or those of a webhook. */
 final class WebhookDispatchCollectionClient
 {
     private ResourceContext $ctx;
@@ -40,9 +37,8 @@ final class WebhookDispatchCollectionClient
     }
 
     /**
-     * Lazily iterates over webhook dispatches, fetching pages on demand. The options' {@code limit}
-     * caps the total number of dispatches yielded across all pages ({@code null} = all);
-     * {@code $chunkSize} is the per-page size ({@code null} = the API's default page size).
+     * Lazily yields webhook dispatches. The {@code limit} option caps the total ({@code null} for all) and
+     * {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
      * @return Generator<int,WebhookDispatch>
      */

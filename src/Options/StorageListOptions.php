@@ -6,11 +6,7 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/**
- * Options for the storage collection list endpoints ({@code GET /v2/datasets},
- * {@code /v2/key-value-stores}, {@code /v2/request-queues}), which add {@code unnamed} and
- * {@code ownership} filters on top of the standard pagination.
- */
+/** Options for listing datasets, key-value stores and request queues: the {@code unnamed} and {@code ownership} filters and the pagination. */
 final class StorageListOptions
 {
     public function __construct(
@@ -27,10 +23,7 @@ final class StorageListOptions
     ) {
     }
 
-    /**
-     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving the other
-     * filters. Used by lazy iteration to request successive pages.
-     */
+    /** A copy with a new {@code offset} and {@code limit} and the same filters. Used to request successive pages. */
     public function withPagination(?int $offset, ?int $limit): self
     {
         return new self($offset, $limit, $this->desc, $this->unnamed, $this->ownership);

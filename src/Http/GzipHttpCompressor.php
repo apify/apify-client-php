@@ -7,9 +7,10 @@ namespace Apify\Client\Http;
 use InvalidArgumentException;
 
 /**
- * Compresses request bodies with gzip at a configurable quality (1-9, default 6). Uses
- * {@code gzencode()} from PHP's standard {@code zlib} extension, which is present on nearly every
- * build; when it is not, {@see compress()} returns {@code null} (the body is sent uncompressed).
+ * Compresses request bodies with gzip at a quality from 1 to 9 (default 6).
+ *
+ * Needs the {@code zlib} extension. Without it, {@see compress()} returns {@code null} and the body is sent
+ * uncompressed.
  */
 final class GzipHttpCompressor implements HttpCompressorInterface
 {

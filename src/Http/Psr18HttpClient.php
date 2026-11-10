@@ -12,17 +12,15 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * Adapts any PSR-18 {@see ClientInterface} to the client's {@see HttpClientInterface}, so an
- * application can plug in its own configured HTTP client (proxy, TLS, connection pool).
+ * Adapts a PSR-18 {@see ClientInterface} to {@see HttpClientInterface}, so the application can plug in its own
+ * HTTP client.
  *
- * PSR-18 has no per-request timeout, so the {@code timeoutSecs} argument is ignored here — configure
- * the timeout on the wrapped PSR-18 client instead.
+ * PSR-18 has no per-request timeout, so {@code timeoutSecs} is ignored. Configure the timeout on the wrapped
+ * client.
  *
- * {@see send()} reads the response body in full, since a PSR-18 client may return a body it reads lazily:
- * a connection dropped mid-body then surfaces as a {@see TransportException} (which is retried) and not
- * as a failure later, when the response is already taken as complete. The response is returned with a
- * seekable buffered body. {@see sendStreaming()} returns the body as the wrapped client provides it, so
- * it is live only if that client reads it lazily.
+ * {@see send()} reads the whole body, so a connection dropped mid-body throws {@see TransportException}, which
+ * is retried, and the response has a seekable body. {@see sendStreaming()} returns the body as the wrapped
+ * client provides it.
  */
 final class Psr18HttpClient implements HttpClientInterface
 {

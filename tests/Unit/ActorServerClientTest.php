@@ -251,6 +251,21 @@ final class ActorServerClientTest extends TestCase
         self::assertSame([false, true], $transport->withoutRedirects);
     }
 
+    public function testParentRequestIdIsSentAsTheRequestIdHeaderOverOnePassedInHeaders(): void
+    {
+        $transport = $this->serverTransport()->queueResponse(200, 'ok')->queueResponse(200, 'ok');
+        $server = $this->client($transport)->actor('a1')->server();
+
+        $server->request('/', new ActorServerRequestOptions(headers: ['x-actor-request-id' => 'stale', 'X-Custom' => 'yes'], parentRequestId: 'parent-id'));
+
+        $request = $transport->lastRequest();
+        self::assertSame(['parent-id'], $request->getHeader('X-Actor-Request-ID'));
+        self::assertSame('yes', $request->getHeaderLine('X-Custom'));
+
+        $server->request('/');
+        self::assertFalse($transport->lastRequest()->hasHeader('X-Actor-Request-ID'));
+    }
+
     public function testRequestUsesTheLongTierTimeoutByDefaultAndAnExplicitOne(): void
     {
         $transport = $this->serverTransport()->queueResponse(200, 'a')->queueResponse(200, 'b');
@@ -375,10 +390,10 @@ final class ActorServerClientTest extends TestCase
         $server = $this->client($transport)->actor('a1')->server();
 
         try {
-            $server->request('/', new ActorServerRequestOptions(compression: 'zstd'));
+            $server->request('/', new ActorServerRequestOptions(compression: 'deflate'));
             self::fail('expected a RuntimeException');
         } catch (\RuntimeException $e) {
-            self::assertStringContainsString('unknown compression "zstd"', $e->getMessage());
+            self::assertStringContainsString('unknown compression "deflate"', $e->getMessage());
         }
 
         $this->expectException(InvalidArgumentException::class);

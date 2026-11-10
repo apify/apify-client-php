@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * The result of a batch request-delete: the requests that were successfully removed and the ones
- * that could not be (and can be retried). Returned by
- * {@see \Apify\Client\Resource\RequestQueueClient::batchDeleteRequests()}.
- */
+/** The result of {@see \Apify\Client\Resource\RequestQueueClient::batchDeleteRequests()}: the deleted requests and the ones to retry. */
 final class BatchDeleteResult
 {
     /**
@@ -46,7 +42,7 @@ final class BatchDeleteResult
     }
 
     /**
-     * The requests that were successfully deleted from the queue.
+     * The requests that were deleted.
      *
      * @return list<RequestQueueRequest>
      */
@@ -56,7 +52,7 @@ final class BatchDeleteResult
     }
 
     /**
-     * The requests that failed to be deleted and can be retried.
+     * The requests that were not deleted and can be retried.
      *
      * @return list<RequestQueueRequest>
      */

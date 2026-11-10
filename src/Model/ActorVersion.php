@@ -20,9 +20,9 @@ final class ActorVersion extends ApifyResource
     }
 
     /**
-     * The Actor's directory inside the uploaded source, as a path relative to the upload root, for a
-     * {@code SOURCE_FILES} or {@code TARBALL} version, or {@code null} when the upload root is the Actor's
-     * directory. On a {@code TARBALL} version, only users with write access to the Actor get it.
+     * The directory of the Actor inside the uploaded source, relative to the upload root, for a
+     * {@code SOURCE_FILES} or {@code TARBALL} version. {@code null} when the upload root is that directory. A
+     * {@code TARBALL} version gives it only to users with write access to the Actor.
      */
     public function getActorPath(): ?string
     {

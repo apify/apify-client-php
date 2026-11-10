@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * The result of releasing all of a client's request locks on a queue. Returned by
- * {@see \Apify\Client\Resource\RequestQueueClient::unlockRequests()}.
- */
+/** The result of {@see \Apify\Client\Resource\RequestQueueClient::unlockRequests()}: the locks the client released. */
 final class UnlockRequestsResult
 {
     public function __construct(private int $unlockedCount)

@@ -1,13 +1,9 @@
 name: Publish PHP client
 
-# Language-specific publish workflow for the PHP client. Triggered manually only (workflow_dispatch)
-# so a maintainer deliberately decides when a release is cut. The release version is the single
-# source of truth in src/Version.php (CLIENT_VERSION). The package is distributed via Packagist,
-# which builds the release from the pushed Git tag; this workflow tags the release, creates the
-# GitHub release, and notifies Packagist to update.
+# Manual release. The version is `Version::CLIENT_VERSION` in src/Version.php. Packagist builds the
+# release from the Git tag, so this workflow tags it, creates the GitHub release and notifies Packagist.
 #
-# Packagist does not offer OIDC "Trusted Publishing"; its update API requires a username + API token,
-# which are read from repository secrets (nothing is stored in the repo).
+# Packagist has no Trusted Publishing. Its update API needs a username and token, read from repository secrets.
 on:
   workflow_dispatch:
     inputs:
@@ -16,7 +12,7 @@ on:
         type: boolean
         default: false
 
-# Never allow two publish runs to race; publishing two releases concurrently is hard to undo.
+# Never run two releases at once.
 concurrency:
   group: php-publish
   cancel-in-progress: false
@@ -33,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # A release must only ever be cut from master.
+      # Releases come from master only.
       - name: Require master branch
         run: |
           if [ "${GITHUB_REF}" != "refs/heads/master" ]; then
@@ -52,7 +48,7 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      # Gate the release on the same quality bar as CI so a broken build can never be published.
+      # The release needs the CI checks to pass.
       - name: Check formatting (php-cs-fixer)
         run: composer lint
 
@@ -102,7 +98,7 @@ jobs:
             --title "${TAG}" \
             --notes "Apify PHP client ${TAG}. See CHANGELOG.md for details."
 
-      # Notify Packagist to pull the new tag. Credentials come from repository secrets.
+      # Packagist pulls the new tag.
       - name: Notify Packagist
         if: ${{ github.event.inputs.dry_run != 'true' }}
         env:

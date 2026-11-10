@@ -5,18 +5,16 @@ declare(strict_types=1);
 namespace Apify\Client\Options;
 
 /**
- * Tuning options for batch request adding. Requests the API reports as unprocessed (typically due to
- * rate limiting) are automatically retried with exponential backoff.
- *
- * Note: unlike the reference JS client, this synchronous client sends the batch API calls
- * sequentially, so it exposes no {@code maxParallel} knob (it would have no effect).
+ * Options for adding requests in batches. Requests the API reports as unprocessed, typically because of rate
+ * limiting, are retried with exponential backoff. Batches are sent one after another, so there is no
+ * {@code maxParallel} option.
  */
 final class BatchAddRequestsOptions
 {
-    /** Default number of retry rounds for unprocessed requests (matches the reference client). */
+    /** The default number of retry rounds for unprocessed requests. */
     public const DEFAULT_MAX_UNPROCESSED_RETRIES = 3;
 
-    /** Default minimum delay before retrying unprocessed requests (matches the reference client). */
+    /** The default minimum delay before a retry, in milliseconds. */
     public const DEFAULT_MIN_DELAY_MILLIS = 500;
 
     public readonly int $maxUnprocessedRequestsRetries;

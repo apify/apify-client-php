@@ -12,10 +12,9 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Offline behavioral tests for {@see \Apify\Client\Resource\RequestQueueClient::batchAddRequests()}:
- * uniqueKey validation, count/byte chunking, unprocessed-retry from a successful response, and the
- * non-throwing error contract (a failed batch call reports its not-yet-processed requests as
- * unprocessed rather than throwing, preserving earlier chunks' results), matching the JS reference.
+ * Offline tests of {@see \Apify\Client\Resource\RequestQueueClient::batchAddRequests()}: uniqueKey validation,
+ * chunking by count and bytes, retries of unprocessed requests, and the non-throwing contract, where a failed
+ * batch reports its requests as unprocessed and keeps the results of the earlier batches.
  */
 final class BatchAddRequestsTest extends TestCase
 {
@@ -178,10 +177,8 @@ final class BatchAddRequestsTest extends TestCase
     }
 
     /**
-     * A request whose JSON is exactly 2 bytes under the payload limit must be accepted: as the sole
-     * member of its own single-item batch body ("[" + json + "]"), it exactly fills the limit. Matches
-     * the reference client's exact `byteLength + 2 > limit` accounting (ported from `#1051`); a
-     * stricter `+1` margin would reject this request even though it fits.
+     * A request whose JSON is 2 bytes under the payload limit is accepted: alone in its batch body
+     * ("[" + json + "]"), it fills the limit exactly.
      */
     public function testRequestExactlyAtThePerItemSizeBoundaryIsAccepted(): void
     {

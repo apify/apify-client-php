@@ -11,10 +11,7 @@ use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Options\LogOptions;
 use Psr\Http\Message\StreamInterface;
 
-/**
- * A client for accessing the log of an Actor build or run ({@code /v2/logs/{buildOrRunId}}, or the
- * run/build-nested {@code .../log}).
- */
+/** A client for the log of a build or run. */
 final class LogClient
 {
     private function __construct(private ResourceContext $ctx)
@@ -28,9 +25,10 @@ final class LogClient
     }
 
     /**
-     * Creates a log client for a run's or build's nested log endpoint (e.g. {@code .../log}). Any
-     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
-     * accessor) become base params so the log of the correct run is resolved. @internal
+     * A client for the nested log endpoint of a build or run. The {@code $inheritedParams}, such as the status
+     * filter of a last-run accessor, are sent with every request.
+     *
+     * @internal
      */
     public static function nested(HttpClientCore $http, string $base, ?QueryParams $inheritedParams = null): self
     {
@@ -42,15 +40,9 @@ final class LogClient
     }
 
     /**
-     * Fetches the log as text, or {@code null} if the log does not exist.
-     *
-     * Unlike the reference client, there is no separate {@code buffer} option: a PHP string is already
-     * a byte sequence, never re-decoded, so this already returns the exact bytes the API sent — the
-     * same thing the reference client's {@code buffer: true} opts into for its own string/Buffer split.
-     *
-     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::log()} or
-     * {@see \Apify\Client\Resource\BuildClient::log()}), a 404 is rethrown instead, since it could mean
-     * either the parent resource or the log is gone.
+     * Fetches the log as text, or returns {@code null} if it does not exist. A client without an ID, such as
+     * {@see \Apify\Client\Resource\RunClient::log()} or {@see \Apify\Client\Resource\BuildClient::log()},
+     * rethrows the 404.
      */
     public function get(?LogOptions $options = null, int|float|string|null $timeoutSecs = null): ?string
     {
@@ -60,13 +52,7 @@ final class LogClient
         return $response === null ? null : (string) $response->getBody();
     }
 
-    /**
-     * Opens a live, streaming connection to the log and returns a stream over the log bytes.
-     *
-     * Unlike {@see get()}, this bypasses the buffered/retrying transport so the log can be followed
-     * in real time as the run produces it (the {@code stream=1} query parameter). Because the
-     * response is consumed incrementally, it is not retried.
-     */
+    /** Opens a stream of the log, to follow it while the run produces it. The stream is not retried. */
     public function stream(?LogOptions $options = null): StreamInterface
     {
         $params = new QueryParams();

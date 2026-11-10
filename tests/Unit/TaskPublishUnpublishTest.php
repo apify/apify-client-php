@@ -9,11 +9,8 @@ use Apify\Client\Internal\Json;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Offline behavioral tests for {@see \Apify\Client\Resource\TaskClient::publish()} and
- * {@see \Apify\Client\Resource\TaskClient::unpublish()}: both are thin wrappers around
- * {@see \Apify\Client\Resource\TaskClient::update()}, so what needs covering offline is the exact
- * request they send (method, path, body), independent of the live-API-dependent behavior already
- * exercised by {@see \Apify\Client\Tests\Integration\TaskIntegrationTest::testPublishUnpublish()}.
+ * Offline tests of {@see \Apify\Client\Resource\TaskClient::publish()} and {@see \Apify\Client\Resource\TaskClient::unpublish()}.
+ * Both wrap {@see \Apify\Client\Resource\TaskClient::update()}, so the tests check the request they send.
  */
 final class TaskPublishUnpublishTest extends TestCase
 {

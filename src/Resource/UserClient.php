@@ -11,12 +11,7 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\User;
 
-/**
- * A client for accessing user data ({@code /v2/users/{userId}} or {@code /v2/users/me}).
- *
- * It also exposes the user's monthly usage and account limits, addressed by the same user ID (or
- * {@code me}).
- */
+/** A client for a user, with the monthly usage and account limits of the user. */
 final class UserClient
 {
     private ResourceContext $ctx;
@@ -28,8 +23,8 @@ final class UserClient
     }
 
     /**
-     * Fetches the user. For {@code me} it returns private account details (via {@see User::toArray()});
-     * for other users it returns the public profile. Returns {@code null} if the user does not exist.
+     * Fetches the user: the private account details for {@code me}, the public profile for others. Returns
+     * {@code null} if the user does not exist.
      */
     public function get(int|float|string|null $timeoutSecs = null): ?User
     {
@@ -38,8 +33,7 @@ final class UserClient
     }
 
     /**
-     * Fetches the user's monthly usage for the month containing the given date (formatted as
-     * {@code YYYY-MM-DD}). An empty/{@code null} date reports the current month.
+     * Fetches the monthly usage for the month of the date ({@code YYYY-MM-DD}), by default the current month.
      *
      * @return array<string,mixed>
      */

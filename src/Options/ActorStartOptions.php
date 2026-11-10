@@ -8,14 +8,12 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\ResourceContext;
 
-/**
- * Configures starting an Actor run. All fields are optional.
- */
+/** Options for starting an Actor run. */
 final class ActorStartOptions
 {
     /**
-     * @param list<mixed>|null $webhooks ad-hoc webhooks to attach to this run; serialized to
-     *                                   base64-encoded JSON as the {@code webhooks} query parameter
+     * @param list<mixed>|null $webhooks ad-hoc webhooks of the run, sent base64-encoded as the {@code webhooks}
+     *                                   query parameter
      */
     public function __construct(
         /** The tag or number of the build to run (e.g. {@code "latest"}, {@code "0.1.2"}). */
@@ -34,26 +32,19 @@ final class ActorStartOptions
         public readonly ?string $contentType = null,
         /** If {@code true}, restart the run if it fails. */
         public readonly ?bool $restartOnError = null,
-        /**
-         * Override the Actor's permission level for this run ({@code LIMITED_PERMISSIONS}/
-         * {@code FULL_PERMISSIONS}).
-         */
+        /** Overrides the permission level of the Actor for this run ({@code LIMITED_PERMISSIONS} or {@code FULL_PERMISSIONS}). */
         public readonly ?string $forcePermissionLevel = null,
         public readonly ?array $webhooks = null,
         /**
-         * Retry the start while the account lacks the resources for the run, that is while the API
-         * rejects it with an {@see \Apify\Client\Exception\ApifyApiException} of type
-         * {@code actor-memory-limit-exceeded} or {@code concurrent-runs-limit-exceeded}. Both clear as
-         * other runs or builds finish. The start is retried every 10 seconds, and any other error is
-         * thrown right away.
+         * Retries the start while the account lacks the resources for the run, which the API reports as
+         * {@code actor-memory-limit-exceeded} or {@code concurrent-runs-limit-exceeded}. The start is retried
+         * every 10 seconds, and any other error is thrown at once.
          *
-         * {@code true} retries until the run starts. An {@code int} number of seconds stops retrying
-         * after that many seconds and throws the last error. {@code null} (the default) makes a single
-         * attempt.
+         * {@code true} retries until the run starts, an {@code int} for that many seconds. {@code null} makes
+         * one attempt.
          *
-         * A run that requests more memory than the whole memory limit of the account is rejected with
-         * {@code actor-memory-limit-exceeded} as well and never starts, so {@code true} retries it
-         * forever.
+         * A run that asks for more memory than the account limit also gets {@code actor-memory-limit-exceeded},
+         * so {@code true} retries it forever.
          */
         public readonly bool|int|null $waitForResources = null,
     ) {
@@ -82,9 +73,8 @@ final class ActorStartOptions
     }
 
     /**
-     * Encodes an ad-hoc webhooks list as base64-encoded JSON, as the API's {@code webhooks} query
-     * parameter requires. Returns {@code null} for a {@code null} list. Shared by Actor and task
-     * start options.
+     * Encodes ad-hoc webhooks as base64-encoded JSON for the {@code webhooks} query parameter. {@code null}
+     * stays {@code null}.
      *
      * @param list<mixed>|null $webhooks
      * @internal

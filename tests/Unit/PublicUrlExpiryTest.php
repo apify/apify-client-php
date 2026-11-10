@@ -10,10 +10,7 @@ use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-/**
- * A signed public URL's {@code expiresInSecs} must be positive: the signer reads zero as "never
- * expires" and a negative value yields an already-expired URL, so both are rejected before any request.
- */
+/** An {@code expiresInSecs} of a signed public URL must be positive. Zero would mean "never expires", and a negative value gives an expired URL. */
 final class PublicUrlExpiryTest extends TestCase
 {
     /** @return iterable<string,array{int}> */

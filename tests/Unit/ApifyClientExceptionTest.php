@@ -12,12 +12,7 @@ use Apify\Client\Exception\NotFoundException;
 use Apify\Client\Exception\TransportException;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Covers {@see ApifyClientException}, the common base every error the client throws for a failed API
- * interaction extends, matching the reference client's {@code ApifyClientError}
- * (apify/apify-client-js#1145): a single {@code instanceof ApifyClientException} check catches a failed
- * (non-2xx) API call and a response body that fails to parse as JSON alike.
- */
+/** Tests of {@see ApifyClientException}: one {@code instanceof} check catches a failed API call and an unparsable response body. */
 final class ApifyClientExceptionTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient
@@ -59,9 +54,8 @@ final class ApifyClientExceptionTest extends TestCase
 
     public function testTransportExceptionIsNotAnApifyClientException(): void
     {
-        // Network/timeout failures stay outside the hierarchy, matching the reference client, where
-        // transport errors are not instances of ApifyClientError either.
-        // maxRetries: 0 so the single queued failure surfaces immediately instead of being retried.
+        // Network failures and timeouts stay outside the hierarchy.
+        // maxRetries: 0, so the queued failure surfaces at once.
         $transport = (new MockTransport())->queueError();
         $client = new ApifyClient(token: 't', maxRetries: 0, timeoutSecs: 5, httpClient: $transport);
 

@@ -8,12 +8,7 @@ use Apify\Client\ApifyClient;
 use Apify\Client\Options\SetRecordOptions;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Covers the {@code $contentEncoding} parameter of
- * {@see \Apify\Client\Resource\KeyValueStoreClient::setRecord()}, matching the reference client's
- * {@code contentEncoding} option of {@code setRecord()} (apify/apify-client-js#1140): a value that is
- * already compressed is uploaded as is, never compressed a second time.
- */
+/** Tests of {@see \Apify\Client\Resource\KeyValueStoreClient::setRecord()} with {@code $contentEncoding}: a compressed value is uploaded as it is. */
 final class KeyValueStoreContentEncodingTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient

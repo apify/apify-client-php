@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Internal;
 
 /**
- * Retry/timeout policy for the orchestrating HTTP client.
+ * The retry and timeout settings of the HTTP client.
  *
  * @internal
  */

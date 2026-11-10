@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * A single, cursor-paginated page of a request queue's requests. Returned by
- * {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}.
- */
+/** A cursor-paginated page of requests, returned by {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}. */
 final class RequestQueueRequestsPage
 {
     /**
@@ -44,7 +41,7 @@ final class RequestQueueRequestsPage
     }
 
     /**
-     * The requests in this page.
+     * The requests of the page.
      *
      * @return list<RequestQueueRequest>
      */
@@ -60,9 +57,9 @@ final class RequestQueueRequestsPage
     }
 
     /**
-     * The ID of the last request of the previous page, if pagination was continued by ID.
+     * The ID of the last request of the previous page, when the pagination continued by ID.
      *
-     * @deprecated superseded by {@see getCursor()}/{@see getNextCursor()}
+     * @deprecated superseded by {@see getCursor()} and {@see getNextCursor()}
      */
     public function getExclusiveStartId(): ?string
     {

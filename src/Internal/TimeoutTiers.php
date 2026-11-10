@@ -7,15 +7,12 @@ namespace Apify\Client\Internal;
 use InvalidArgumentException;
 
 /**
- * The named request-timeout tiers, mirroring the reference client's {@code TimeoutTier}: {@code
- * 'short'} for metadata reads/writes, {@code 'medium'} for listing/batch/trigger calls, and {@code
- * 'long'} for downloads/uploads/streaming. {@code 'noTimeout'} (accepted per call, not a configured
- * duration) opts a single call out of any request timeout.
+ * The named request timeout tiers: {@code 'short'} for metadata reads and writes, {@code 'medium'} for
+ * listing, batch and trigger calls, and {@code 'long'} for downloads, uploads and streaming. A call can also
+ * pass {@code 'noTimeout'}.
  *
- * Defaults match the reference client: {@code short} 5s, {@code medium} 30s, {@code long} and the
- * per-attempt cap {@code max} the client's overall {@code $timeoutSecs} (360s by default). Every
- * tier is configurable on the {@see \Apify\Client\ApifyClient} constructor; a tier or per-call
- * duration above the cap is capped at it.
+ * Defaults: {@code short} 5 s, {@code medium} 30 s, and {@code long} and the cap {@code max} the client's
+ * {@code $timeoutSecs} (360 s). A duration above the cap is capped.
  *
  * @internal
  */
@@ -26,14 +23,7 @@ final class TimeoutTiers
     public const TIER_LONG = 'long';
     public const NO_TIMEOUT = 'noTimeout';
 
-    /**
-     * The request-timeout value meaning "no timeout", as sent to the transport. Both Guzzle
-     * ({@code RequestOptions::TIMEOUT}) and the underlying cURL option it sets treat {@code 0.0} as
-     * "wait indefinitely", so this sentinel reaches {@see \Apify\Client\Http\HttpClientInterface}
-     * as an ordinary {@code float} with no special-cased {@code null} along the way — {@code 0.0} is
-     * never confused with "no override" because every {@code ?? } fallback in this client only
-     * triggers on {@code null}, not on a falsy {@code 0.0}.
-     */
+    /** The timeout meaning "none", which Guzzle and cURL read from {@code 0.0}. A {@code null} fallback never triggers on it. */
     public const INFINITE_SECS = 0.0;
 
     /** Default duration of the {@code short} tier, in seconds (metadata reads and writes). */
@@ -51,9 +41,8 @@ final class TimeoutTiers
     }
 
     /**
-     * Builds the tier configuration. A tier argument left {@code null} falls back to its default:
-     * {@see DEFAULT_SHORT_SECS}, {@see DEFAULT_MEDIUM_SECS}, and, for the {@code long} tier and the
-     * per-attempt cap, {@code $defaultSecs} (this client's overall {@code $timeoutSecs}).
+     * Builds the tiers. A {@code null} argument falls back to {@see DEFAULT_SHORT_SECS},
+     * {@see DEFAULT_MEDIUM_SECS} or, for the {@code long} tier and the cap, {@code $defaultSecs}.
      */
     public static function create(
         float $defaultSecs,
@@ -83,14 +72,11 @@ final class TimeoutTiers
     }
 
     /**
-     * Resolves a per-call timeout override against this tier configuration: {@code null} uses
-     * {@code $defaultTier}'s configured duration; a tier name ({@see TIER_SHORT}, {@see TIER_MEDIUM},
-     * {@see TIER_LONG}) uses that tier's duration instead; {@see NO_TIMEOUT} returns {@see
-     * INFINITE_SECS} (no request timeout at all — for calls that poll until a job finishes); a number
-     * of seconds is used as-is, capped at {@see $maxSecs}.
+     * Resolves the timeout of a call: {@code null} is the duration of {@code $defaultTier}, a tier name that
+     * tier's duration, {@see NO_TIMEOUT} {@see INFINITE_SECS}, and a number of seconds itself, capped at
+     * {@see $maxSecs}.
      *
-     * @param int|float|string|null $timeoutSecs a number of seconds, a tier name, {@see NO_TIMEOUT}, or
-     *                                            {@code null} to use {@code $defaultTier}
+     * @param int|float|string|null $timeoutSecs seconds, a tier name, {@see NO_TIMEOUT} or {@code null}
      */
     public function resolve(int|float|string|null $timeoutSecs, string $defaultTier): float
     {

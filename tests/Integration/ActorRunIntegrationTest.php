@@ -136,10 +136,7 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
         }
     }
 
-    /**
-     * Creates an Actor whose {@code main.js} is the given script and waits for its build to succeed;
-     * returns the Actor ID. The caller deletes the Actor.
-     */
+    /** Creates an Actor with the script as {@code main.js}, waits for its build and returns its ID. The caller deletes the Actor. */
     private function createBuiltActor(ApifyClient $client, string $label, string $mainJs): string
     {
         $definition = self::minimalActor(self::uniqueName($label));

@@ -7,9 +7,8 @@ namespace Apify\Client\Internal;
 use Apify\Client\Http\HttpCompressorInterface;
 
 /**
- * Per-request deviations from the default behaviour of {@see HttpClientCore::call()}. The defaults describe
- * a call to the Apify API itself; {@see \Apify\Client\Resource\ActorServerClient} overrides them to talk to an
- * Actor's own web server, whose responses and side effects the client must not second-guess.
+ * Per-request deviations from the defaults of {@see HttpClientCore::call()}, which describe a call to the Apify
+ * API. {@see \Apify\Client\Resource\ActorServerClient} overrides them to call the web server of an Actor.
  *
  * @internal
  */

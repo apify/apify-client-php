@@ -30,9 +30,9 @@ final class WebhookClient
     }
 
     /**
-     * Updates the webhook with the given fields and returns the updated object.
+     * Updates the webhook and returns it.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Webhook
     {

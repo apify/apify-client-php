@@ -37,9 +37,8 @@ final class DatasetCollectionClient
     }
 
     /**
-     * Lazily iterates over datasets, fetching pages on demand. The options' {@code limit} caps the
-     * total number of datasets yielded across all pages ({@code null} = all); {@code $chunkSize} is
-     * the per-page size ({@code null} = the API's default page size).
+     * Lazily yields datasets. The {@code limit} option caps the total ({@code null} for all) and
+     * {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
      * @return Generator<int,Dataset>
      */
@@ -55,9 +54,8 @@ final class DatasetCollectionClient
     }
 
     /**
-     * Gets the dataset with the given name, creating it if it does not exist. An empty/{@code null}
-     * name creates a new unnamed dataset. An optional {@code $schema} (an associative array) is sent
-     * when creating the dataset, mirroring the reference client's {@code getOrCreate(name, { schema })}.
+     * Returns the dataset with the name, creating it if needed. An empty name creates an unnamed dataset. The
+     * {@code $schema} is sent when the dataset is created.
      *
      * @param array<string,mixed>|null $schema
      */

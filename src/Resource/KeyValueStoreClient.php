@@ -34,9 +34,10 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Creates a client for a run's default key-value store (nested path only, no ID). Any
-     * {@code $inheritedParams} (e.g. the {@code status}/{@code origin} filters pinned by a last-run
-     * accessor) become base params so every request resolves the correct run's store. @internal
+     * A client for the default key-value store of a run, which has no ID. The {@code $inheritedParams}, such as
+     * the status filter of a last-run accessor, are sent with every request.
+     *
+     * @internal
      */
     public static function nested(HttpClientCore $http, string $base, string $subPath, ?QueryParams $inheritedParams = null): self
     {
@@ -55,10 +56,8 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Fetches the store metadata, or {@code null} if it does not exist.
-     *
-     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::keyValueStore()}),
-     * a 404 is rethrown instead, since it could mean either the parent resource or the store is gone.
+     * Fetches the store, or returns {@code null} if it does not exist. A client without an ID, such as
+     * {@see \Apify\Client\Resource\RunClient::keyValueStore()}, rethrows the 404.
      */
     public function get(int|float|string|null $timeoutSecs = null): ?KeyValueStore
     {
@@ -67,19 +66,16 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Updates the store metadata (e.g. name) and returns the updated object.
+     * Updates the store, for example its name.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): KeyValueStore
     {
         return new KeyValueStore($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)));
     }
 
-    /**
-     * Deletes the store. A not-found is a no-op, unless this client was obtained without an ID (e.g.
-     * {@see \Apify\Client\Resource\RunClient::keyValueStore()}), in which case it is rethrown.
-     */
+    /** Deletes the store. A missing store is ignored, unless the client has no ID. */
     public function delete(int|float|string|null $timeoutSecs = null): void
     {
         $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
@@ -96,32 +92,25 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Lazily iterates over the store's keys, transparently following cursor pagination
-     * ({@code exclusiveStartKey}/{@code nextExclusiveStartKey}), mirroring the reference client's
-     * async-iterable {@code listKeys()}.
+     * Lazily yields the keys of the store, following the cursor pages.
      *
-     * The options' {@code limit} caps the total number of keys yielded across all pages ({@code null}
-     * or {@code 0} = all); {@code exclusiveStartKey} starts the listing after a given key; {@code prefix} and
-     * {@code collection} restrict which keys are listed. {@code $chunkSize} caps how many keys are
-     * requested per page ({@code null} = the remaining total cap, or the API's default page size when
-     * unbounded) — the two are independent, matching the offset/limit collection iterators.
+     * The {@code limit} option caps the total number of keys ({@code null} or {@code 0} for all),
+     * {@code exclusiveStartKey} starts the listing after a key, and {@code prefix} and {@code collection} filter
+     * the keys. {@code $chunkSize} caps the keys per page ({@code null} for the remaining total, or the API's
+     * default without a limit).
      *
      * @return Generator<int,KeyValueStoreKey>
      */
     public function iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new ListKeysOptions();
-        // Total cap across all pages. null or 0 means "iterate the whole store" (the API treats
-        // limit=0 as unset). Normalizing 0 -> null here matches the offset paginator's minLimit
-        // convention and the sibling clients, and stops a per-page limit=0 from short-circuiting
-        // the iteration after a single page.
+        // A limit of 0 means no limit, as for the API.
         $limit = ($options->limit !== null && $options->limit > 0) ? $options->limit : null;
         $exclusiveStartKey = $options->exclusiveStartKey;
         $iterated = 0;
 
         while (true) {
-            // Ask for only as many keys as remain under the total cap (null = server default),
-            // further capped by $chunkSize.
+            // Only the keys that remain under the total cap, further capped by $chunkSize.
             $remaining = $limit !== null ? $limit - $iterated : null;
             $page = $this->listKeys(new ListKeysOptions(
                 limit: ResourceContext::minLimit($remaining, $chunkSize),
@@ -159,15 +148,12 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Fetches a record by key, or {@code null} if it does not exist. Like the reference client, it
-     * requests the record as an attachment so the API returns the raw bytes directly. The value is never
-     * parsed: {@see KeyValueStoreRecord::getValue()} holds the exact bytes the API sent whatever the
-     * content type, so a JSON record is decoded by the caller.
+     * Fetches a record, or returns {@code null} if it does not exist. The record is requested as an
+     * attachment, so the API returns the raw bytes. {@see KeyValueStoreRecord::getValue()} holds them whatever the
+     * content type, so decode a JSON record yourself.
      */
     public function getRecord(string $key, ?GetRecordOptions $options = null, int|float|string|null $timeoutSecs = null): ?KeyValueStoreRecord
     {
-        // GetRecordOptions defaults attachment=true (matching the reference client), so a caller-
-        // supplied options object requests the record as an attachment unless it opts out explicitly.
         $options ??= new GetRecordOptions();
         $params = new QueryParams();
         $options->appendTo($params);
@@ -184,20 +170,12 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Stores a record with raw bytes and the given content type, honoring the given write options
-     * ({@code timeoutSecs}, {@code doNotRetryTimeouts}). {@code $value} is sent exactly as given, also
-     * under {@code application/json}, so it has to be valid JSON already; use {@see setRecordJson()} to
-     * have a value encoded.
+     * Stores a record of raw bytes. {@code $value} is sent as it is, also under {@code application/json}, so it
+     * must already be valid JSON. Use {@see setRecordJson()} to have a value encoded.
      *
-     * {@code $contentEncoding}, if given, is sent as the request's {@code Content-Encoding} header, for
-     * a {@code $value} that is already compressed (gzip, br, deflate, ...): the client's own best-effort
-     * request compression ({@see \Apify\Client\Internal\Compression}) always backs off when a {@code
-     * Content-Encoding} header is already present (see {@see
-     * \Apify\Client\Internal\HttpClientCore::call()}), so the bytes are stored exactly as given, never
-     * compressed a second time. Unlike the reference client's {@code setRecord()}, this has no
-     * "non-identity encoding on a non-binary value" validation case to replicate: a PHP string is
-     * already the raw-bytes case there, since JSON values go through the separate {@see setRecordJson()}
-     * instead of a union type on one method.
+     * {@code $contentEncoding} is the {@code Content-Encoding} of a {@code $value} that is already compressed,
+     * for example {@code gzip}, {@code br}, {@code zstd} or {@code deflate}. The bytes are then stored as given
+     * and not compressed again.
      */
     public function setRecord(
         string $key,
@@ -220,7 +198,7 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Stores a record holding the JSON serialization of {@code $value}.
+     * Stores the JSON serialization of {@code $value} as a record.
      *
      * @param mixed $value any JSON-serializable value
      */
@@ -239,9 +217,8 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Builds a public URL for fetching the given record. It fetches the store, and if the store
-     * exposes a URL-signing secret key (i.e. it is private), appends an HMAC-SHA256 signature so the
-     * URL grants access without an API token. The URL is built from the configured public base URL.
+     * Builds a public URL for a record. If the store has a URL signing secret, the URL is signed with
+     * HMAC-SHA256, so it works without a token.
      */
     public function getRecordPublicUrl(string $key, int|float|string|null $timeoutSecs = null): string
     {
@@ -257,12 +234,10 @@ final class KeyValueStoreClient
     }
 
     /**
-     * Builds a public URL for listing this store's keys, forwarding the given key-listing filters
-     * into the URL. As with {@see getRecordPublicUrl()}, a signature is appended for private stores
-     * unless the caller already supplied one. {@code $expiresInSecs} optionally bounds a signed URL; it
-     * must be positive, otherwise an {@see InvalidArgumentException} is thrown before any request is
-     * sent. {@code $timeoutSecs} applies to the request that fetches the store (default: the {@code long}
-     * tier).
+     * Builds a public URL for listing the keys, with the filters of {@code $options}. As for
+     * {@see getRecordPublicUrl()}, the URL of a private store is signed, unless the options carry a signature.
+     * {@code $expiresInSecs} limits the validity of a signed URL. {@code $timeoutSecs} is for the request that
+     * fetches the store (default: the {@code long} tier).
      *
      * @throws InvalidArgumentException if {@code $expiresInSecs} is zero or negative
      */

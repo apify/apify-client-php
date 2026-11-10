@@ -10,10 +10,7 @@ use Apify\Client\Internal\Json;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
-/**
- * The response of an Actor's web server to {@see ActorServerClient::request()}. Any status the server answers
- * with is returned, an error status included: check {@see getStatusCode()} or {@see isSuccessful()}.
- */
+/** The response of an Actor's server to {@see ActorServerClient::request()}. Error statuses are returned too, so check {@see getStatusCode()} or {@see isSuccessful()}. */
 final class ActorServerResponse
 {
     private const JSON_CONTENT_TYPE_PATTERN = '#^application/(?:[\w.+-]+\+)?json(?:\s*;|\s*$)#i';
@@ -51,32 +48,25 @@ final class ActorServerResponse
         return $this->response->getHeaderLine($name);
     }
 
-    /**
-     * The response body as raw bytes. With the {@code stream} request option, this reads the rest of the stream.
-     */
+    /** The body as raw bytes. With the {@code stream} option, this reads the rest of the stream. */
     public function getBody(): string
     {
         return (string) $this->response->getBody();
     }
 
-    /**
-     * The response body as a PSR-7 stream. It is live, and holds its connection open until it is read to the end
-     * or closed, when the request was made with the {@code stream} option.
-     */
+    /** The body as a PSR-7 stream. With the {@code stream} option it is live, and its connection stays open until it is read to the end or closed. */
     public function getBodyStream(): StreamInterface
     {
         return $this->response->getBody();
     }
 
     /**
-     * The response body parsed by its content type: JSON is decoded to PHP values (objects become associative
-     * arrays), and any other body is returned as a string. An error response whose body does not parse as its
-     * content type comes back as the raw string. With the {@code stream} request option, this reads the rest of the
-     * stream.
+     * The body parsed by its content type: JSON becomes PHP values, anything else a string. An error response
+     * that does not parse comes back as the raw string. With the {@code stream} option, this reads the rest of
+     * the stream.
      *
      * @return mixed
-     * @throws InvalidResponseBodyException if the body of a success response is not valid JSON, although its
-     *                                      content type says it is
+     * @throws InvalidResponseBodyException if a success response says it is JSON but is not
      */
     public function getData(): mixed
     {

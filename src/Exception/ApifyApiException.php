@@ -5,13 +5,9 @@ declare(strict_types=1);
 namespace Apify\Client\Exception;
 
 /**
- * Thrown for HTTP requests that reach the Apify API but receive a non-success status code.
- *
- * It mirrors the {@code ApifyApiError} of the reference JavaScript client and exposes the parsed
- * error {@see getType() type}, the human-readable {@see getMessage() message}, the HTTP
- * {@see getStatusCode() status code}, the number of the final {@see getAttempt() attempt}, and the
- * request {@see getHttpMethod() method}/{@see getPath() path}. Extends {@see ApifyClientException},
- * the common base every client error shares.
+ * An API response with an error status. Gives the error {@see getType() type}, {@see getMessage() message},
+ * {@see getStatusCode() status code}, the {@see getAttempt() attempt} that failed, and the request
+ * {@see getHttpMethod() method} and {@see getPath() path}.
  */
 class ApifyApiException extends ApifyClientException
 {
@@ -27,7 +23,7 @@ class ApifyApiException extends ApifyClientException
     private string $apiMessage;
 
     /**
-     * @param array<string,mixed>|null $data additional structured error data provided by the API
+     * @param array<string,mixed>|null $data structured error data from the API
      */
     public function __construct(
         int $statusCode,
@@ -38,8 +34,7 @@ class ApifyApiException extends ApifyClientException
         string $path,
         ?array $data = null
     ) {
-        // Exception::getMessage() is final, so the human-readable prefix is baked into the message
-        // passed to the parent constructor (matching the JS reference's formatted error output).
+        // getMessage() is final, so the prefix is part of the message given to the parent.
         $errType = ($type === null || $type === '') ? 'unknown' : $type;
         parent::__construct(sprintf('apify API error (status %d, type %s): %s', $statusCode, $errType, $message));
         $this->apiMessage = $message;
@@ -82,7 +77,7 @@ class ApifyApiException extends ApifyClientException
     }
 
     /**
-     * Additional structured data provided by the API about the error, if any.
+     * Structured data about the error from the API, if any.
      *
      * @return array<string,mixed>|null
      */

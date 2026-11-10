@@ -8,7 +8,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Marks a transport-level (network/timeout) failure, which is retryable by the client.
+ * A network failure or timeout, retried by the client.
  *
  * @internal
  */

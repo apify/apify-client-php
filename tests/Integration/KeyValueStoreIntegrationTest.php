@@ -131,20 +131,14 @@ final class KeyValueStoreIntegrationTest extends IntegrationTestCase
             self::assertIsString($original);
             $gzipped = gzencode($original);
             self::assertIsString($gzipped);
-            // A gzipped JSON payload is itself well over the 1 KiB auto-compression threshold, so
-            // this also proves the client's own compression genuinely backed off: if it had gzipped
-            // the already-gzipped bytes a second time, the API would receive double-compressed gzip
-            // under a single Content-Encoding: gzip header, decode it once, and store the *inner*
-            // gzip bytes as the record's "JSON" — which could never decode back to the original value
-            // below.
+            // The gzipped payload is above the 1 KiB compression threshold, so this shows that the client's own
+            // compression backed off. Compressed twice, the API would store the inner gzip bytes as the record.
             self::assertGreaterThan(1024, strlen($gzipped));
 
             $kvs->setRecord('precompressed.json', $gzipped, 'application/json', contentEncoding: 'gzip');
 
-            // The live API decompresses a Content-Encoding-tagged upload on ingest and serves the
-            // record's plain bytes back out (it does not echo Content-Encoding on GET, nor keep the
-            // compressed bytes verbatim), so the round-trip is verified through the parsed value
-            // rather than a byte-for-byte comparison against $gzipped.
+            // The API decompresses an upload on ingest and serves the plain bytes, without
+            // `Content-Encoding`. The round trip is verified through the parsed value.
             $record = $kvs->getRecord('precompressed.json');
             self::assertNotNull($record);
             self::assertSame($original, $record->getValue());

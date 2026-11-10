@@ -16,10 +16,7 @@ use Apify\Client\Options\RunResurrectOptions;
 use Apify\Client\Options\ValidateInputOptions;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Offline request-shape tests for mutating/convenience endpoints that are risky to exercise live on
- * the shared account. Each asserts the HTTP method, path, query and body the client actually sends.
- */
+/** Offline tests of the method, path, query and body that mutating and convenience calls send. */
 final class RequestShapeTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient
@@ -83,9 +80,7 @@ final class RequestShapeTest extends TestCase
 
     public function testMetamorphSendsRawStringInputAsIs(): void
     {
-        // A string $input is sent exactly as given (raw bytes), not JSON-encoded, so it can be
-        // paired with a non-default contentType — matching the reference client's raw-bytes Actor
-        // input support (ActorClient::start() is covered the same way below).
+        // A string $input is sent as it is, not JSON-encoded, so it can have another contentType.
         $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => ['id' => 'r']]));
         $this->client($transport)->run('run1')->metamorph('apify/other', 'col_a,col_b\n1,2', new MetamorphOptions(contentType: 'text/csv'));
 

@@ -8,30 +8,22 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * The replaceable transport contract of the client.
+ * The transport of the client. An implementation sends one prepared PSR-7 request and returns the PSR-7
+ * response. The client adds the token, the {@code User-Agent} and the retries.
  *
- * Implementations are responsible only for sending a single, fully-prepared PSR-7 request and
- * returning the raw PSR-7 response. Authentication, the {@code User-Agent} header, retries and
- * (de)serialization are handled by the client, so a backend only needs to perform one network
- * round-trip.
- *
- * A non-2xx HTTP status is <b>not</b> an error at this layer — return it as a normal response.
- * Only transport-level failures (connection refused, DNS, timeout, a connection dropped before the
- * response body is complete) should be thrown, as an {@see \Apify\Client\Exception\TransportException}.
+ * An error status is a normal response here. Throw {@see \Apify\Client\Exception\TransportException} only for
+ * transport failures: a refused connection, DNS, a timeout, or a connection dropped before the body is complete.
  * The client takes a returned body as complete and does not retry one that fails to parse.
  *
- * Swap the default implementation ({@see GuzzleHttpClient}) via the {@code httpClient} constructor
- * argument of {@see \Apify\Client\ApifyClient} to share a connection pool, customize TLS/proxy
- * settings, wrap any PSR-18 client ({@see Psr18HttpClient}), or inject a mock in tests.
+ * Pass an implementation as the {@code httpClient} argument of {@see \Apify\Client\ApifyClient}, for example to
+ * share a connection pool, set TLS or proxy options, wrap a PSR-18 client ({@see Psr18HttpClient}), or mock it
+ * in tests.
  */
 interface HttpClientInterface
 {
     /** Sends a single request with a per-attempt timeout (seconds) and buffers the whole response. */
     public function send(RequestInterface $request, float $timeoutSecs): ResponseInterface;
 
-    /**
-     * Sends a single request and returns a response whose body is a live stream, for incremental
-     * consumption (used by log streaming). The caller reads the body stream to completion.
-     */
+    /** Sends a request and returns a response with a live body stream, for incremental reading. The caller reads it to the end. */
     public function sendStreaming(RequestInterface $request, float $timeoutSecs): ResponseInterface;
 }

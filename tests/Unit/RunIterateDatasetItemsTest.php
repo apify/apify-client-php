@@ -9,10 +9,7 @@ use Apify\Client\Internal\Json;
 use Apify\Client\Options\RunIterateDatasetItemsOptions;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Offline tests for {@see \Apify\Client\Resource\RunClient::iterateDatasetItems()}, driven by a
- * scripted transport. Each test queues the exact request sequence the algorithm is expected to make.
- */
+/** Offline tests of {@see \Apify\Client\Resource\RunClient::iterateDatasetItems()}. Each test queues the request sequence it expects. */
 final class RunIterateDatasetItemsTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient

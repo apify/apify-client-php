@@ -7,10 +7,9 @@ namespace Apify\Client\Exception;
 use JsonException;
 
 /**
- * Thrown when the body of a successful (2xx) response does not parse as valid JSON, for example a
- * non-JSON value served as {@code application/json}. The response arrived in full, so the request is not
- * retried. An error status with an unparsable body throws {@see ApifyApiException} for its status code
- * instead. Mirrors the reference client's {@code InvalidResponseBodyError}.
+ * Thrown when the body of a success response is not valid JSON, for example non-JSON served as
+ * {@code application/json}. It is not retried, since the response arrived in full. An error status with an
+ * unparsable body throws {@see ApifyApiException} instead.
  */
 final class InvalidResponseBodyException extends ApifyClientException
 {

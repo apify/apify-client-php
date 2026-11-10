@@ -10,11 +10,9 @@ use Apify\Client\Internal\Json;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Hermetic tests for {@see \Apify\Client\Resource\RunClient::waitForFinish()} /
- * {@see \Apify\Client\Resource\BuildClient::waitForFinish()}'s polling loop, driven by a scripted
- * transport. They exercise the 404-tolerance grace window added alongside the reference client's
- * {@code waitForFinish()} fix: a run/build that 404s right after creation (replica lag) is polled
- * through, but one that keeps 404ing gives up and throws instead of polling for the whole budget.
+ * Tests of the polling loop of {@see \Apify\Client\Resource\RunClient::waitForFinish()} and
+ * {@see \Apify\Client\Resource\BuildClient::waitForFinish()}. A run or build that returns 404 right after its
+ * creation is polled through, but one that keeps returning 404 throws instead of polling for the whole budget.
  */
 final class WaitForFinishTest extends TestCase
 {

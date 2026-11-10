@@ -8,7 +8,7 @@ use Apify\Client\Exception\InvalidResponseBodyException;
 use JsonException;
 
 /**
- * Shared JSON (de)serialization for the client.
+ * JSON encoding and decoding.
  *
  * @internal
  */
@@ -28,12 +28,8 @@ final class Json
     }
 
     /**
-     * Decodes a JSON string into PHP values (objects become associative arrays).
-     *
-     * Every caller of this method (directly or via {@see decodeData()}) decodes a response body the
-     * client just received over the wire, never a value the caller constructed itself (that path is
-     * {@see encode()}), so a malformed body is wrapped as an {@see InvalidResponseBodyException} instead
-     * of leaking the raw {@see JsonException}. A response body that arrived in full is not retried.
+     * Decodes a JSON response body to PHP values (objects become associative arrays). A malformed body throws
+     * {@see InvalidResponseBodyException} and is not retried, since it arrived in full.
      *
      * @return mixed the decoded value
      */
@@ -50,8 +46,7 @@ final class Json
     }
 
     /**
-     * Decodes a JSON response body wrapped in a {@code {"data": ...}} envelope, returning the
-     * unwrapped {@code data} value (or {@code null} if it is absent/null).
+     * Decodes a JSON response body and returns its {@code data} envelope content, or {@code null} if absent.
      *
      * @return mixed the unwrapped data
      */

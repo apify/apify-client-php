@@ -13,11 +13,9 @@ use Apify\Client\Options\TaskStartOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the timeout-tier configuration (matches the reference client's `#1046`): the {@code short} and
- * {@code medium} tiers default to 5s and 30s, the {@code long} tier and {@code timeoutMaxSecs} to the
- * client's overall {@code timeoutSecs}; a per-call override replaces the method's tier for that call
- * alone; {@code timeoutMaxSecs} caps both; and a {@code waitForFinish} request gets the API's hold on
- * top of its tier.
+ * Tests of the timeout tiers: {@code short} and {@code medium} default to 5 s and 30 s, {@code long} and
+ * {@code timeoutMaxSecs} to the client's {@code timeoutSecs}. A per-call override replaces the tier for that
+ * call, {@code timeoutMaxSecs} caps both, and a {@code waitForFinish} request adds the API's hold to its tier.
  */
 final class TimeoutTiersTest extends TestCase
 {

@@ -125,7 +125,8 @@ For `actor($id)->server()->request()`.
 | `params` | `array<string,mixed>\|null` | Query parameters, converted as for API calls: `null` values are left out, booleans are sent as `1`/`0` and a list is joined with commas. |
 | `headers` | `array<string,string>\|null` | Additional headers, `Authorization` included. They reach the Actor's server as they are. |
 | `body` | `mixed` | The request body: an array (or any other JSON-serializable value) is sent as JSON, a string as it is. |
-| `compression` | `string\|HttpCompressorInterface\|null` | `'brotli'`, `'gzip'` or a custom compressor for the request body. Unset sends the body uncompressed, since the Actor's server may not decode a compressed body. |
+| `compression` | `string\|HttpCompressorInterface\|null` | `'brotli'`, `'gzip'`, `'zstd'` or a custom compressor for the request body. Unset sends the body uncompressed, since the server may not decode it. |
+| `parentRequestId` | `?string` | The `X-Actor-Request-ID` header of the request your Server Actor is handling. It is sent as the same header, replacing one in `headers`, so the called Actor charges at the pricing tier of that request. |
 | `stream` | `bool` | Leave the response body unread, so it can be consumed incrementally with `ActorServerResponse::getBodyStream()`. The connection stays open until the body is read to the end or closed. |
 
 ## Running Actors and tasks
@@ -183,7 +184,7 @@ For `run()->charge()` (pay-per-event Actors). `eventName` is **required**.
 | `eventName` | `string` | Name of the event to charge for. |
 | `count` | `?int` | Number of times to charge the event (defaults to 1). |
 | `idempotencyKey` | `?string` | Deduplicates the charge across retries; auto-generated if unset. Expires 3 minutes after the charge — reusing it later creates a new charge rather than deduplicating. |
-| `requestId` | `?string` | ID of the Server Actor request being charged, from the `X-Actor-Request-ID` header of the incoming request. Required for multi-tenant Server Actor runs. |
+| `requestId` | `?string` | ID of the Server Actor request being charged, from the `X-Actor-Request-ID` header of the incoming request. Required for runs of multi-tenant Server Actors. Runs of single-tenant Server Actors ignore it. |
 
 ## Builds
 
@@ -267,10 +268,9 @@ For `keyValueStore()->setRecord()`.
 | `timeoutSecs` | `?int` | Per-request timeout for the upload (capped at the client's overall request timeout). |
 | `doNotRetryTimeouts` | `bool` | If `true`, do not retry the upload on request timeout (default `false`). |
 
-`setRecord()` also takes a trailing `?string $contentEncoding = null` parameter (not a field of
-`SetRecordOptions`, which only holds the write-retry options above): set it to the encoding already
-applied to `$value` (e.g. `'gzip'`) so the client's own request compression backs off and the bytes
-are uploaded exactly as given.
+`setRecord()` also takes a trailing `?string $contentEncoding = null` parameter, which is not a field of
+`SetRecordOptions`. Set it to the encoding already applied to `$value`, for example `'gzip'` or `'zstd'`, and the
+bytes are uploaded as they are, without further compression.
 
 ## Request queues
 

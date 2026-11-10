@@ -5,13 +5,13 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 ## Apify Store — `$client->store()`
 
 - `list(?StoreListOptions $options = null): PaginationList` — one page of Store Actors.
-- `iterate(?StoreListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all matching Actors, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
+- `iterate(?StoreListOptions $options = null, ?int $chunkSize = null): iterable` — lazily yields the matching Actors. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 
 ```php
 $page = $client->store()->list(new StoreListOptions(search: 'scraper', limit: 10));
 
 $shown = 0;
-// $chunkSize (50) is the per-page size; limit (unset) would cap the total across all pages.
+// 50 is the page size. The limit option would cap the total.
 foreach ($client->store()->iterate(new StoreListOptions(search: 'scraper'), 50) as $item) {
     echo $item->getName() . PHP_EOL;
     if (++$shown >= 5) {
@@ -22,9 +22,9 @@ foreach ($client->store()->iterate(new StoreListOptions(search: 'scraper'), 50) 
 
 ## Users — `$client->me()` / `$client->user($id)`
 
-- `get(): ?User` — for `me()`, private account details are available via `toArray()`.
-- `monthlyUsage(?string $date = null): array` — the user's monthly usage. `$date` is an ISO date in `YYYY-MM-DD` format; the report covers the monthly usage cycle containing that date. Omit it (or pass `null`) to report the current month.
-- `limits(): array`, `updateLimits(mixed $newLimits): void` — the user's account limits. `monthlyUsage()`, `limits()` and `updateLimits()` work for `me()` and for any user ID the token may access.
+- `get(): ?User` — for `me()`, the private account details are in `toArray()`.
+- `monthlyUsage(?string $date = null): array` — the monthly usage of the cycle that contains `$date` (`YYYY-MM-DD`), by default the current month.
+- `limits(): array`, `updateLimits(mixed $newLimits): void` — the account limits. These three methods work for `me()` and for any user ID the token may access.
 
 ```php
 $me = $client->me()->get();
@@ -35,9 +35,7 @@ $publicProfile = $client->user('some-username')->get();
 
 ## Logs — `$client->log($buildOrRunId)`
 
-- `get(?LogOptions $options = null): ?string` — the full log as text. A PHP string is already a byte
-  sequence and is never re-decoded, so this already returns the log's exact bytes — there is no
-  separate "raw bytes" mode to opt into.
+- `get(?LogOptions $options = null): ?string` — the log as text, with the exact bytes the API sent.
 - `stream(?LogOptions $options = null): StreamInterface` — a live stream of the log.
 
 ```php

@@ -1,26 +1,24 @@
 # Models reference
 
-Response models live under the `Apify\Client\Model\` namespace and wrap the JSON objects the API
-returns. Each model exposes the commonly-used fields as typed getters; every model also extends
-`ApifyResource`, so two extra methods are always available:
+Response models are in the `Apify\Client\Model\` namespace and wrap the JSON objects of the API. They have typed
+getters for common fields, and all extend `ApifyResource`, which adds:
 
-- `toArray(): array` — the full raw object as an associative array (nothing the API returns is lost,
-  even fields without a dedicated getter).
-- `get(string $key): mixed` — a single raw field by its API name.
+- `toArray(): array` — the whole object, including fields without a getter.
+- `get(string $key): mixed` — a field by its API name.
 
-Getters return `null` when the field is absent from the API response.
+A getter returns `null` when the field is absent from the response.
 
-URL fields the OpenAPI specification declares as `format: uri` — a run's `consoleUrl`, `containerUrl` and
-`output` links, the `consoleUrl` and public URLs of storages, a key's `recordPublicUrl`, a task's
-`standbyUrl`, a webhook's `requestUrl`, a Store Actor's `url` and `userPictureUrl`, and a user profile's
-`pictureUrl` and `websiteUrl` — are returned in the WHATWG URL serialization, as the reference client
-does, by the getters, `get()` and `toArray()` alike: an empty path gets a trailing slash
-(`https://abc.runs.apify.net` becomes `https://abc.runs.apify.net/`), the scheme and host are lowercased,
-a default port is dropped, an internationalized host becomes punycode (needs the optional `intl`
-extension) and unsafe characters are percent-encoded. A value that is not an absolute http(s)/ws(s)/ftp
-URL is kept as received, so a value compared against a stored URL has to be in that form too. The `RequestQueueRequest`
-model is also used as an input object and therefore additionally exposes setters and a constructor
-(see [Input models](#input-models)).
+The URL fields that the OpenAPI specification declares as `format: uri` are returned in the WHATWG URL
+serialization by the getters, `get()` and `toArray()`. They are a run's `consoleUrl`, `containerUrl` and `output`
+links, the `consoleUrl` and public URLs of storages, a key's `recordPublicUrl`, a task's `standbyUrl`, a webhook's
+`requestUrl`, a Store Actor's `url` and `userPictureUrl`, and a user's `pictureUrl` and `websiteUrl`. An empty path
+gets a trailing slash (`https://abc.runs.apify.net` becomes `https://abc.runs.apify.net/`), the scheme and host
+are lowercased, a default port is dropped, an internationalized host becomes punycode (needs the optional `intl`
+extension) and unsafe characters are percent-encoded. A value that is not an absolute http(s), ws(s) or ftp URL is
+kept as received.
+
+`RequestQueueRequest` is also an input object, so it has setters and a constructor (see
+[Input models](#input-models)).
 
 ## Resource models
 
@@ -34,7 +32,7 @@ model is also used as an input object and therefore additionally exposes setters
 | `getTitle(): ?string` | Human-readable title. |
 | `getDescription(): ?string` | Free-text description. |
 | `isPublic(): ?bool` | Whether the Actor is public. |
-| `getStandbyUrl(): ?string` | URL for sending requests to the Actor in Standby mode (a Server Actor), or `null` if Standby mode is not enabled. |
+| `getStandbyUrl(): ?string` | URL for sending requests to the Server Actor, or `null` if it has no server interface. |
 | `getCreatedAt(): ?string` | ISO-8601 creation timestamp. |
 | `getModifiedAt(): ?string` | ISO-8601 last-modification timestamp. |
 

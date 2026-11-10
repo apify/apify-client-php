@@ -23,11 +23,9 @@ final class BuildClient
     }
 
     /**
-     * Fetches the build, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * for the build to finish before responding. The API caps the wait at 60s, and the client
-     * additionally keeps it below the {@code timeoutMaxSecs} cap of a single attempt. Unless
-     * {@code $timeoutSecs} is given, the request timeout is that wait on top of the {@code short} tier.
-     * Returns {@code null} if it does not exist.
+     * Fetches the build, or returns {@code null} if it does not exist. With {@code $waitForFinishSecs}, the API
+     * holds the response until the build finishes, for at most 60 seconds and less than the request timeout. The
+     * request timeout then defaults to that wait plus the {@code short} tier.
      */
     public function get(?int $waitForFinishSecs = null, int|float|string|null $timeoutSecs = null): ?Build
     {
@@ -53,9 +51,8 @@ final class BuildClient
     }
 
     /**
-     * Polls until the build reaches a terminal state or {@code $waitSecs} elapses ({@code null} waits
-     * indefinitely). Returns the latest build. {@code $timeoutSecs} is the timeout of each poll request (a
-     * number of seconds, a tier name or {@code 'noTimeout'}, the default).
+     * Polls until the build finishes or {@code $waitSecs} elapse ({@code null} waits indefinitely), and returns
+     * the latest build. {@code $timeoutSecs} is the timeout of each poll (default {@code 'noTimeout'}).
      */
     public function waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): Build
     {
@@ -69,14 +66,10 @@ final class BuildClient
     }
 
     /**
-     * Returns the OpenAPI definition generated for the build.
+     * Returns the OpenAPI definition generated for the build. A 404 is always thrown, never turned into
+     * {@code null}. A {@code null} result means the body is not an object.
      *
-     * Like the reference client, a 404 here is not swallowed: it always throws instead, since the only
-     * way this fixed sub-path 404s is the build itself being gone (same rule as {@see
-     * \Apify\Client\Resource\DatasetClient::getStatistics()} and friends). A {@code null} return means
-     * the response body did not decode to an object — not a missing build, which throws.
-     *
-     * @return array<string,mixed>|null the raw OpenAPI document
+     * @return array<string,mixed>|null the OpenAPI document
      */
     public function getOpenApiDefinition(int|float|string|null $timeoutSecs = null): ?array
     {
@@ -86,12 +79,10 @@ final class BuildClient
     }
 
     /**
-     * A client for accessing this build's log.
+     * A client for the log of the build.
      *
-     * A 404 from this client's {@code get()} throws an {@see \Apify\Client\Exception\ApifyApiException}
-     * instead of resolving to {@code null}, since this build client has no ID of its own at this
-     * sub-path — the 404 could mean either the build or its log is gone, and the response cannot tell
-     * the two apart (matches the reference client's {@code catchNotFoundForResourceOrThrow}).
+     * A 404 from its {@code get()} is thrown instead of returning {@code null}, since the client cannot tell a
+     * missing build from a missing log.
      */
     public function log(): LogClient
     {

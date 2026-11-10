@@ -47,6 +47,13 @@ final class ActorServerRequestOptions
          * connection stays open until the caller reads the body to the end or closes it.
          */
         public readonly bool $stream = false,
+        /**
+         * The {@code X-Actor-Request-ID} header of the request your Server Actor is handling. It is sent on as the
+         * same header, replacing one in {@code headers}, so the called Actor charges at that request's pricing tier.
+         *
+         * @see https://docs.apify.com/platform/actors/development/programming-interface/server-actors
+         */
+        public readonly ?string $parentRequestId = null,
     ) {
     }
 

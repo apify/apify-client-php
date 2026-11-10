@@ -6,15 +6,11 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/**
- * Run-specific filters for listing runs. The {@code startedAfter}/{@code startedBefore} filters are
- * only honoured by the Actor-scoped and task-scoped run collections.
- */
+/** Filters for listing runs. {@code startedAfter} and {@code startedBefore} work only for Actor and task runs. */
 final class RunListOptions
 {
     /**
-     * @param list<string>|null $status filter by one or more run statuses (e.g. {@code "SUCCEEDED"},
-     *                                  {@code "RUNNING"}); sent as a comma-separated list
+     * @param list<string>|null $status filters by run status, for example {@code "SUCCEEDED"}; sent comma-separated
      */
     public function __construct(
         public readonly ?array $status = null,
@@ -23,12 +19,10 @@ final class RunListOptions
         /** Filter to runs started before this ISO-8601 timestamp. */
         public readonly ?string $startedBefore = null,
         /**
-         * Filter to runs of the given Actor Standby deployments ({@code SINGLE_TENANT},
-         * {@code MULTI_TENANT_FREE_USERS}, {@code MULTI_TENANT_PAYING_USERS},
-         * {@code MULTI_TENANT_OWNER_PAID}); sent as a comma-separated list. Honoured by the Actor-scoped
-         * and account-wide run collections. The API requires {@code status} to be set to non-terminal
-         * statuses only ({@code READY}, {@code RUNNING}, {@code TIMING-OUT}, {@code ABORTING}) when this
-         * filter is used.
+         * Filters by the deployment of Server Actor runs ({@code SINGLE_TENANT}, {@code MULTI_TENANT_FREE_USERS},
+         * {@code MULTI_TENANT_PAYING_USERS}, {@code MULTI_TENANT_OWNER_PAID}); sent comma-separated. Works for
+         * Actor runs and all runs. The API then requires {@code status} to hold only non-terminal statuses
+         * ({@code READY}, {@code RUNNING}, {@code TIMING-OUT}, {@code ABORTING}).
          *
          * @var list<string>|null
          */

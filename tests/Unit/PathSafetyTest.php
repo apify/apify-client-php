@@ -10,10 +10,8 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers URL path-segment sanitization (matches the reference client's `#1011`): an id or key
- * interpolated into a request path is percent-encoded, and an empty or dot-segment value is rejected
- * instead, since a URL parser resolves "." / ".." from the decoded path even when the string contains
- * no literal "/" of its own.
+ * Tests of the path segment sanitization: an ID or key in a request path is percent-encoded, and an empty
+ * or dot segment is rejected, since a URL parser would resolve it to the parent.
  */
 final class PathSafetyTest extends TestCase
 {
@@ -103,11 +101,7 @@ final class PathSafetyTest extends TestCase
         $this->client(new MockTransport())->actor('..');
     }
 
-    /**
-     * A record key sent as "a/../../secret" cannot escape the records/ sub-path: the "/" is
-     * percent-encoded into "%2F", which decodes back to a single literal segment rather than being
-     * resolved by a URL parser into extra path segments.
-     */
+    /** The key "a/../../secret" cannot leave the records/ sub-path, since its "/" is encoded as "%2F". */
     public function testRecordKeyWithSlashesCannotEscapeItsSegment(): void
     {
         $transport = (new MockTransport())->queueResponse(200, '', ['Content-Type' => 'text/plain']);

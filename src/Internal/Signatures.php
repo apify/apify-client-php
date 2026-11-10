@@ -7,20 +7,19 @@ namespace Apify\Client\Internal;
 use InvalidArgumentException;
 
 /**
- * Apify storage-content URL signing, byte-for-byte compatible with the platform's
- * {@code @apify/utilities} implementation that the reference clients rely on.
+ * Apify storage content URL signing, compatible with the platform's {@code @apify/utilities}.
  *
  * @internal
  */
 final class Signatures
 {
-    /** Version tag embedded in storage-content signatures (upstream default). */
+    /** The version tag in storage content signatures. */
     private const STORAGE_CONTENT_SIGNATURE_VERSION = '0';
 
-    /** Number of leading hex characters of the HMAC digest used. */
+    /** The number of leading hex characters of the HMAC digest that are used. */
     private const HMAC_SIGNATURE_HEX_LEN = 30;
 
-    /** Base62 alphabet (digits, then lowercase, then uppercase), matching upstream. */
+    /** The base62 alphabet: digits, lowercase, uppercase. */
     private const BASE62_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
     private function __construct()
@@ -28,9 +27,8 @@ final class Signatures
     }
 
     /**
-     * Computes an Apify URL-signing signature, byte-for-byte compatible with upstream
-     * {@code createHmacSignature}: HMAC-SHA256(secret, message) as lowercase hex, take the first 30
-     * hex characters, interpret them as a big integer, then base62-encode (alphabet {@code 0-9a-zA-Z}).
+     * Computes a signature: the first 30 hex characters of HMAC-SHA256(secret, message) as a big integer in
+     * base62 ({@code 0-9a-zA-Z}). Same as upstream {@code createHmacSignature}.
      */
     public static function createHmacSignature(string $secretKey, string $message): string
     {
@@ -48,15 +46,12 @@ final class Signatures
     }
 
     /**
-     * Builds a storage-content signature for a resource's public URL, byte-for-byte compatible with
-     * upstream {@code createStorageContentSignature}.
+     * Builds the signature of a public storage URL, as upstream {@code createStorageContentSignature} does:
+     * the base64url encoding, without padding, of {@code "{version}.{expiresAtMillis}.{hmac}"}. The HMAC signs
+     * {@code "{version}.{expiresAtMillis}.{resourceId}"}, where {@code expiresAtMillis} is the absolute expiry or
+     * {@code 0} for none.
      *
-     * It signs the message {@code "{version}.{expiresAtMillis}.{resourceId}"} ({@code expiresAtMillis}
-     * is the absolute expiry in ms, or {@code 0} for a non-expiring URL) with
-     * {@see createHmacSignature}, then returns the base64url (no padding) encoding of
-     * {@code "{version}.{expiresAtMillis}.{hmac}"}.
-     *
-     * @param int|null $expiresInSecs optional expiry in seconds ({@code null} for a non-expiring URL)
+     * @param int|null $expiresInSecs the expiry in seconds ({@code null} for none)
      */
     public static function signStorageContent(string $secretKey, string $resourceId, ?int $expiresInSecs): string
     {
@@ -70,10 +65,7 @@ final class Signatures
         return rtrim(strtr(base64_encode($envelope), '+/', '-_'), '=');
     }
 
-    /**
-     * Interprets a hex string as a big-endian non-negative integer and encodes it in base62.
-     * Implemented with byte-wise long division (base 256 → base 62) so it needs no bignum extension.
-     */
+    /** Converts a hex string to base62 by long division on bytes, so it needs no bignum extension. */
     private static function hexToBase62(string $hex): string
     {
         $binary = hex2bin($hex);

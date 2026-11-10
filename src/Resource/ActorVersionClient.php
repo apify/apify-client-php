@@ -10,10 +10,7 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorVersion;
 
-/**
- * A client for a specific Actor version ({@code GET/PUT/DELETE
- * /v2/actors/{actorId}/versions/{versionNumber}}).
- */
+/** A client for an Actor version. */
 final class ActorVersionClient
 {
     private ResourceContext $ctx;
@@ -34,9 +31,9 @@ final class ActorVersionClient
     }
 
     /**
-     * Updates the version with the given fields and returns the updated object.
+     * Updates the version and returns it.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): ActorVersion
     {

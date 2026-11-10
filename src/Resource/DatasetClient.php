@@ -34,8 +34,9 @@ final class DatasetClient
     }
 
     /**
-     * Creates a dataset client over a ready context, such as the one of a run's default dataset (nested
-     * path only, no ID). @internal
+     * A dataset client over a ready context, such as the one of the default dataset of a run, which has no ID.
+     *
+     * @internal
      */
     public static function fromContext(HttpClientCore $http, ResourceContext $ctx): self
     {
@@ -50,10 +51,8 @@ final class DatasetClient
     }
 
     /**
-     * Fetches the dataset metadata, or {@code null} if it does not exist.
-     *
-     * When this client was obtained without an ID (e.g. {@see \Apify\Client\Resource\RunClient::dataset()}),
-     * a 404 is rethrown instead, since it could mean either the parent resource or the dataset is gone.
+     * Fetches the dataset, or returns {@code null} if it does not exist. A client without an ID, such as
+     * {@see \Apify\Client\Resource\RunClient::dataset()}, rethrows the 404.
      */
     public function get(int|float|string|null $timeoutSecs = null): ?Dataset
     {
@@ -62,33 +61,27 @@ final class DatasetClient
     }
 
     /**
-     * Updates the dataset metadata (e.g. name, title) and returns the updated object.
+     * Updates the dataset, for example its name or title.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Dataset
     {
         return new Dataset($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
     }
 
-    /**
-     * Deletes the dataset. A not-found is a no-op, unless this client was obtained without an ID (e.g.
-     * {@see \Apify\Client\Resource\RunClient::dataset()}), in which case it is rethrown.
-     */
+    /** Deletes the dataset. A missing dataset is ignored, unless the client has no ID. */
     public function delete(int|float|string|null $timeoutSecs = null): void
     {
         $this->ctx->deleteResource('', $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT));
     }
 
     /**
-     * Lists items from the dataset, each decoded to a PHP value (associative array for objects).
+     * Lists items of the dataset, decoded to PHP values.
      *
-     * The dataset items endpoint returns a bare JSON array (not a data envelope) and reports
-     * pagination via {@code X-Apify-Pagination-*} headers, surfaced in the returned page. The page's
-     * {@see PaginationList::getCount()} is the number of dataset rows the API scanned for it, or the number
-     * of items returned when that is larger: filters ({@code clean}, {@code skipEmpty}) can leave it above
-     * the number of items. The next page starts at {@code offset + min(count, limit)}; the cap matters only
-     * with {@code unwind}, which can return more items than the rows scanned.
+     * The endpoint answers with a bare JSON array and reports the pagination in {@code X-Apify-Pagination-*}
+     * headers. The page's {@see PaginationList::getCount()} is the number of rows the API scanned, or the
+     * number of items returned when that is larger. The next page starts at {@code offset + min(count, limit)}.
      *
      * @return PaginationList<mixed>
      */
@@ -99,23 +92,17 @@ final class DatasetClient
     }
 
     /**
-     * Lazily iterates over the dataset's items, fetching pages on demand. Each item is decoded to a
-     * PHP value (an associative array for objects), like {@see listItems()}.
+     * Lazily yields the items of the dataset, fetching pages on demand and decoding them like
+     * {@see listItems()}.
      *
-     * The options' {@code limit} caps the total number of items yielded across all pages ({@code null}
-     * = all), {@code offset} is the starting offset, and {@code $chunkSize} is the per-page size. Dataset
-     * items have no default limit, so without {@code $chunkSize} (and without a {@code limit}) the first
-     * request loads the whole dataset in one response: pass {@code $chunkSize} to iterate a large
-     * dataset. All other {@see DatasetListItemsOptions} fields (field selection, filtering, ordering) are
-     * applied to every page.
+     * The {@code limit} option caps the total number of items, {@code offset} is the start and
+     * {@code $chunkSize} is the page size. Without {@code $chunkSize} and {@code limit}, the first request loads
+     * the whole dataset, so pass {@code $chunkSize} for a large one. The other {@see DatasetListItemsOptions}
+     * apply to every page.
      *
-     * Item-dropping filters ({@code skipEmpty}, and {@code clean} which implies it) and {@code unwind}
-     * are applied after {@code offset}/{@code limit}, so a page's item count can land on either side of
-     * the number of rows the API scanned to produce it. The iterator therefore pages like every other
-     * collection iterator (see {@see ResourceContext::paginateOffset()}): by the page's
-     * {@see PaginationList::getCount()}, the scanned rows or the returned items when larger, capped at the
-     * page's requested limit, never by the returned item count alone. ({@code skipHidden} only strips
-     * hidden fields from each item, not whole items, so it does not affect paging.)
+     * The filters {@code skipEmpty} and {@code clean}, and {@code unwind}, change the number of items per page,
+     * so the iterator advances as {@see ResourceContext::paginateOffset()} does: by the page's
+     * {@see PaginationList::getCount()}, capped at the limit asked for.
      *
      * @return Generator<int,mixed>
      */
@@ -137,11 +124,7 @@ final class DatasetClient
         );
     }
 
-    /**
-     * Downloads dataset items serialized in the given format, returning the raw bytes as a string.
-     * Unlike {@see listItems()} (parsed items), this returns the items already serialized to JSON,
-     * CSV, XLSX, XML, RSS or HTML — useful for exporting.
-     */
+    /** Downloads the items in a format (JSON, CSV, XLSX, XML, RSS or HTML) and returns the bytes. */
     public function downloadItems(
         DownloadItemsFormat $format,
         ?DatasetDownloadOptions $options = null,
@@ -156,18 +139,11 @@ final class DatasetClient
     }
 
     /**
-     * Opens a live, streaming connection to the dataset's items export in the given format and
-     * returns a stream over the serialized bytes, so a large export can be read (and, e.g., piped to a
-     * file) in chunks without holding the whole thing in memory.
+     * Opens a stream of the items in a format, so a large export can be read in chunks. The stream is not
+     * retried.
      *
-     * The reference client exposes this as a {@code stream} option of {@code downloadItems()}; this
-     * client keeps a separate method instead, since PHP has no equivalent of a single method whose
-     * return type switches on a boolean option, and a dedicated {@see streamItems()} name matches this
-     * client's existing {@see \Apify\Client\Resource\LogClient::get()}/{@see
-     * \Apify\Client\Resource\LogClient::stream()} split for the same buffered/streamed choice.
-     *
-     * Like {@see \Apify\Client\Resource\LogClient::stream()}, this bypasses the buffered/retrying
-     * transport, so because the response is consumed incrementally, it is not retried.
+     * This is a separate method from {@see downloadItems()}, since a PHP method cannot change its return type
+     * with an option.
      */
     public function streamItems(
         DownloadItemsFormat $format,
@@ -180,9 +156,9 @@ final class DatasetClient
     }
 
     /**
-     * Pushes one or more items to the dataset.
+     * Pushes items to the dataset.
      *
-     * @param mixed $items must serialize to a JSON object or an array of objects
+     * @param mixed $items a JSON object or an array of objects
      */
     public function pushItems(mixed $items, int|float|string|null $timeoutSecs = null): void
     {
@@ -199,12 +175,8 @@ final class DatasetClient
     }
 
     /**
-     * Returns statistical information about the dataset.
-     *
-     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
-     * this fixed sub-path 404s is the dataset itself being gone (matching the reference client). A
-     * {@code null} return means the response body did not decode to an object — not a missing
-     * dataset, which throws.
+     * Returns statistics of the dataset. A 404 is always thrown, never turned into {@code null}. A {@code null}
+     * result means the body is not an object.
      *
      * @return array<string,mixed>|null
      */
@@ -216,15 +188,12 @@ final class DatasetClient
     }
 
     /**
-     * Builds a public URL for downloading this dataset's items.
+     * Builds a public URL for downloading the items.
      *
-     * It fetches the dataset, and if the dataset exposes a URL-signing secret key (i.e. it is
-     * private), appends an HMAC-SHA256 signature so the URL grants access without an API token.
-     * {@code $expiresInSecs} optionally bounds the validity of a signed URL ({@code null} for
-     * non-expiring); it must be positive, otherwise an {@see InvalidArgumentException} is thrown before
-     * any request is sent. {@code $format} selects the output format of the items served by the URL
-     * (defaults to {@code json} when omitted). The URL is built from the configured public base URL.
-     * {@code $timeoutSecs} applies to the request that fetches the dataset (default: the {@code long} tier).
+     * Fetches the dataset and, if it has a URL signing secret, signs the URL with HMAC-SHA256, so it works
+     * without a token. {@code $expiresInSecs} limits the validity of a signed URL ({@code null} for none). The
+     * {@code $format} defaults to {@code json}. {@code $timeoutSecs} is for the request that fetches the
+     * dataset (default: the {@code long} tier).
      *
      * @throws InvalidArgumentException if {@code $expiresInSecs} is zero or negative
      */
@@ -241,8 +210,7 @@ final class DatasetClient
         if ($format !== null) {
             $params->addString('format', $format->value);
         }
-        // Only compute a signature when the caller did not already supply one, otherwise the URL
-        // would carry two conflicting `signature` query params (mirrors KeyValueStoreClient::createKeysPublicUrl).
+        // A signature the caller passed is kept, so the URL does not carry two.
         if ($options->signature === null) {
             $dataset = $this->get($timeoutSecs ?? TimeoutTiers::TIER_LONG);
             if ($dataset !== null) {

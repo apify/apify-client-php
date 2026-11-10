@@ -37,7 +37,9 @@
         "phpstan/phpstan": "^1.11"
     },
     "suggest": {
-        "ext-intl": "Converts an internationalized host of a URL field in a response to punycode, as the reference client does."
+        "ext-intl": "Converts an internationalized host in a URL field of a response to punycode.",
+        "ext-brotli": "Compresses request bodies with brotli, which is the default when it is loaded.",
+        "ext-zstd": "Compresses request bodies with zstd, with compression: 'zstd'."
     },
     "autoload": {
         "psr-4": {

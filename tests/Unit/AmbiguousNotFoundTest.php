@@ -19,11 +19,10 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the status-keyed {@see ApifyApiException} subclasses and the "ambiguous 404" rule: a 404 on
- * a resource addressed by ID resolves to null/no-op, but a 404 on an ID-less chained resource (e.g.
- * {@code run.dataset()}) or a fixed sub-path (e.g. {@code getStatistics()}) is rethrown, since the
- * response cannot tell a missing parent from a missing sub-resource. Matches the reference client's
- * `#1041`/`#1042`.
+ * Tests of the status-keyed {@see ApifyApiException} subclasses and the ambiguous 404 rule: a 404 on a resource
+ * addressed by ID resolves to null, but a 404 on a chained resource without an ID (for example
+ * {@code run.dataset()}) or a fixed sub-path (for example {@code getStatistics()}) is rethrown, since it cannot
+ * tell a missing parent from a missing sub-resource.
  */
 final class AmbiguousNotFoundTest extends TestCase
 {

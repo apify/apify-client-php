@@ -17,8 +17,7 @@ final class ListRequestsOptions
     public const FILTER_PENDING = 'pending';
 
     /**
-     * @param list<string>|null $filter restrict the listing to requests in the given states; each
-     *                                  value must be {@see FILTER_LOCKED} or {@see FILTER_PENDING}
+     * @param list<string>|null $filter lists only requests in these states, {@see FILTER_LOCKED} or {@see FILTER_PENDING}
      */
     public function __construct(
         /** Maximum number of requests to return. */

@@ -7,30 +7,23 @@ namespace Apify\Client\Model;
 use Apify\Client\Internal\UrlNormalizer;
 
 /**
- * Base class for API resource models.
+ * Base class of the response models. A model wraps the decoded JSON object and has getters for common fields.
+ * {@see toArray()} and {@see get()} return every field, including those the model does not list.
  *
- * Each model wraps the raw decoded JSON object and exposes commonly-used fields as typed getters.
- * The full payload — including any field the API adds that is not modelled here — is always
- * available via {@see toArray()} and {@see get()}, so additive API changes never lose data.
- *
- * The fields a model lists in {@see URL_FIELDS} (those the OpenAPI specification declares as
- * {@code format: uri}) are normalized to the WHATWG URL serialization when the model is built, the same
- * way the reference client does: a trailing slash is added to an empty path, the scheme and host are
- * lowercased, a default port is dropped and unsafe characters are percent-encoded. A value that is not
- * an absolute http(s)/ws(s)/ftp URL is kept as received.
+ * The {@see URL_FIELDS} of a model, which the OpenAPI specification declares as {@code format: uri}, are
+ * normalized to the WHATWG URL serialization when the model is built. Other values are kept as received.
  */
 abstract class ApifyResource
 {
     /**
-     * The URL fields of this resource: dot-separated key paths into the raw object, where {@code *}
-     * stands for every entry of an object.
+     * The URL fields: dot-separated key paths into the object, where {@code *} matches every entry of an object.
      *
      * @var list<string>
      */
     protected const URL_FIELDS = [];
 
     /**
-     * @param array<string,mixed> $data the raw decoded resource object
+     * @param array<string,mixed> $data the decoded resource object
      */
     public function __construct(protected array $data)
     {
@@ -38,7 +31,7 @@ abstract class ApifyResource
     }
 
     /**
-     * The full raw resource object, including fields not mapped to a typed getter.
+     * The whole resource object, including fields without a getter.
      *
      * @return array<string,mixed>
      */
@@ -48,7 +41,7 @@ abstract class ApifyResource
     }
 
     /**
-     * A single raw field by key ({@code null} if absent).
+     * A field by key, or {@code null} if it is absent.
      *
      * @return mixed
      */

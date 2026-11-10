@@ -10,10 +10,7 @@ use Apify\Client\Internal\ResourceContext;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\ActorEnvVar;
 
-/**
- * A client for a single environment variable ({@code GET/PUT/DELETE
- * /v2/actors/{actorId}/versions/{versionNumber}/env-vars/{name}}).
- */
+/** A client for an environment variable of an Actor version. */
 final class ActorEnvVarClient
 {
     private ResourceContext $ctx;

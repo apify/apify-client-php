@@ -6,10 +6,7 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/**
- * Adds format-specific options for downloading dataset items on top of the shared item
- * filtering/projection options ({@see DatasetListItemsOptions}).
- */
+/** Format-specific options for downloading dataset items, on top of the {@see DatasetListItemsOptions}. */
 final class DatasetDownloadOptions
 {
     public function __construct(

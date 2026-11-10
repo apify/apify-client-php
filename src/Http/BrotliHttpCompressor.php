@@ -7,10 +7,10 @@ namespace Apify\Client\Http;
 use InvalidArgumentException;
 
 /**
- * Compresses request bodies with brotli at a configurable quality (0-11, default 6 — matching the
- * client's own default). Requires the optional PECL {@code brotli} extension; when it is not loaded,
- * {@see compress()} returns {@code null} (the body is sent uncompressed) rather than throwing, since
- * compression is always best-effort.
+ * Compresses request bodies with brotli at a quality from 0 to 11 (default 6).
+ *
+ * Needs the PECL {@code brotli} extension. Without it, {@see compress()} returns {@code null} and the body is
+ * sent uncompressed.
  */
 final class BrotliHttpCompressor implements HttpCompressorInterface
 {
@@ -36,8 +36,7 @@ final class BrotliHttpCompressor implements HttpCompressorInterface
         if (!function_exists('brotli_compress')) {
             return null;
         }
-        // Called indirectly: brotli_compress only exists when the PECL brotli extension is loaded, so a
-        // direct call would be an unresolved reference for static analysis on builds without it.
+        // Called by name, so static analysis does not flag builds without the extension.
         $brotliCompress = 'brotli_compress';
         $compressed = $brotliCompress($body, $this->quality);
         return is_string($compressed) ? $compressed : null;

@@ -1,20 +1,16 @@
 # Runnable examples
 
-Each snippet below assumes a configured `$client` and that the types it uses are imported with the
-appropriate `use` statements (see [Namespaces](README.md#namespaces)); the first
-[complete program](#a-complete-standalone-program) shows the full scaffolding the shorter snippets
-omit for brevity. The complete programs on this page live under
-[`tests/Examples/`](../tests/Examples) and are executed end-to-end against the live API by the
-`Test examples` CI step (see `ExamplesTest`), so those programs are guaranteed to stay runnable.
-Inline snippets on the other documentation pages are not executed: they are only syntax-checked with
-`php -l` by `DocSnippetsTest`, which catches parse errors but does not resolve classes or check types.
+The snippets assume a `$client` and imported types (see [Namespaces](README.md#namespaces)). The first
+[complete program](#a-complete-standalone-program) shows the scaffolding that the shorter snippets omit.
+
+The programs on this page are in [`tests/Examples/`](../tests/Examples), and the `Test examples` CI step runs them
+against the live API (`ExamplesTest`). Other snippets in the documentation are only checked with `php -l` by
+`DocSnippetsTest`, which finds parse errors but not unknown classes or wrong types.
 
 ## A complete, standalone program
 
-The snippet below is a full program you can save as `example.php` and run with `php example.php`
-after `composer require apify/apify-client`. It shows the required scaffolding — the `<?php` tag,
-loading Composer's autoloader, and the `use` imports — that the shorter snippets in this file omit
-for brevity (they assume a configured `$client` and imported types).
+Save this program as `example.php` and run it with `php example.php` after `composer require apify/apify-client`.
+It has the `<?php` tag, the Composer autoloader and the `use` imports that the shorter snippets leave out.
 
 ```php
 <?php
@@ -29,11 +25,10 @@ use Apify\Client\Exception\ApifyApiException;
 $client = new ApifyClient(getenv('APIFY_TOKEN') ?: 'my-api-token');
 
 try {
-    // Run a public store Actor and wait up to 120s for it to finish.
+    // Run a Store Actor and wait up to 120 seconds for it to finish.
     $run = $client->actor('apify/hello-world')->call(null, null, 120);
 
-    // Read the items the run produced into its default dataset. getDefaultDatasetId() is
-    // ?string, so cast it to satisfy dataset(string $id).
+    // getDefaultDatasetId() is ?string, so cast it for dataset(string $id).
     $items = $client->dataset((string) $run->getDefaultDatasetId())->listItems();
     echo 'Item count: ' . $items->getCount() . PHP_EOL;
 } catch (ApifyApiException $e) {

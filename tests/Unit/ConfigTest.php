@@ -46,10 +46,7 @@ final class ConfigTest extends TestCase
         self::assertSame('https://api.example.com/v2', $client->getApiBaseUrl());
     }
 
-    /**
-     * A $baseUrl that already ends with the /v2 version path is accepted as-is instead of becoming
-     * .../v2/v2, matching the reference client's toApiBaseUrl.
-     */
+    /** A {@code $baseUrl} that already ends with {@code /v2} does not become {@code .../v2/v2}. */
     public function testApiBaseUrlAlreadyEndingInV2IsNotDoubled(): void
     {
         $client = new ApifyClient(token: 't', baseUrl: 'https://api.example.com/v2', httpClient: new MockTransport());

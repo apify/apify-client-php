@@ -10,8 +10,7 @@ use PHPUnit\Framework\TestCase;
 final class PlatformTest extends TestCase
 {
     /**
-     * The User-Agent OS token must be the short lowercase identifier used by the other Apify clients
-     * (Node's os.platform()), regardless of the uname-style value PHP_OS reports.
+     * The OS token of the User-Agent is the short lowercase name, whatever {@code PHP_OS} reports.
      *
      * @return array<string,array{0:string,1:string}>
      */

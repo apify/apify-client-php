@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * A batch of requests from the head of a request queue, locked for exclusive processing. Returned by
- * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
- */
+/** Requests from the head of a queue, locked for exclusive processing. Returned by {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}. */
 final class LockedRequestQueueHead
 {
     /**
@@ -48,8 +45,7 @@ final class LockedRequestQueueHead
     }
 
     /**
-     * The locked requests from the head of the queue. Each item's own
-     * {@see RequestQueueRequest::getLockExpiresAt()} reports when its individual lock expires.
+     * The locked requests. {@see RequestQueueRequest::getLockExpiresAt()} gives the lock expiry of each.
      *
      * @return list<RequestQueueRequest>
      */

@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * A single record retrieved from a key-value store. Its {@see getValue() value} holds the raw bytes
- * (as a string); callers can decode it according to {@see getContentType() content type}.
- */
+/** A record of a key-value store. {@see getValue()} holds the raw bytes, to decode by {@see getContentType()}. */
 final class KeyValueStoreRecord
 {
     public function __construct(

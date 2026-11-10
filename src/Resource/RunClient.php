@@ -23,12 +23,7 @@ use Generator;
 use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 
-/**
- * A client for a specific Actor run.
- *
- * It provides CRUD methods plus convenience helpers (abort, metamorph, reboot, resurrect, charge,
- * wait-for-finish) and accessors for the run's default storages and log.
- */
+/** A client for an Actor run: its CRUD calls, abort, metamorph, reboot, resurrect, charge and wait, and its default storages and log. */
 final class RunClient
 {
     /** Header the API uses to deduplicate charge requests. */
@@ -54,8 +49,7 @@ final class RunClient
     }
 
     /**
-     * Pins the {@code status}/{@code origin} query parameters inherited by all calls on this client
-     * (used by the last-run accessors). Empty values are skipped.
+     * Sets the status and origin filters that every call of this client sends. Used by the last-run accessors.
      *
      * @internal
      */
@@ -70,11 +64,9 @@ final class RunClient
     }
 
     /**
-     * Fetches the run, optionally asking the API to wait up to {@code $waitForFinishSecs} seconds
-     * for the run to reach a terminal state. The API caps the wait at 60s, and the client additionally
-     * keeps it below the {@code timeoutMaxSecs} cap of a single attempt. Unless {@code $timeoutSecs} is
-     * given, the request timeout is that wait on top of the {@code short} tier. Returns {@code null}
-     * if it does not exist.
+     * Fetches the run, or returns {@code null} if it does not exist. With {@code $waitForFinishSecs}, the API
+     * holds the response until the run finishes, for at most 60 seconds and less than the request timeout. The
+     * request timeout then defaults to that wait plus the {@code short} tier.
      */
     public function get(?int $waitForFinishSecs = null, int|float|string|null $timeoutSecs = null): ?ActorRun
     {
@@ -85,9 +77,9 @@ final class RunClient
     }
 
     /**
-     * Updates the run with the given fields and returns the updated object.
+     * Updates the run and returns it.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): ActorRun
     {
@@ -101,9 +93,8 @@ final class RunClient
     }
 
     /**
-     * Aborts the run. If {@code $gracefully} is {@code true}, the run is signalled so it can finish
-     * the current request before terminating; {@code false} aborts immediately. {@code null} omits
-     * the parameter and lets the server apply its default (immediate abort).
+     * Aborts the run. With {@code $gracefully}, the run can finish its current request first. {@code null}
+     * leaves the choice to the API, which aborts immediately.
      */
     public function abort(?bool $gracefully = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
@@ -116,9 +107,8 @@ final class RunClient
      * Transforms the run into a run of another Actor with a new input.
      *
      * @param string $targetActorId the Actor to metamorph into
-     * @param mixed  $input         the new input: a JSON-serializable array, a raw string of bytes
-     *                               sent exactly as given (pair it with a non-default
-     *                               {@code $options->contentType}), or {@code null} for none
+     * @param mixed  $input         the new input: a JSON-serializable value, a string sent as it is (set a
+     *                               matching {@code $options->contentType}), or {@code null} for none
      */
     public function metamorph(
         string $targetActorId,
@@ -128,8 +118,6 @@ final class RunClient
     ): ActorRun {
         $options ??= new MetamorphOptions();
         $params = new QueryParams();
-        // Normalize the target Actor id to the URL-safe `username~actor-name` form (first `/`→`~`),
-        // matching the reference JS client, so a slash-form id is sent as the same wire value.
         $params->addString('targetActorId', ResourceContext::toSafeId($targetActorId));
         if ($options->build !== null && $options->build !== '') {
             $params->addString('build', $options->build);
@@ -163,11 +151,9 @@ final class RunClient
     }
 
     /**
-     * Charges for a pay-per-event Actor run: records occurrences of a named event. Only meaningful
-     * for runs of pay-per-event Actors.
+     * Charges for events of a pay-per-event Actor run.
      *
-     * An idempotency key is always sent (auto-generated if not provided), so a charge that is retried
-     * by the transport is applied at most once, matching the reference client.
+     * The request always carries an idempotency key, so a retried charge is applied once.
      */
     public function charge(RunChargeOptions $options, int|float|string|null $timeoutSecs = null): void
     {
@@ -193,19 +179,15 @@ final class RunClient
         );
     }
 
-    /**
-     * Builds a per-charge idempotency key of the form {@code "{runId}-{eventName}-{millis}-{random}"}.
-     * It need not be cryptographically secure, only unique enough to avoid collisions within a request.
-     */
+    /** Builds an idempotency key: {@code "{runId}-{eventName}-{millis}-{random}"}. */
     private function generateIdempotencyKey(string $eventName): string
     {
         return sprintf('%s-%s-%d-%d', $this->id, $eventName, (int) round(microtime(true) * 1000), mt_rand(0, 999999));
     }
 
     /**
-     * Polls until the run reaches a terminal state or {@code $waitSecs} elapses ({@code null} waits
-     * indefinitely). Returns the latest run. {@code $timeoutSecs} is the timeout of each poll request (a
-     * number of seconds, a tier name or {@code 'noTimeout'}, the default).
+     * Polls until the run finishes or {@code $waitSecs} elapse ({@code null} waits indefinitely), and returns
+     * the latest run. {@code $timeoutSecs} is the timeout of each poll (default {@code 'noTimeout'}).
      */
     public function waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
@@ -219,13 +201,10 @@ final class RunClient
     }
 
     /**
-     * A client for this run's default dataset. Any {@code status}/{@code origin} filters pinned by a
-     * last-run accessor are inherited so the correct run's dataset is resolved.
+     * A client for the default dataset of the run. Last-run filters are inherited.
      *
-     * This client has no ID of its own, so {@code get()}/{@code delete()} throw an {@see
-     * \Apify\Client\Exception\ApifyApiException} on a 404 instead of resolving to {@code null}/no-op:
-     * the response cannot tell a missing run apart from a missing dataset (matches the reference
-     * client's {@code catchNotFoundForResourceOrThrow}).
+     * A client without an ID of its own rethrows a 404 from {@code get()} and {@code delete()}, since it cannot
+     * tell a missing run from a missing dataset.
      */
     public function dataset(): DatasetClient
     {
@@ -233,14 +212,11 @@ final class RunClient
     }
 
     /**
-     * A client for this run's default key-value store. Any {@code status}/{@code origin} filters
-     * pinned by a last-run accessor are inherited so the correct run's store is resolved.
+     * A client for the default key-value store of the run. Last-run filters are inherited.
      *
-     * {@code get()}/{@code delete()} throw an {@see \Apify\Client\Exception\ApifyApiException} on a 404
-     * instead of resolving to {@code null}/no-op, since this client has no ID of its own and the 404
-     * could mean either the run or its store is gone. Record lookups such as {@see
-     * \Apify\Client\Resource\KeyValueStoreClient::getRecord()} are unaffected and still resolve to
-     * {@code null} for a missing record.
+     * A client without an ID of its own rethrows a 404 from {@code get()} and {@code delete()}, since it cannot
+     * tell a missing run from a missing store. Record lookups still
+     * return {@code null} for a missing record.
      */
     public function keyValueStore(): KeyValueStoreClient
     {
@@ -248,14 +224,11 @@ final class RunClient
     }
 
     /**
-     * A client for this run's default request queue. Any {@code status}/{@code origin} filters pinned
-     * by a last-run accessor are inherited so the correct run's queue is resolved.
+     * A client for the default request queue of the run. Last-run filters are inherited.
      *
-     * {@code get()}/{@code delete()} throw an {@see \Apify\Client\Exception\ApifyApiException} on a 404
-     * instead of resolving to {@code null}/no-op, since this client has no ID of its own and the 404
-     * could mean either the run or its queue is gone. {@see
-     * \Apify\Client\Resource\RequestQueueClient::getRequest()} is unaffected and still resolves to
-     * {@code null} for a missing request.
+     * A client without an ID of its own rethrows a 404 from {@code get()} and {@code delete()}, since it cannot
+     * tell a missing run from a missing queue. Request lookups still
+     * return {@code null} for a missing request.
      */
     public function requestQueue(): RequestQueueClient
     {
@@ -263,42 +236,34 @@ final class RunClient
     }
 
     /**
-     * A client for accessing this run's log. Any {@code status}/{@code origin} filters pinned by a
-     * last-run accessor are inherited so the correct run's log is resolved.
+     * A client for the log of the run. Last-run filters are inherited.
      *
-     * {@code get()} throws an {@see \Apify\Client\Exception\ApifyApiException} on a 404 instead of
-     * resolving to {@code null}, since this client has no ID of its own and the 404 could mean either
-     * the run or its log is gone (matches the reference client's {@code catchNotFoundForResourceOrThrow}).
+     * A client without an ID of its own rethrows a 404 from {@code get()}, since it cannot tell a missing run
+     * from a missing log.
      */
     public function log(): LogClient
     {
         return LogClient::nested($this->http, $this->ctx->subUrl(''), $this->ctx->baseParams);
     }
 
-    /**
-     * Opens a live stream of this run's raw log, for convenient log redirection. The caller reads
-     * the returned stream to completion.
-     */
+    /** Opens a stream of the raw log of the run. Read it to the end. */
     public function getStreamedLog(): StreamInterface
     {
         return $this->log()->stream(new LogOptions(raw: true));
     }
 
     /**
-     * Lazily iterates over the items of the run's default dataset while the run is still producing
-     * them, and returns once the run has finished and the dataset is drained.
+     * Lazily yields the items of the default dataset while the run is still producing them, and returns once
+     * the run has finished and the dataset is drained.
      *
-     * While the run has not finished, each poll yields the rows below the dataset's {@code itemCount}
-     * and then waits up to {@code pollIntervalSecs} for the run to finish, so the last rows are read as
-     * soon as it does. Each page is requested with a {@code limit} that ends at {@code itemCount}, so it
-     * covers exactly the rows it asks for, whatever the filters or {@code unwind} do to the items.
-     * {@code itemCount} lags a few seconds behind the pushed items, so once the run reaches a terminal
-     * status, the rows past it are read a page at a time until none are left. On a last-run client, the
-     * iteration sticks to the run its first request resolves to.
+     * While the run is active, each poll yields the rows below the dataset's {@code itemCount}, then waits up to
+     * {@code pollIntervalSecs} for the run to finish. A page ends at {@code itemCount}, so it covers exactly the
+     * rows it asks for, whatever the filters or {@code unwind} do. {@code itemCount} lags a few seconds behind,
+     * so once the run is terminal, the remaining rows are read page by page. A last-run client stays on the run
+     * its first request resolved to.
      *
-     * @param int|float|string|null $timeoutSecs timeout of each API request (default: the {@code long}
-     *                                           tier)
-     * @return Generator<int,mixed> the dataset items, each decoded like {@see DatasetClient::listItems()}
+     * @param int|float|string|null $timeoutSecs timeout of each API request (default: the {@code long} tier)
+     * @return Generator<int,mixed> the dataset items, decoded like {@see DatasetClient::listItems()}
      */
     public function iterateDatasetItems(?RunIterateDatasetItemsOptions $options = null, int|float|string|null $timeoutSecs = null): Generator
     {
@@ -310,8 +275,7 @@ final class RunClient
         $end = $options->limit !== null && $options->limit > 0 ? $position + $options->limit : null;
 
         $run = $this->get(null, $timeoutSecs);
-        // A last-run client resolves `runs/last` on each request, so a newer run would swap the dataset
-        // mid-iteration: pin the iteration to the run the first request resolved to.
+        // A last-run client resolves `runs/last` on every request, so stay on the first run it resolved to.
         $runClient = $run !== null && $run->getId() !== null && $run->getId() !== $this->id ? $this->root->run($run->getId()) : $this;
         // One context serves both the dataset client and the page reads, so they cannot drift apart.
         $itemsCtx = $runClient->datasetContext();
@@ -350,9 +314,8 @@ final class RunClient
             foreach ($page->getItems() as $item) {
                 yield $item;
             }
-            // Only an empty page marks the end, as filters can shorten a full one. A page that `clean`,
-            // `skipEmpty` or `unwind` emptied past a lagging `itemCount` reports no scanned rows either,
-            // so a plain, unfiltered one-row read confirms the dataset really has nothing left.
+            // Only an empty page ends the iteration, since filters can shorten a full one. A page emptied
+            // past a lagging `itemCount` reports no scanned rows, so a plain one-row read confirms it.
             $isEmpty = $page->getCount() === 0;
             if ($isEmpty && (!self::hasRowChangingFilter($options) || $this->hasNoItemsAt($datasetClient, $position, $timeoutSecs))) {
                 return;

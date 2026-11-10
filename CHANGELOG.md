@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0
+
+- Synced with Apify OpenAPI spec `v2-2026-11-09T143926Z`: `zstd` is a documented `Content-Encoding`.
+- Added `ZstdHttpCompressor` and `compression: 'zstd'`. Needs the PECL `zstd` extension.
+- Added `ActorServerRequestOptions::$parentRequestId`, sent as the `X-Actor-Request-ID` header.
+- Shortened the documentation and code comments, and removed outdated ones.
+
 ## 0.13.0
 
 - Synced with Apify OpenAPI spec `v2-2026-11-06T140128Z`: `ActorVersion::getActorPath()` and `Actor::getStandbyUrl()`.
