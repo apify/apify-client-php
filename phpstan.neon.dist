@@ -1,5 +1,5 @@
-# Level 8 checks types, nullable access, and union types. Level 9 adds strict `mixed` handling, which the client
-# does not use, since it exposes `mixed` on purpose at the API boundary (JSON input, record values, `toArray()`).
+# Level 8 checks types, nullable access, and union types. Level 9 adds strict `mixed` handling. The client exposes
+# `mixed` on purpose at the API boundary (JSON input, record values, `toArray()`), so it stays at level 8.
 parameters:
     level: 8
     paths:

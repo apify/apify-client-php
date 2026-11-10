@@ -9,7 +9,7 @@ use Apify\Client\Http\HttpClientInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
-/** Sends requests with the default transport and records the {@code Content-Encoding} of each, in order. */
+/** Sends requests with the default transport and records the {@code Content-Encoding} of each non-streaming one. */
 final class RecordingHttpClient implements HttpClientInterface
 {
     /** @var list<string> */

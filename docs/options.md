@@ -125,7 +125,7 @@ For `actor($id)->server()->request()`.
 | `params` | `array<string,mixed>\|null` | Query parameters, converted as for API calls: `null` values are left out, booleans are sent as `1`/`0`, and a list is joined with commas. |
 | `headers` | `array<string,string>\|null` | Additional headers, `Authorization` included. They reach the Actor's server as they are. |
 | `body` | `mixed` | The request body: an array (or any other JSON-serializable value) is sent as JSON, a string as it is. |
-| `compression` | `string\|HttpCompressorInterface\|null` | `'brotli'`, `'gzip'`, `'zstd'`, or a custom compressor for the request body. Unset sends the body uncompressed, since the server may not decode it. A codec without its PECL extension throws `RuntimeException`. |
+| `compression` | `string\|HttpCompressorInterface\|null` | `'brotli'`, `'gzip'`, `'zstd'`, or a custom compressor for the request body. Unset sends the body uncompressed, since the server may not decode it. A codec without its extension throws `RuntimeException`. |
 | `parentRequestId` | `?string` | The `X-Actor-Request-ID` header of the request your Server Actor is handling. It is sent as the same header, replacing one in `headers`, so the called Actor charges at the pricing tier of that request. |
 | `stream` | `bool` | Leave the response body unread, so it can be consumed incrementally with `ActorServerResponse::getBodyStream()`. The connection stays open until the body is read to the end or closed. |
 

@@ -15,7 +15,7 @@ final class ZstdCompressionIntegrationTest extends IntegrationTestCase
 {
     private RecordingHttpClient $recorder;
 
-    /** A JSON body above the compression threshold, which applies to the uncompressed body. The padding takes it there. */
+    /** A JSON body above the compression threshold, which applies to the uncompressed body. */
     private static function largeJson(): string
     {
         $json = json_encode(['hello' => 'world', 'padding' => bin2hex(random_bytes(2048))]);
