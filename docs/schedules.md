@@ -6,7 +6,7 @@ A schedule starts Actor or task runs at set times. Snippets assume
 ## Schedule collection — `$client->schedules()`
 
 - `list(?ListOptions $options = null): PaginationList`
-- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily yields the schedules. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
+- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the schedules. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 - `create(mixed $schedule): Schedule`
 
 ```php
@@ -25,7 +25,7 @@ foreach ($client->schedules()->iterate(new ListOptions(), 50) as $s) {
 ## A single schedule — `$client->schedule($id)`
 
 - `get(): ?Schedule`, `update(mixed $newFields): Schedule`, `delete(): void`
-- `getLog(): array` — the invocation log: a list with one array per invocation, with `message`, `level` and
+- `getLog(): array`: the invocation log: a list with one array per invocation, with `message`, `level` and
   `createdAt`. It is empty if the schedule has not run. Throws if the schedule does not exist.
 
 ```php

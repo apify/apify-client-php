@@ -19,7 +19,7 @@ use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ValidateInputOptions;
 use InvalidArgumentException;
 
-/** A client for an Actor: its CRUD calls, start, call and build, and its runs, builds, versions and webhooks. */
+/** A client for an Actor: its CRUD calls, start, call, and build, and its runs, builds, versions, and webhooks. */
 final class ActorClient
 {
     private ResourceContext $ctx;
@@ -161,7 +161,10 @@ final class ActorClient
         ));
     }
 
-    /** Returns a client for the default build. {@code $waitForFinish} is how many seconds the API holds the response until the build finishes. */
+    /**
+     * Returns a client for the default build. {@code $waitForFinish} is how many seconds the API holds the response
+     * until the build finishes.
+     */
     public function defaultBuild(?int $waitForFinish = null, int|float|string|null $timeoutSecs = null): BuildClient
     {
         $params = new QueryParams();

@@ -16,7 +16,10 @@ use Apify\Client\Model\Task;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\TaskStartOptions;
 
-/** A client for a task, an Actor run with a stored input: its CRUD calls, start and call, and its input, runs and webhooks. */
+/**
+ * A client for a task, an Actor run with a stored input: its CRUD calls, start and call, and its input, runs, and
+ * webhooks.
+ */
 final class TaskClient
 {
     private ResourceContext $ctx;

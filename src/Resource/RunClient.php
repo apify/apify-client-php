@@ -23,7 +23,10 @@ use Generator;
 use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 
-/** A client for an Actor run: its CRUD calls, abort, metamorph, reboot, resurrect, charge and wait, and its default storages and log. */
+/**
+ * A client for an Actor run: its CRUD calls, abort, metamorph, reboot, resurrect, charge, and wait, and its default
+ * storages and log.
+ */
 final class RunClient
 {
     /** Header the API uses to deduplicate charge requests. */

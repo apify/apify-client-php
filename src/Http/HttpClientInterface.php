@@ -9,7 +9,7 @@ use Psr\Http\Message\ResponseInterface;
 
 /**
  * The transport of the client. An implementation sends one prepared PSR-7 request and returns the PSR-7
- * response. The client adds the token, the {@code User-Agent} and the retries.
+ * response. The client adds the token, the {@code User-Agent}, and the retries.
  *
  * An error status is a normal response here. Throw {@see \Apify\Client\Exception\TransportException} only for
  * transport failures: a refused connection, DNS, a timeout, or a connection dropped before the body is complete.
@@ -24,6 +24,9 @@ interface HttpClientInterface
     /** Sends a single request with a per-attempt timeout (seconds) and buffers the whole response. */
     public function send(RequestInterface $request, float $timeoutSecs): ResponseInterface;
 
-    /** Sends a request and returns a response with a live body stream, for incremental reading. The caller reads it to the end. */
+    /**
+     * Sends a request and returns a response with a live body stream, for incremental reading. The caller reads it to
+     * the end.
+     */
     public function sendStreaming(RequestInterface $request, float $timeoutSecs): ResponseInterface;
 }

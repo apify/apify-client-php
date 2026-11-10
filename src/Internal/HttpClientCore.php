@@ -72,7 +72,7 @@ final class HttpClientCore
     }
 
     /**
-     * Sends a request with auth, User-Agent and the retry policy applied.
+     * Sends a request with auth, User-Agent, and the retry policy applied.
      *
      * @param array<string,string> $extraHeaders
      * @param RequestPolicy|null   $policy       per-request deviations from the defaults of a call to the API
@@ -235,7 +235,7 @@ final class HttpClientCore
     }
 
     /**
-     * Builds a PSR-7 request with the token, User-Agent, content type and extra headers.
+     * Builds a PSR-7 request with the token, User-Agent, content type, and extra headers.
      *
      * @param array<string,string> $extraHeaders
      * @param string               $authorizationHeader the header that carries the token

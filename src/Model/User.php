@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/** A user account. The private details of {@code me}, such as email, plan and proxy settings, are in {@see toArray()}. */
+/**
+ * A user account. The private details of {@code me}, such as email, plan, and proxy settings, are in {@see toArray()}.
+ */
 final class User extends ApifyResource
 {
     protected const URL_FIELDS = ['profile.pictureUrl', 'profile.websiteUrl'];

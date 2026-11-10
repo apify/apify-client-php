@@ -3,18 +3,18 @@
 Response models are in the `Apify\Client\Model\` namespace and wrap the JSON objects of the API. They have typed
 getters for common fields, and all extend `ApifyResource`, which adds:
 
-- `toArray(): array` — the whole object, including fields without a getter.
-- `get(string $key): mixed` — a field by its API name.
+- `toArray(): array`: the whole object, including fields without a getter.
+- `get(string $key): mixed`: a field by its API name.
 
 A getter returns `null` when the field is absent from the response.
 
 The URL fields that the OpenAPI specification declares as `format: uri` are returned in the WHATWG URL
-serialization by the getters, `get()` and `toArray()`. They are a run's `consoleUrl`, `containerUrl` and `output`
+serialization by the getters, `get()` and `toArray()`. They are a run's `consoleUrl`, `containerUrl`, and `output`
 links, the `consoleUrl` and public URLs of storages, a key's `recordPublicUrl`, a task's `standbyUrl`, a webhook's
 `requestUrl`, a Store Actor's `url` and `userPictureUrl`, and a user's `pictureUrl` and `websiteUrl`. An empty path
 gets a trailing slash (`https://abc.runs.apify.net` becomes `https://abc.runs.apify.net/`), the scheme and host
 are lowercased, a default port is dropped, an internationalized host becomes punycode (needs the optional `intl`
-extension) and unsafe characters are percent-encoded. A value that is not an absolute http(s), ws(s) or ftp URL is
+extension) and unsafe characters are percent-encoded. A value that is not an absolute http(s), ws(s), or ftp URL is
 kept as received.
 
 `RequestQueueRequest` is also an input object, so it has setters and a constructor (see

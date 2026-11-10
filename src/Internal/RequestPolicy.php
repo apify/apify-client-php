@@ -17,7 +17,9 @@ final class RequestPolicy
     /** The name of the header the API reads the token from. */
     public const AUTHORIZATION_HEADER = 'Authorization';
 
-    /** The header that carries the token to an Actor server. The platform removes it before the Actor sees the request. */
+    /**
+     * The header that carries the token to an Actor server. The platform removes it before the Actor sees the request.
+     */
     public const SERVER_AUTHORIZATION_HEADER = 'X-Apify-Authorization';
 
     /**

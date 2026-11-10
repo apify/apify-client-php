@@ -98,7 +98,7 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
     {
         $client = $this->requireClient();
         // An Actor that pushes one item every ten seconds, three times, straight through the API
-        // (the Actor runtime provides the token, the dataset ID and the public API base URL).
+        // (the Actor runtime provides the token, the dataset ID, and the public API base URL).
         $script = <<<'JS'
             const base = (process.env.APIFY_API_PUBLIC_BASE_URL || 'https://api.apify.com').replace(/\/$/, '');
             const url = `${base}/v2/datasets/${process.env.APIFY_DEFAULT_DATASET_ID}/items?token=${process.env.APIFY_TOKEN}`;
@@ -136,7 +136,10 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
         }
     }
 
-    /** Creates an Actor with the script as {@code main.js}, waits for its build and returns its ID. The caller deletes the Actor. */
+    /**
+     * Creates an Actor with the script as {@code main.js}, waits for its build, and returns its ID. The caller deletes
+     * the Actor.
+     */
     private function createBuiltActor(ApifyClient $client, string $label, string $mainJs): string
     {
         $definition = self::minimalActor(self::uniqueName($label));

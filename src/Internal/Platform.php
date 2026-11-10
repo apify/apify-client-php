@@ -6,7 +6,7 @@ namespace Apify\Client\Internal;
 
 /**
  * The OS token of the {@code User-Agent}: the short lowercase name that Node's {@code os.platform()} gives, such as
- * {@code linux}, {@code darwin} or {@code win32}, so the API sees one value across all clients.
+ * {@code linux}, {@code darwin}, or {@code win32}, so the API sees one value across all clients.
  *
  * @internal
  */

@@ -10,7 +10,10 @@ use Apify\Client\Internal\Json;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
-/** The response of an Actor's server to {@see ActorServerClient::request()}. Error statuses are returned too, so check {@see getStatusCode()} or {@see isSuccessful()}. */
+/**
+ * The response of an Actor's server to {@see ActorServerClient::request()}. Error statuses are returned too, so check
+ * {@see getStatusCode()} or {@see isSuccessful()}.
+ */
 final class ActorServerResponse
 {
     private const JSON_CONTENT_TYPE_PATTERN = '#^application/(?:[\w.+-]+\+)?json(?:\s*;|\s*$)#i';
@@ -42,7 +45,10 @@ final class ActorServerResponse
         return $this->response->getHeaders();
     }
 
-    /** The values of a header joined with commas, or an empty string if the response has none. The name is case-insensitive. */
+    /**
+     * The values of a header joined with commas, or an empty string if the response has none. The name is
+     * case-insensitive.
+     */
     public function getHeaderLine(string $name): string
     {
         return $this->response->getHeaderLine($name);
@@ -54,7 +60,10 @@ final class ActorServerResponse
         return (string) $this->response->getBody();
     }
 
-    /** The body as a PSR-7 stream. With the {@code stream} option it is live, and its connection stays open until it is read to the end or closed. */
+    /**
+     * The body as a PSR-7 stream. With the {@code stream} option it is live, and its connection stays open until it is
+     * read to the end or closed.
+     */
     public function getBodyStream(): StreamInterface
     {
         return $this->response->getBody();

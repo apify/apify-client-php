@@ -53,6 +53,43 @@ jobs:
       - name: Unit tests (brotli and zstd)
         run: vendor/bin/phpunit --testsuite unit
 
+  # The zstd integration tests, with the PECL zstd extension that the `test` job lacks. They skip themselves
+  # without the extension or the token, so both are checked first.
+  integration-zstd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP (with zstd)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, json, curl, zlib, zstd
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Require the zstd extension and APIFY_TOKEN
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          if ! php -r "exit(extension_loaded('zstd') ? 0 : 1);"; then
+            echo "::error::The zstd extension failed to load; the zstd integration tests would skip."
+            exit 1
+          fi
+          if [ -z "${APIFY_TOKEN}" ]; then
+            echo "::error::APIFY_TOKEN secret is empty or missing; the zstd integration tests would skip."
+            exit 1
+          fi
+
+      - name: Integration tests (zstd)
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: vendor/bin/phpunit --testsuite integration --filter ZstdCompressionIntegrationTest
+
   test:
     runs-on: ubuntu-latest
     steps:

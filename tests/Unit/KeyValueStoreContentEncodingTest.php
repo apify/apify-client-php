@@ -8,7 +8,10 @@ use Apify\Client\ApifyClient;
 use Apify\Client\Options\SetRecordOptions;
 use PHPUnit\Framework\TestCase;
 
-/** Tests of {@see \Apify\Client\Resource\KeyValueStoreClient::setRecord()} with {@code $contentEncoding}: a compressed value is uploaded as it is. */
+/**
+ * Tests of {@see \Apify\Client\Resource\KeyValueStoreClient::setRecord()} with {@code $contentEncoding}: a compressed
+ * value is uploaded as it is.
+ */
 final class KeyValueStoreContentEncodingTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient

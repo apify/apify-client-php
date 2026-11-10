@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 /**
  * The named request timeout tiers: {@code 'short'} for metadata reads and writes, {@code 'medium'} for
- * listing, batch and trigger calls, and {@code 'long'} for downloads, uploads and streaming. A call can also
+ * listing, batch, and trigger calls, and {@code 'long'} for downloads, uploads, and streaming. A call can also
  * pass {@code 'noTimeout'}.
  *
  * Defaults: {@code short} 5 s, {@code medium} 30 s, and {@code long} and the cap {@code max} the client's
@@ -23,13 +23,16 @@ final class TimeoutTiers
     public const TIER_LONG = 'long';
     public const NO_TIMEOUT = 'noTimeout';
 
-    /** The timeout meaning "none", which Guzzle and cURL read from {@code 0.0}. A {@code null} fallback never triggers on it. */
+    /**
+     * The timeout meaning "none", which Guzzle and cURL read from {@code 0.0}. A {@code null} fallback never triggers
+     * on it.
+     */
     public const INFINITE_SECS = 0.0;
 
     /** Default duration of the {@code short} tier, in seconds (metadata reads and writes). */
     public const DEFAULT_SHORT_SECS = 5.0;
 
-    /** Default duration of the {@code medium} tier, in seconds (listing, batch and trigger calls). */
+    /** Default duration of the {@code medium} tier, in seconds (listing, batch, and trigger calls). */
     public const DEFAULT_MEDIUM_SECS = 30.0;
 
     private function __construct(
@@ -76,7 +79,7 @@ final class TimeoutTiers
      * tier's duration, {@see NO_TIMEOUT} {@see INFINITE_SECS}, and a number of seconds itself, capped at
      * {@see $maxSecs}.
      *
-     * @param int|float|string|null $timeoutSecs seconds, a tier name, {@see NO_TIMEOUT} or {@code null}
+     * @param int|float|string|null $timeoutSecs seconds, a tier name, {@see NO_TIMEOUT}, or {@code null}
      */
     public function resolve(int|float|string|null $timeoutSecs, string $defaultTier): float
     {

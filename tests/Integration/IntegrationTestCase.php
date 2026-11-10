@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Tests\Integration;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Http\HttpCompressorInterface;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Resource\DatasetClient;
 use PHPUnit\Framework\TestCase;
@@ -21,7 +22,9 @@ abstract class IntegrationTestCase extends TestCase
     /** The integration-test contract fallback base URL. */
     private const DEFAULT_API_URL = 'https://api.apify.com/v2';
 
-    /** Derives the client base URL from {@code APIFY_API_URL}. The client adds {@code /v2} itself, so it is stripped. */
+    /**
+     * Derives the client base URL from {@code APIFY_API_URL}. The client adds {@code /v2} itself, so it is stripped.
+     */
     protected static function resolveBaseUrl(?string $apiUrl): string
     {
         if ($apiUrl === null || $apiUrl === '') {
@@ -35,14 +38,14 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
-     * How often, and how many seconds apart, a listing is re-read while a resource the test just created is
+     * How many times, and how many seconds apart, a listing is re-read while a resource the test just created is
      * missing from it. The list endpoints read from secondaries that can lag by up to 90 seconds.
      */
     private const LISTING_MAX_ATTEMPTS = 30;
     private const LISTING_RETRY_DELAY_SECS = 3;
 
     /** Returns a configured client, or skips the test if {@code APIFY_TOKEN} is unset. */
-    protected function requireClient(): ApifyClient
+    protected function requireClient(string|HttpCompressorInterface|null $compression = null): ApifyClient
     {
         $token = getenv('APIFY_TOKEN');
         if ($token === false || $token === '') {
@@ -52,6 +55,7 @@ abstract class IntegrationTestCase extends TestCase
         return new ApifyClient(
             token: $token,
             baseUrl: self::resolveBaseUrl($apiUrl === false ? null : $apiUrl),
+            compression: $compression,
         );
     }
 

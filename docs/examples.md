@@ -10,7 +10,7 @@ against the live API (`ExamplesTest`). Other snippets in the documentation are o
 ## A complete, standalone program
 
 Save this program as `example.php` and run it with `php example.php` after `composer require apify/apify-client`.
-It has the `<?php` tag, the Composer autoloader and the `use` imports that the shorter snippets leave out.
+It has the `<?php` tag, the Composer autoloader, and the `use` imports that the shorter snippets leave out.
 
 ```php
 <?php

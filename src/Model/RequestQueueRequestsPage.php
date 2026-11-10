@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/** A cursor-paginated page of requests, returned by {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}. */
+/**
+ * A cursor-paginated page of requests, returned by {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}.
+ */
 final class RequestQueueRequestsPage
 {
     /**

@@ -105,6 +105,6 @@ jobs:
           PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
           PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
         run: |
-          curl -sS -XPOST -H'content-type:application/json' \
+          curl --fail-with-body -sS -XPOST -H'content-type:application/json' \
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
             -d'{"repository":{"url":"https://packagist.org/packages/apify/apify-client"}}'

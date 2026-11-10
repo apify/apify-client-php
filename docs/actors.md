@@ -4,9 +4,9 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 
 ## Actor collection — `$client->actors()`
 
-- `list(?ActorListOptions $options = null): PaginationList` — list the account's Actors.
-- `iterate(?ActorListOptions $options = null, ?int $chunkSize = null): iterable` — lazily yields the Actors. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
-- `create(mixed $actor): Actor` — create an Actor from a JSON-serializable definition.
+- `list(?ActorListOptions $options = null): PaginationList`: list the account's Actors.
+- `iterate(?ActorListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the Actors. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
+- `create(mixed $actor): Actor`: create an Actor from a JSON-serializable definition.
 
 ```php
 $page = $client->actors()->list(new ActorListOptions(my: true, limit: 10));
@@ -34,8 +34,8 @@ Addressed by ID or `username~name` (a `username/name` is accepted too).
 - `get(): ?Actor`
 - `update(mixed $newFields): Actor`
 - `delete(): void`
-- `start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun` — start and return immediately.
-- `call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun` — start and wait. `$timeoutSecs` is the timeout of the start request and of every poll (default `'noTimeout'`).
+- `start(mixed $input = null, ?ActorStartOptions $options = null): ActorRun`: start and return immediately.
+- `call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun`: start and wait. `$timeoutSecs` is the timeout of the start request and of every poll (default `'noTimeout'`).
 - `validateInput(mixed $input = null, ?ValidateInputOptions $options = null): bool`
 
 `$input` is a JSON-serializable array, or a `string` sent as it is. Set `$options->contentType` for a string, for
@@ -51,8 +51,8 @@ toward `$waitSecs`.
 - `lastRun(?LastRunOptions $options = null): RunClient`
 - `builds(): BuildCollectionClient`, `runs(): RunCollectionClient`
 - `version(string $versionNumber): ActorVersionClient`, `versions(): ActorVersionCollectionClient`
-- `webhooks(): NestedWebhookCollectionClient` — read-only.
-- `server(): ActorServerClient` — the [server interface](#server-actors--client-actorid-server) of a Server Actor. Every call returns the same client.
+- `webhooks(): NestedWebhookCollectionClient`: read-only.
+- `server(): ActorServerClient`: the [server interface](#server-actors--client-actorid-server) of a Server Actor. Every call returns the same client.
 
 ```php
 $run = $client->actor('apify/hello-world')->call(['name' => 'world'], new ActorStartOptions(memoryMbytes: 512), 120);
@@ -65,9 +65,9 @@ $lastSucceeded = $client->actor('apify/hello-world')->lastRun(new LastRunOptions
 A Server Actor runs a web server that answers HTTP requests without a run for each request.
 `ActorServerClient` sends requests to that server and reads its URL and OpenAPI specification.
 
-- `request(string $path = '/', ?ActorServerRequestOptions $options = null, int|float|string|null $timeoutSecs = null): ActorServerResponse` — sends an HTTP request to the server. The timeout defaults to the `long` tier, which covers the start of an idle Actor.
-- `getUrl(int|float|string|null $timeoutSecs = null): string` — the server URL, the `standbyUrl` of the Actor. It is fetched once per client.
-- `getOpenApiSpec(int|float|string|null $timeoutSecs = null): ?array` — the web server schema of the build that serves the server (`actorStandby.build`, else `latest`), or `null` if the Actor has none.
+- `request(string $path = '/', ?ActorServerRequestOptions $options = null, int|float|string|null $timeoutSecs = null): ActorServerResponse`: sends an HTTP request to the server. The timeout defaults to the `long` tier, which covers the start of an idle Actor.
+- `getUrl(int|float|string|null $timeoutSecs = null): string`: the server URL, the `standbyUrl` of the Actor. It is fetched once per client.
+- `getOpenApiSpec(int|float|string|null $timeoutSecs = null): ?array`: the web server schema of the build that serves the server (`actorStandby.build`, else `latest`), or `null` if the Actor has none.
 
 `request()` resolves `$path` against the server URL, so the request and the token cannot reach another host. Pass
 the query in the `params` option. The token goes in the `X-Apify-Authorization` header, which the platform removes,
@@ -130,8 +130,8 @@ $version = $client->actor('me~my-actor')->versions()->create([
 
 A `SOURCE_FILES` or `TARBALL` version can set `actorPath`, the directory of the Actor inside the uploaded source,
 to push an Actor from an upload of a monorepo. It is relative to the upload root, 1 to 255 characters, with `/`
-separators, no leading, trailing or repeated `/`, and no `.` or `..` segment. The API rejects it for a `GIT_REPO`
-or `GITHUB_GIST` version. An `update()` that sends `sourceType`, `sourceFiles` or `tarballUrl` without `actorPath`
+separators, no leading, trailing, or repeated `/`, and no `.` or `..` segment. The API rejects it for a `GIT_REPO`
+or `GITHUB_GIST` version. An `update()` that sends `sourceType`, `sourceFiles`, or `tarballUrl` without `actorPath`
 removes the stored path, so send it with every upload. `'actorPath' => null` removes it too, and an update of
 other fields keeps it. `ActorVersion::getActorPath()` reads it.
 

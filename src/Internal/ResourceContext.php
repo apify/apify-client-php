@@ -559,7 +559,7 @@ final class ResourceContext
         return is_array($value) ? $value : [];
     }
 
-    /** Encodes a run input: {@code null} stays {@code null}, a string is sent as it is and anything else as JSON. */
+    /** Encodes a run input: {@code null} stays {@code null}, a string is sent as it is, and anything else as JSON. */
     public static function encodeInputBody(mixed $input): ?string
     {
         if ($input === null) {
@@ -581,7 +581,7 @@ final class ResourceContext
      * Percent-encodes a path segment, so an ID or key cannot restructure the path. An empty segment, {@code "."}
      * and {@code ".."} are rejected, since a URL parser would collapse them to the parent resource.
      *
-     * @throws InvalidArgumentException if {@code $input} is empty, {@code "."} or {@code ".."}
+     * @throws InvalidArgumentException if {@code $input} is empty, {@code "."}, or {@code ".."}
      */
     public static function encodePathSegment(string $input): string
     {

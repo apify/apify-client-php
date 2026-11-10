@@ -5,7 +5,7 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 ## Webhook collection — `$client->webhooks()`
 
 - `list(?ListOptions $options = null): PaginationList`
-- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily yields the webhooks. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
+- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the webhooks. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 - `create(mixed $webhook): Webhook`
 
 The webhooks of an Actor or task (`$client->actor($id)->webhooks()`, `$client->task($id)->webhooks()`) are
@@ -23,7 +23,7 @@ $webhook = $client->webhooks()->create([
 ## A single webhook — `$client->webhook($id)`
 
 - `get(): ?Webhook`, `update(mixed $newFields): Webhook`, `delete(): void`
-- `test(): WebhookDispatch` — dispatch immediately.
+- `test(): WebhookDispatch`: dispatch immediately.
 - `dispatches(): WebhookDispatchCollectionClient`
 
 ```php
@@ -33,7 +33,7 @@ $client->webhook('WEBHOOK_ID')->dispatches()->list(new ListOptions(limit: 10));
 
 ## Webhook dispatches — `$client->webhookDispatches()` / `$client->webhookDispatch($id)`
 
-- Collection: `list(?ListOptions $options = null): PaginationList`, `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily yields the dispatches. The `limit` option caps the total, `$chunkSize` is the page size.
+- Collection: `list(?ListOptions $options = null): PaginationList`, `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the dispatches. The `limit` option caps the total, `$chunkSize` is the page size.
 - Single: `get(): ?WebhookDispatch`.
 
 ```php

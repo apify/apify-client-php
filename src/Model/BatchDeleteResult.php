@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/** The result of {@see \Apify\Client\Resource\RequestQueueClient::batchDeleteRequests()}: the deleted requests and the ones to retry. */
+/**
+ * The result of {@see \Apify\Client\Resource\RequestQueueClient::batchDeleteRequests()}: the deleted requests and the
+ * ones to retry.
+ */
 final class BatchDeleteResult
 {
     /**

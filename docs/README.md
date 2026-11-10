@@ -18,7 +18,7 @@ All classes are under the `Apify\Client\` root:
 | `Apify\Client\` | The entry point and version constants. | `ApifyClient`, `Version` |
 | `Apify\Client\Model\` | Response models returned by the API. | `RequestQueueRequest`, `ActorEnvVar`, `Dataset`, `ActorRun`, `PaginationList` |
 | `Apify\Client\Options\` | The `*Options` classes and enums. | `ActorListOptions`, `ActorStartOptions`, `RunListOptions`, `StorageListOptions`, `DatasetListItemsOptions`, `DownloadItemsFormat`, and the others in the [options reference](options.md) |
-| `Apify\Client\Http\` | The transport, its adapters and the compressors. | `HttpClientInterface`, `NoRedirectHttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor`, `ZstdHttpCompressor` |
+| `Apify\Client\Http\` | The transport, its adapters, and the compressors. | `HttpClientInterface`, `NoRedirectHttpClientInterface`, `GuzzleHttpClient`, `Psr18HttpClient`, `HttpCompressorInterface`, `BrotliHttpCompressor`, `GzipHttpCompressor`, `ZstdHttpCompressor` |
 | `Apify\Client\Exception\` | Exceptions thrown by the client. | `ApifyApiException` and its status-specific subclasses (`NotFoundException`, `RateLimitException`, ...), `TransportException` |
 
 To add requests to a queue, import the model and the batch options:
@@ -88,7 +88,7 @@ whatever JSON value was stored.
 
 - Read: `me()->monthlyUsage(...)`, `me()->limits()`, `schedule($id)->getLog()`, `task($id)->getInput()`,
   `build($id)->getOpenApiDefinition()` and `dataset($id)->getStatistics()`. The request queue operations
-  `listRequests`, `listAndLockHead`, `prolongRequestLock`, `unlockRequests` and `batchDeleteRequests` return
+  `listRequests`, `listAndLockHead`, `prolongRequestLock`, `unlockRequests`, and `batchDeleteRequests` return
   [models](models.md).
 - Write: the definition arguments of `update` and `create` accept any JSON-serializable value, usually an
   associative array.
@@ -106,7 +106,7 @@ The [options reference](options.md) lists the fields of every option class.
 
 ## Common list options — `ListOptions`
 
-Most `list` methods take `ListOptions`: `offset`, `limit` and `desc`.
+Most `list` methods take `ListOptions`: `offset`, `limit`, and `desc`.
 
 ```php
 $builds = $client->builds()->list(new ListOptions(limit: 50, desc: true));
@@ -115,7 +115,7 @@ $builds = $client->builds()->list(new ListOptions(limit: 50, desc: true));
 ## Pagination — `PaginationList`
 
 `list` methods return a `PaginationList`, which is iterable and countable and has `getTotal()`, `getOffset()`,
-`getLimit()`, `getCount()`, `isDesc()` and `getItems()`. `listKeys` and `listHead` return their own page types.
+`getLimit()`, `getCount()`, `isDesc()`, and `getItems()`. `listKeys` and `listHead` return their own page types.
 
 For `DatasetClient::listItems()`, `getCount()` is the number of rows the API scanned, or the number of items
 when that is larger. Filters such as `skipEmpty` and `clean` can leave it above the number of items. The next

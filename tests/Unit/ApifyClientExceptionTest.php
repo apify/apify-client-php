@@ -12,7 +12,10 @@ use Apify\Client\Exception\NotFoundException;
 use Apify\Client\Exception\TransportException;
 use PHPUnit\Framework\TestCase;
 
-/** Tests of {@see ApifyClientException}: one {@code instanceof} check catches a failed API call and an unparsable response body. */
+/**
+ * Tests of {@see ApifyClientException}: one {@code instanceof} check catches a failed API call and an unparsable
+ * response body.
+ */
 final class ApifyClientExceptionTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient

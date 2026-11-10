@@ -98,9 +98,11 @@ final class ApifyClient
      * @param StreamFactoryInterface|null  $streamFactory            PSR-17 stream factory (defaults to Guzzle's)
      * @param callable():bool|null     $isAtHomeFn                   replaces the detection of the {@code isAtHome} flag
      * @param string|HttpCompressorInterface|null $compression       request-body compression: {@code 'brotli'},
-     *                                                               {@code 'gzip'}, {@code 'zstd'} or a custom compressor,
-     *                                                               which also sets the quality. {@code null} picks brotli
-     *                                                               when its extension is loaded, gzip otherwise.
+     *                                                               {@code 'gzip'}, {@code 'zstd'}, or a custom compressor,
+     *                                                               which also sets the quality. A codec whose extension
+     *                                                               is not loaded throws {@see RuntimeException}.
+     *                                                               {@code null} picks brotli when its extension is
+     *                                                               loaded, gzip otherwise.
      */
     public function __construct(
         ?string $token = null,

@@ -19,7 +19,10 @@ final class RunIterateDatasetItemsOptions
     public function __construct(
         /** Number of dataset rows to skip from the beginning (default 0). */
         public readonly ?int $offset = null,
-        /** The maximum number of dataset rows to scan (default: no limit). Filters can yield fewer items, {@code unwind} more. */
+        /**
+         * The maximum number of dataset rows to scan (default: no limit). Filters can yield fewer items, {@code unwind}
+         * more.
+         */
         public readonly ?int $limit = null,
         /** Maximum number of dataset rows requested per API call (default 1000). */
         public readonly ?int $chunkSize = null,

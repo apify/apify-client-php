@@ -63,7 +63,7 @@ final class MockTransport implements NoRedirectHttpClientInterface
         return $this->received[count($this->received) - 1];
     }
 
-    /** Reads the body of a recorded request, decompressing it when it carries a {@code Content-Encoding}. */
+    /** Reads the body of a recorded request, decompressing a {@code gzip}, {@code br}, or {@code zstd} one. */
     public static function readBody(RequestInterface $request): string
     {
         $raw = (string) $request->getBody();
@@ -71,10 +71,12 @@ final class MockTransport implements NoRedirectHttpClientInterface
         if ($encoding === 'gzip') {
             $decoded = gzdecode($raw);
         } elseif ($encoding === 'br') {
-            // brotli_uncompress only exists when the PECL brotli extension is loaded; call it
-            // indirectly so the symbol is not referenced statically when the extension is absent.
+            // Called by name, so static analysis does not flag builds without the extension.
             $brotliUncompress = 'brotli_uncompress';
             $decoded = $brotliUncompress($raw);
+        } elseif ($encoding === 'zstd') {
+            $zstdUncompress = 'zstd_uncompress';
+            $decoded = $zstdUncompress($raw);
         } else {
             return $raw;
         }

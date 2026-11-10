@@ -21,7 +21,10 @@ final class Build extends ApifyResource
         return $this->getString('actId');
     }
 
-    /** The build status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code TIMED-OUT}, {@code ABORTING} or {@code ABORTED}. */
+    /**
+     * The build status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code
+     * TIMED-OUT}, {@code ABORTING}, or {@code ABORTED}.
+     */
     public function getStatus(): ?string
     {
         return $this->getString('status');
@@ -45,7 +48,10 @@ final class Build extends ApifyResource
         return $this->getString('buildNumber');
     }
 
-    /** The digest of the Docker image manifest without the {@code sha256:} prefix, or {@code null}. It differs between builds with different image contents. */
+    /**
+     * The digest of the Docker image manifest without the {@code sha256:} prefix, or {@code null}. It differs between
+     * builds with different image contents.
+     */
     public function getImageDigest(): ?string
     {
         return $this->getString('imageDigest');

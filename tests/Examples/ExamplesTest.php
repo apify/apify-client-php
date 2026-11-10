@@ -8,7 +8,10 @@ use Apify\Client\ApifyClient;
 use PHPUnit\Framework\TestCase;
 use Throwable;
 
-/** Runs each documentation example against the live API. Skipped without {@code APIFY_TOKEN}. This is the "Test examples" CI step. */
+/**
+ * Runs each documentation example against the live API. Skipped without {@code APIFY_TOKEN}. This is the "Test
+ * examples" CI step.
+ */
 final class ExamplesTest extends TestCase
 {
     private function client(): ApifyClient

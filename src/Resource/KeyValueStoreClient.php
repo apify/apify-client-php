@@ -174,7 +174,7 @@ final class KeyValueStoreClient
      * must already be valid JSON. Use {@see setRecordJson()} to have a value encoded.
      *
      * {@code $contentEncoding} is the {@code Content-Encoding} of a {@code $value} that is already compressed,
-     * for example {@code gzip}, {@code br}, {@code zstd} or {@code deflate}. The bytes are then stored as given
+     * for example {@code gzip}, {@code br}, {@code zstd}, or {@code deflate}. The bytes are then stored as given
      * and not compressed again.
      */
     public function setRecord(
@@ -202,9 +202,9 @@ final class KeyValueStoreClient
      *
      * @param mixed $value any JSON-serializable value
      */
-    public function setRecordJson(string $key, mixed $value): void
+    public function setRecordJson(string $key, mixed $value, ?SetRecordOptions $options = null): void
     {
-        $this->setRecord($key, Json::encode($value), ResourceContext::CONTENT_TYPE_JSON_CHARSET);
+        $this->setRecord($key, Json::encode($value), ResourceContext::CONTENT_TYPE_JSON_CHARSET, $options);
     }
 
     /** Deletes a record by key. */

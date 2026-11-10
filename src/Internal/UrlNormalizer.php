@@ -19,22 +19,25 @@ final class UrlNormalizer
     /** Default ports of the special schemes; a URL spelling its scheme's default port drops it. */
     private const DEFAULT_PORTS = ['http' => 80, 'https' => 443, 'ws' => 80, 'wss' => 443, 'ftp' => 21];
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in a path. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in a path. */
     private const PATH_UNSAFE = '"#<>?`{}';
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in a query. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in a query. */
     private const QUERY_UNSAFE = '"#<>\'';
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in a fragment. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in a fragment. */
     private const FRAGMENT_UNSAFE = '"<>`';
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in the user name and password. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in the user name and password. */
     private const USERINFO_UNSAFE = '"#<>?`{}/:;=@[\\]^|';
 
-    /** An IPv6 literal in a host: the brackets around hexadecimal digits, colons and dots. */
+    /** An IPv6 literal in a host: the brackets around hexadecimal digits, colons, and dots. */
     private const IPV6_LITERAL_PATTERN = '/^\[[0-9a-f:.]+\]$/';
 
-    /** The IDNA errors that WHATWG URL parsing ignores, since it turns {@code CheckHyphens} and {@code VerifyDnsLength} off. */
+    /**
+     * The IDNA errors that WHATWG URL parsing ignores, since it turns {@code CheckHyphens} and {@code VerifyDnsLength}
+     * off.
+     */
     private const IGNORED_IDNA_ERRORS = IDNA_ERROR_EMPTY_LABEL | IDNA_ERROR_LABEL_TOO_LONG | IDNA_ERROR_DOMAIN_NAME_TOO_LONG
         | IDNA_ERROR_LEADING_HYPHEN | IDNA_ERROR_TRAILING_HYPHEN | IDNA_ERROR_HYPHEN_3_4;
 
@@ -193,7 +196,10 @@ final class UrlNormalizer
         return $userinfo . $host;
     }
 
-    /** Lowercases a domain host and converts it to punycode when {@code intl} can; {@code ''} when it is not a valid host. */
+    /**
+     * Lowercases a domain host and converts it to punycode when {@code intl} can; {@code ''} when it is not a valid
+     * host.
+     */
     private static function normalizeHost(string $host): string
     {
         $decoded = rawurldecode($host);
@@ -245,7 +251,7 @@ final class UrlNormalizer
         return '/' . implode('/', $resolved);
     }
 
-    /** Percent-encodes controls, spaces, non-ASCII bytes and the {@code $unsafe} characters. Existing escapes stay. */
+    /** Percent-encodes controls, spaces, non-ASCII bytes, and the {@code $unsafe} characters. Existing escapes stay. */
     private static function encode(string $value, string $unsafe): string
     {
         $encoded = '';

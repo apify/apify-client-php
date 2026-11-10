@@ -6,7 +6,10 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/** Options for starting a task run. Like {@see ActorStartOptions}, without the Actor-only {@code contentType} and {@code forcePermissionLevel}. */
+/**
+ * Options for starting a task run. Like {@see ActorStartOptions}, without the Actor-only {@code contentType} and
+ * {@code forcePermissionLevel}.
+ */
 final class TaskStartOptions
 {
     /**

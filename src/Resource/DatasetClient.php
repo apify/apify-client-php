@@ -124,7 +124,7 @@ final class DatasetClient
         );
     }
 
-    /** Downloads the items in a format (JSON, CSV, XLSX, XML, RSS or HTML) and returns the bytes. */
+    /** Downloads the items in a format (JSON, CSV, XLSX, XML, RSS, or HTML) and returns the bytes. */
     public function downloadItems(
         DownloadItemsFormat $format,
         ?DatasetDownloadOptions $options = null,

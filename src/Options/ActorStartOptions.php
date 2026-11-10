@@ -32,7 +32,10 @@ final class ActorStartOptions
         public readonly ?string $contentType = null,
         /** If {@code true}, restart the run if it fails. */
         public readonly ?bool $restartOnError = null,
-        /** Overrides the permission level of the Actor for this run ({@code LIMITED_PERMISSIONS} or {@code FULL_PERMISSIONS}). */
+        /**
+         * Overrides the permission level of the Actor for this run ({@code LIMITED_PERMISSIONS} or {@code
+         * FULL_PERMISSIONS}).
+         */
         public readonly ?string $forcePermissionLevel = null,
         public readonly ?array $webhooks = null,
         /**

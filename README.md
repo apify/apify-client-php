@@ -5,11 +5,11 @@
 
 A PHP client for the [Apify API](https://docs.apify.com/api/v2), modeled on the
 [JavaScript client](https://github.com/apify/apify-client-js). Start from an `ApifyClient` and go on to
-Actors, runs, datasets, key-value stores, request queues, tasks, schedules, webhooks, the Store, users and logs.
+Actors, runs, datasets, key-value stores, request queues, tasks, schedules, webhooks, the Store, users, and logs.
 
 ## Requirements
 
-- PHP 8.1 or newer with the `json`, `mbstring` and `hash` extensions.
+- PHP 8.1 or newer with the `json`, `mbstring`, and `hash` extensions.
 
 ## Installation
 
@@ -63,20 +63,20 @@ $configured = new ApifyClient(
 | `timeoutShortSecs` | `5` | Timeout of the `short` tier, see [Timeout tiers](#timeout-tiers). |
 | `timeoutMediumSecs` | `30` | Timeout of the `medium` tier. |
 | `timeoutLongSecs` | `timeoutSecs` | Timeout of the `long` tier. |
-| `timeoutMaxSecs` | `timeoutSecs` | Cap on the timeout of any attempt, per-call overrides and growth across retries included. |
-| `compression` | `null` (brotli, else gzip) | Request body compression: `'brotli'`, `'gzip'`, `'zstd'` or a custom `HttpCompressorInterface`, see [HTTP compression](#http-compression). |
+| `timeoutMaxSecs` | `timeoutSecs` | Cap on the timeout of any attempt, per-call overrides, and growth across retries included. |
+| `compression` | `null` (brotli, else gzip) | Request body compression: `'brotli'`, `'gzip'`, `'zstd'`, or a custom `HttpCompressorInterface`, see [HTTP compression](#http-compression). |
 | `userAgentSuffix` | `null` | Suffix appended to the `User-Agent` header. |
 | `httpClient` | Guzzle | The transport, an `Apify\Client\Http\HttpClientInterface`. |
 
-Requests are retried with exponential backoff and jitter on network errors, HTTP 429 and 5xx. Other 4xx
+Requests are retried with exponential backoff and jitter on network errors, HTTP 429, and 5xx. Other 4xx
 responses throw an `ApifyApiException` subclass for the status. A 404 on a single resource is not thrown:
 `get()` returns `null` and `delete()` does nothing, see [Error handling](#error-handling).
 
 ### Timeout tiers
 
 Each method has a timeout tier: `short` for metadata reads and writes such as `get()`, `update()` and
-`delete()`, `medium` for listing, batch and trigger calls, and `long` for downloads, uploads and streaming. The
-tiers last 5 seconds, 30 seconds and `timeoutSecs` (360 by default). Set `timeoutShortSecs`,
+`delete()`, `medium` for listing, batch, and trigger calls, and `long` for downloads, uploads, and streaming. The
+tiers last 5 seconds, 30 seconds, and `timeoutSecs` (360 by default). Set `timeoutShortSecs`,
 `timeoutMediumSecs` or `timeoutLongSecs` to change one.
 
 A call that asks the API to hold its response with `waitForFinish` (`RunClient::get()`, `BuildClient::get()`,
@@ -84,7 +84,7 @@ A call that asks the API to hold its response with `waitForFinish` (`RunClient::
 `TaskClient::start()`) gets that hold on top of its tier, for at most 60 seconds.
 
 Every request method also takes a trailing `$timeoutSecs` that overrides the tier for that call: seconds, a
-tier name (`'short'`, `'medium'`, `'long'`) or `'noTimeout'`:
+tier name (`'short'`, `'medium'`, `'long'`), or `'noTimeout'`:
 
 ```php
 $client->actor('my-actor')->get(timeoutSecs: 10); // 10 seconds
@@ -99,7 +99,7 @@ doubles the timeout up to that cap. The `timeoutSecs` of a request queue client,
 ### HTTP compression
 
 A request body of at least 1 KiB is compressed, unless its `Content-Type` is already compressed (`image/*`,
-`audio/*`, `video/*`, common archive, office and font formats) or the request has a `Content-Encoding` header.
+`audio/*`, `video/*`, common archive, office, and font formats) or the request has a `Content-Encoding` header.
 By default the client uses brotli when the PECL `brotli` extension is loaded and gzip (the `zlib` extension)
 otherwise. Compression is best-effort: without a codec, the body is sent as it is.
 
@@ -118,7 +118,8 @@ $client = new ApifyClient(token: 'my-api-token', compression: new GzipHttpCompre
 $client = new ApifyClient(token: 'my-api-token', compression: new ZstdHttpCompressor(quality: 19));
 ```
 
-Zstd needs the PECL `zstd` extension. A custom algorithm is a `Apify\Client\Http\HttpCompressorInterface`
+Brotli and zstd need their PECL extensions. Choosing one without its extension throws `RuntimeException`
+when the client is created. A custom algorithm is an `Apify\Client\Http\HttpCompressorInterface`
 implementation: `contentEncoding(): string` and `compress(string $body): ?string`, which returns `null` to send
 the body as it is.
 
@@ -144,7 +145,7 @@ $client = new ApifyClient(token: 'my-api-token', httpClient: new Psr18HttpClient
 A method that fetches one resource by ID returns `null` if it does not exist, and `delete()` does nothing for a
 missing resource. Other API failures throw `Apify\Client\Exception\ApifyApiException` or the subclass for the
 status: `InvalidRequestException` (400), `UnauthorizedException` (401), `ForbiddenException` (403),
-`NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429) and `ServerException` (5xx).
+`NotFoundException` (404), `ConflictException` (409), `RateLimitException` (429), and `ServerException` (5xx).
 All extend `ApifyApiException`.
 
 ```php
@@ -158,7 +159,7 @@ try {
 ```
 
 A 404 resolves to `null` only if it is certain which resource is missing. A client obtained without an ID,
-such as `RunClient::dataset()`, `keyValueStore()`, `requestQueue()`, `log()` and `BuildClient::log()`, throws
+such as `RunClient::dataset()`, `keyValueStore()`, `requestQueue()`, `log()`, and `BuildClient::log()`, throws
 instead, since the run or build may be the missing one:
 
 ```php

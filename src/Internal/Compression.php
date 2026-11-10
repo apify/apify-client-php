@@ -13,7 +13,7 @@ use RuntimeException;
 /**
  * Request-body compression: brotli when the PECL {@code brotli} extension is loaded, gzip otherwise.
  *
- * Compression is best-effort. A body is sent unchanged when it is small, already compressed, or no codec is
+ * The default choice is best-effort. A body is sent unchanged when it is small, already compressed, or no codec is
  * available.
  *
  * @internal
@@ -22,9 +22,6 @@ final class Compression
 {
     /** Minimum body size in bytes worth compressing. */
     public const MIN_COMPRESS_BYTES = 1024;
-
-    /** Brotli quality level, faster than the brotli default of 11. */
-    private const BROTLI_QUALITY = 6;
 
     /** Media type prefixes whose payloads already carry their own compression. */
     private const ALREADY_COMPRESSED_PREFIXES = ['audio/', 'image/', 'video/'];
@@ -109,41 +106,39 @@ final class Compression
     }
 
     /**
-     * Compresses {@code $body} with the best available codec.
+     * Compresses {@code $body} with brotli if the extension is loaded, else with gzip.
      *
      * @return array{0: string, 1: string}|null the {@code Content-Encoding} value and the compressed body, or
      *                                          {@code null} to send the body unchanged
      */
     public static function maybeCompress(string $body): ?array
     {
-        return self::compressWith($body, self::brotliEncoder(), self::gzipEncoder());
+        $compressors = [];
+        if (BrotliHttpCompressor::isAvailable()) {
+            $compressors[] = new BrotliHttpCompressor();
+        }
+        if (GzipHttpCompressor::isAvailable()) {
+            $compressors[] = new GzipHttpCompressor();
+        }
+        return self::compressWith($body, $compressors);
     }
 
     /**
-     * Applies the size gate and picks the first codec that succeeds, brotli before gzip. Split out of
-     * {@see maybeCompress()} so tests can run each codec whatever extensions are loaded.
+     * Applies the size gate and compresses with the first compressor that succeeds.
      *
-     * @param (callable(string): mixed)|null $brotli brotli encoder, or {@code null} when unavailable
-     * @param (callable(string): mixed)|null $gzip   gzip encoder, or {@code null} when unavailable
+     * @param list<HttpCompressorInterface> $compressors in order of preference
      * @return array{0: string, 1: string}|null
      */
-    public static function compressWith(string $body, ?callable $brotli, ?callable $gzip): ?array
+    public static function compressWith(string $body, array $compressors): ?array
     {
         if (strlen($body) < self::MIN_COMPRESS_BYTES) {
             return null;
         }
 
-        if ($brotli !== null) {
-            $compressed = $brotli($body);
-            if (is_string($compressed)) {
-                return ['br', $compressed];
-            }
-        }
-
-        if ($gzip !== null) {
-            $compressed = $gzip($body);
-            if (is_string($compressed)) {
-                return ['gzip', $compressed];
+        foreach ($compressors as $compressor) {
+            $compressed = $compressor->compress($body);
+            if ($compressed !== null) {
+                return [$compressor->contentEncoding(), $compressed];
             }
         }
 
@@ -151,40 +146,11 @@ final class Compression
     }
 
     /**
-     * The brotli encoder, or {@code null} when the PECL {@code brotli} extension is not loaded.
-     *
-     * @return (callable(string): mixed)|null
-     */
-    private static function brotliEncoder(): ?callable
-    {
-        if (!function_exists('brotli_compress')) {
-            return null;
-        }
-
-        // Called by name, so static analysis does not flag builds without the extension.
-        $brotliCompress = 'brotli_compress';
-        return static fn (string $body) => $brotliCompress($body, self::BROTLI_QUALITY);
-    }
-
-    /**
-     * The gzip encoder, or {@code null} when zlib is not loaded.
-     *
-     * @return (callable(string): mixed)|null
-     */
-    private static function gzipEncoder(): ?callable
-    {
-        if (!function_exists('gzencode')) {
-            return null;
-        }
-
-        return static fn (string $body) => gzencode($body);
-    }
-
-    /**
      * Resolves a {@code compression} option to a compressor, or {@code null} for the default choice.
      *
      * @param string $option the name of the option's owner, for the error message
-     * @throws RuntimeException if the option is an unknown algorithm name
+     * @throws RuntimeException if the option is an unknown algorithm name, or names a codec whose extension is
+     *                          not loaded
      */
     public static function resolveCompressor(string|HttpCompressorInterface|null $compression, string $option): ?HttpCompressorInterface
     {

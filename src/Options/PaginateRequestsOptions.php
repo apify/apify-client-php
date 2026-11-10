@@ -19,7 +19,8 @@ final class PaginateRequestsOptions
     public const FILTER_PENDING = 'pending';
 
     /**
-     * @param list<string>|null $filter iterates only requests in these states, {@see FILTER_LOCKED} or {@see FILTER_PENDING}
+     * @param list<string>|null $filter iterates only requests in these states, {@see FILTER_LOCKED} or
+     *                                  {@see FILTER_PENDING}
      */
     public function __construct(
         /** Maximum total number of requests to iterate across all pages ({@code null} for no bound). */

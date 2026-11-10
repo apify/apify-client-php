@@ -13,8 +13,8 @@ final class RunChargeOptions
         /** The number of times to charge the event (defaults to 1). */
         public readonly ?int $count = null,
         /**
-         * A key that deduplicates the charge across retries. By default {@code "{runId}-{eventName}-{timestampMillis}-{random}"}.
-         * It expires 3 minutes after the charge, and a later request that reuses it creates a new charge.
+         * A key that deduplicates the charge across retries. By default
+         * {@code "{runId}-{eventName}-{timestampMillis}-{random}"}. It expires 3 minutes after the charge, and a later request that reuses it creates a new charge.
          */
         public readonly ?string $idempotencyKey = null,
         /**

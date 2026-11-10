@@ -195,7 +195,9 @@ final class RequestQueueClient
         }
     }
 
-    /** Returns up to {@code $limit} requests from the head of the queue and locks them for {@code $lockSecs} seconds. */
+    /**
+     * Returns up to {@code $limit} requests from the head of the queue and locks them for {@code $lockSecs} seconds.
+     */
     public function listAndLockHead(int $lockSecs, ?int $limit = null, int|float|string|null $timeoutSecs = null): LockedRequestQueueHead
     {
         $params = new QueryParams();
@@ -451,7 +453,10 @@ final class RequestQueueClient
         );
     }
 
-    /** Extends the lock of a request by {@code $lockSecs} seconds. With {@code $forefront}, it moves to the front when the lock expires. */
+    /**
+     * Extends the lock of a request by {@code $lockSecs} seconds. With {@code $forefront}, it moves to the front when
+     * the lock expires.
+     */
     public function prolongRequestLock(
         string $id,
         int $lockSecs,

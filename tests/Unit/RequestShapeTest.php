@@ -13,15 +13,26 @@ use Apify\Client\Options\MetamorphOptions;
 use Apify\Client\Options\RequestQueueClientOptions;
 use Apify\Client\Options\RunChargeOptions;
 use Apify\Client\Options\RunResurrectOptions;
+use Apify\Client\Options\SetRecordOptions;
 use Apify\Client\Options\ValidateInputOptions;
 use PHPUnit\Framework\TestCase;
 
-/** Offline tests of the method, path, query and body that mutating and convenience calls send. */
+/** Offline tests of the method, path, query, and body that mutating and convenience calls send. */
 final class RequestShapeTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient
     {
         return new ApifyClient(token: 't', minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
+    }
+
+    public function testSetRecordJsonPassesTheWriteOptionsOn(): void
+    {
+        $transport = (new MockTransport())->queueResponse(200, '');
+
+        $this->client($transport)->keyValueStore('s1')->setRecordJson('k', ['a' => 1], new SetRecordOptions(timeoutSecs: 3));
+
+        self::assertSame([3.0], $transport->timeouts);
+        self::assertSame('{"a":1}', MockTransport::readBody($transport->lastRequest()));
     }
 
     public function testRunChargeSendsBodyAndIdempotencyKey(): void

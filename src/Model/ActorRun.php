@@ -35,7 +35,10 @@ final class ActorRun extends ApifyResource
         return $this->getString('userId');
     }
 
-    /** The run status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code TIMED-OUT}, {@code ABORTING} or {@code ABORTED}. */
+    /**
+     * The run status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code
+     * TIMED-OUT}, {@code ABORTING}, or {@code ABORTED}.
+     */
     public function getStatus(): ?string
     {
         return $this->getString('status');

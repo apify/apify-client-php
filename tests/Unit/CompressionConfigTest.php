@@ -13,7 +13,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-/** Tests of the {@code compression} constructor option: algorithm by name, quality through a compressor, and the default when it is omitted. */
+/**
+ * Tests of the {@code compression} constructor option: algorithm by name, quality through a compressor, and the
+ * default when it is omitted.
+ */
 final class CompressionConfigTest extends TestCase
 {
     private const LARGE_BODY_FIELD = 'blob'; // forces the JSON body above the compression threshold
@@ -61,28 +64,34 @@ final class CompressionConfigTest extends TestCase
         self::assertSame('zstd', $transport->lastRequest()->getHeaderLine('Content-Encoding'));
     }
 
-    public function testZstdSendsTheBodyUncompressedWhenExtensionIsMissing(): void
+    /** @return array<string,array{string,string}> */
+    public static function codecsWithAnExtension(): array
     {
-        if (function_exists('zstd_compress')) {
-            self::markTestSkipped('PECL zstd extension loaded');
-        }
-        $transport = (new MockTransport())->queueResponse(200, '{"data":{}}');
-        $client = new ApifyClient(token: 't', compression: 'zstd', httpClient: $transport);
-
-        $client->keyValueStore('s1')->setRecordJson('k', $this->largeBody());
-
-        self::assertSame('', $transport->lastRequest()->getHeaderLine('Content-Encoding'));
+        return [
+            'brotli' => ['brotli', 'brotli_compress'],
+            'zstd' => ['zstd', 'zstd_compress'],
+        ];
     }
 
-    public function testZstdCompressorReportsItsEncodingAndRoundTrips(): void
+    #[DataProvider('codecsWithAnExtension')]
+    public function testChoosingACodecWithoutItsExtensionFailsAtConstruction(string $name, string $function): void
     {
+        if (function_exists($function)) {
+            self::markTestSkipped("the $name extension is loaded");
+        }
+        $this->expectException(RuntimeException::class);
+        new ApifyClient(token: 't', compression: $name, httpClient: new MockTransport());
+    }
+
+    public function testZstdCompressorRoundTrips(): void
+    {
+        if (!function_exists('zstd_uncompress')) {
+            self::markTestSkipped('PECL zstd extension not loaded');
+        }
         $compressor = new ZstdHttpCompressor();
         self::assertSame('zstd', $compressor->contentEncoding());
-        if (!function_exists('zstd_uncompress')) {
-            self::assertNull($compressor->compress('payload'));
-            return;
-        }
-        self::assertSame('payload', zstd_uncompress((string) $compressor->compress('payload')));
+        $zstdUncompress = 'zstd_uncompress';
+        self::assertSame('payload', $zstdUncompress((string) $compressor->compress('payload')));
     }
 
     /** @return array<string,array{int}> */

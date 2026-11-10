@@ -17,6 +17,9 @@ use Psr\Http\Message\ResponseInterface;
  */
 interface NoRedirectHttpClientInterface extends HttpClientInterface
 {
-    /** Sends a request like {@see HttpClientInterface::send()}, or {@see HttpClientInterface::sendStreaming()} with {@code $stream}, but returns a 3xx response instead of following it. */
+    /**
+     * Sends a request like {@see HttpClientInterface::send()}, or {@see HttpClientInterface::sendStreaming()} with
+     * {@code $stream}, but returns a 3xx response instead of following it.
+     */
     public function sendWithoutRedirects(RequestInterface $request, float $timeoutSecs, bool $stream = false): ResponseInterface;
 }

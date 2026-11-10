@@ -36,7 +36,7 @@ final class ActorServerClient
     /** The tag of the build that serves the server interface when the Actor does not name one. */
     private const DEFAULT_BUILD_REF = 'latest';
 
-    /** A build number such as {@code 0.1.23}: version, minor version and sequence number. */
+    /** A build number such as {@code 0.1.23}: version, minor version, and sequence number. */
     private const BUILD_NUMBER_PATTERN = '/^(\d+)\.(\d+)\.(\d+)$/';
 
     private ResourceContext $ctx;
@@ -145,7 +145,7 @@ final class ActorServerClient
     }
 
     /**
-     * Fetches the Actor, checks that it is a Server Actor and caches its server URL.
+     * Fetches the Actor, checks that it is a Server Actor, and caches its server URL.
      *
      * @return array{0:Actor,1:string} the Actor and its server URL
      * @throws ApifyClientException if the Actor is not a Server Actor

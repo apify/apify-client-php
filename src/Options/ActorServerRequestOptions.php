@@ -24,8 +24,8 @@ final class ActorServerRequestOptions
      * @param array<string,string>|null $headers     additional headers of the request, {@code Authorization} included;
      *                                               they reach the Actor's server as they are
      * @param string|HttpCompressorInterface|null $compression the compression of the request body: {@code 'brotli'},
-     *                                               {@code 'gzip'} or a custom compressor. The body is sent
-     *                                               uncompressed when it is not set, since the Actor's server may
+     *                                               {@code 'gzip'}, {@code 'zstd'}, or a custom compressor. The body is
+     *                                               sent uncompressed when it is not set, since the Actor's server may
      *                                               not decode a compressed body. A body is compressed under the same
      *                                               conditions as for API calls, so set this only if the server
      *                                               decodes the resulting {@code Content-Encoding}.

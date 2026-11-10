@@ -94,8 +94,8 @@ final class RequestQueueRequest extends ApifyResource
     }
 
     /**
-     * How many times the request was retried. Set on requests from {@see \Apify\Client\Resource\RequestQueueClient::listHead()},
-     * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()} and
+     * How many times the request was retried. Set on requests from
+     * {@see \Apify\Client\Resource\RequestQueueClient::listHead()}, {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()} and
      * {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}.
      */
     public function getRetryCount(): ?int

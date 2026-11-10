@@ -6,7 +6,10 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/** Options for listing datasets, key-value stores and request queues: the {@code unnamed} and {@code ownership} filters and the pagination. */
+/**
+ * Options for listing datasets, key-value stores, and request queues: the {@code unnamed} and {@code ownership} filters
+ * and the pagination.
+ */
 final class StorageListOptions
 {
     public function __construct(

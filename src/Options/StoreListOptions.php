@@ -12,7 +12,10 @@ final class StoreListOptions
     public function __construct(
         /** Number of Actors to skip. */
         public readonly ?int $offset = null,
-        /** The maximum number of Actors. When iterating, it caps the total over all pages, not the page size ({@code chunkSize}). */
+        /**
+         * The maximum number of Actors. When iterating, it caps the total over all pages, not the page size ({@code
+         * chunkSize}).
+         */
         public readonly ?int $limit = null,
         /** Full-text search query. */
         public readonly ?string $search = null,
