@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * The result of prolonging a request lock. Returned by
- * {@see \Apify\Client\Resource\RequestQueueClient::prolongRequestLock()}.
- */
+/** The result of {@see \Apify\Client\Resource\RequestQueueClient::prolongRequestLock()}. */
 final class RequestLockInfo
 {
     public function __construct(private ?string $lockExpiresAt)

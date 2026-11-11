@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * A single request stored in a request queue. Fields left {@code null} are omitted when the request
- * is sent to the API. Construct one for adding to a queue, or receive one when reading a queue.
- */
+/** A request in a request queue. Fields left {@code null} are not sent to the API. */
 final class RequestQueueRequest extends ApifyResource
 {
     /**
-     * @param array<string,mixed> $data raw data (used when hydrating from the API)
+     * @param array<string,mixed> $data the raw data, when built from an API response
      */
     public function __construct(?string $url = null, ?string $uniqueKey = null, array $data = [])
     {
@@ -81,7 +78,7 @@ final class RequestQueueRequest extends ApifyResource
     }
 
     /**
-     * Arbitrary user-attached metadata.
+     * User-attached metadata.
      *
      * @return mixed
      */
@@ -97,11 +94,10 @@ final class RequestQueueRequest extends ApifyResource
     }
 
     /**
-     * How many times processing this request has already been retried. Populated on requests
-     * returned by {@see \Apify\Client\Resource\RequestQueueClient::listHead()},
-     * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()} and
-     * {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}; absent when constructing a
-     * request to add.
+     * How many times the request was retried. Set on requests from
+     * {@see \Apify\Client\Resource\RequestQueueClient::listHead()},
+     * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}, and
+     * {@see \Apify\Client\Resource\RequestQueueClient::listRequests()}.
      */
     public function getRetryCount(): ?int
     {
@@ -109,8 +105,8 @@ final class RequestQueueRequest extends ApifyResource
     }
 
     /**
-     * ISO 8601 timestamp of when this request's processing lock expires. Only present on requests
-     * returned by {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
+     * ISO 8601 time when the lock of the request expires. Set on requests from
+     * {@see \Apify\Client\Resource\RequestQueueClient::listAndLockHead()}.
      */
     public function getLockExpiresAt(): ?string
     {

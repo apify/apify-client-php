@@ -6,11 +6,7 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/**
- * The standard offset/limit pagination shared by most {@code list} endpoints (builds, runs, tasks,
- * schedules, webhooks, Actor versions). All fields are optional; leave one {@code null} to use the
- * API default.
- */
+/** Offset and limit pagination, shared by most {@code list} endpoints. A {@code null} field uses the API default. */
 final class ListOptions
 {
     public function __construct(
@@ -23,10 +19,7 @@ final class ListOptions
     ) {
     }
 
-    /**
-     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving the other
-     * filters. Used by lazy iteration to request successive pages.
-     */
+    /** A copy with a new {@code offset} and {@code limit} and the same filters. Used to request successive pages. */
     public function withPagination(?int $offset, ?int $limit): self
     {
         return new self($offset, $limit, $this->desc);

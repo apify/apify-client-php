@@ -13,10 +13,7 @@ use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\ListOptions;
 use Generator;
 
-/**
- * A client for a build collection: the account-wide collection ({@code GET /v2/actor-builds}) or an
- * Actor's builds ({@code GET /v2/actors/{id}/builds}).
- */
+/** A client for a build collection: all builds of the account or the builds of an Actor. */
 final class BuildCollectionClient
 {
     private ResourceContext $ctx;
@@ -40,9 +37,8 @@ final class BuildCollectionClient
     }
 
     /**
-     * Lazily iterates over builds, fetching pages on demand. The options' {@code limit} caps the total
-     * number of builds yielded across all pages ({@code null} = all); {@code $chunkSize} is the
-     * per-page size ({@code null} = the API's default page size).
+     * Lazily yields builds. The {@code limit} option caps the total ({@code null} for all) and
+     * {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
      * @return Generator<int,Build>
      */

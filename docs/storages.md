@@ -1,31 +1,29 @@
 # Storages: datasets, key-value stores, request queues
 
 Snippets assume `$client = new ApifyClient('my-api-token');` and imported types (see
-[Namespaces](README.md#namespaces)). The storage collections all support
-`list(?StorageListOptions $options = null)` and `getOrCreate(?string $name = null)`; the dataset and
-key-value-store collections additionally accept an optional `?array $schema` on `getOrCreate`
-(request queues take only a name). The same storage can be reached from a run
-(`$client->run($id)->dataset()`, etc.).
+[Namespaces](README.md#namespaces)). Every storage collection has `list(?StorageListOptions $options = null)` and
+`getOrCreate(?string $name = null)`. The dataset and key-value store collections also take an optional
+`?array $schema` in `getOrCreate`. The storages of a run are reached from the run, for example
+`$client->run($id)->dataset()`.
 
 ## Datasets
 
 Collection — `$client->datasets()`:
 
 - `list(?StorageListOptions $options = null): PaginationList`
-- `iterate(?StorageListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all datasets, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
+- `iterate(?StorageListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the datasets. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 - `getOrCreate(?string $name = null, ?array $schema = null): Dataset`
 
 Single — `$client->dataset($id)`:
 
 - `get(): ?Dataset`, `update(mixed $newFields): Dataset`, `delete(): void`
-- `listItems(?DatasetListItemsOptions $options = null): PaginationList` — one page of items decoded to PHP values.
-- `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all items, paging on demand. The options' `limit` caps the total number of items yielded across all pages (unset = all); `$chunkSize` is the per-page size. Dataset items have no default limit, so without `$chunkSize` the iteration loads the whole dataset, or all `limit` items, in one response. The iterator advances and terminates by the page's `getCount()` (the rows the API scanned, or the items returned when that is larger), not by the number of items a page returns, matching the reference JS client exactly — see the method's doc comment for why that matters with `skipEmpty`/`clean`/`unwind`.
-- `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string` — raw export bytes.
-- `streamItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): StreamInterface` — the same export as `downloadItems()`, as a PSR-7 stream instead of a fully-buffered string, so a large export can be read incrementally (e.g. piped to a file) without holding it all in memory. Bypasses the retrying transport, so a failed request is not retried.
+- `listItems(?DatasetListItemsOptions $options = null): PaginationList`: one page of items decoded to PHP values.
+- `iterateItems(?DatasetListItemsOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the items. The `limit` option caps the total (unset for all), `$chunkSize` is the page size. Dataset items have no default limit, so without `$chunkSize` the first request loads the whole dataset. The iterator advances by the `getCount()` of a page (the rows the API scanned, or the items when that is larger), not by its number of items, which matters with `skipEmpty`, `clean` and `unwind`.
+- `downloadItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): string`: the export as bytes.
+- `streamItems(DownloadItemsFormat $format, ?DatasetDownloadOptions $options = null): StreamInterface`: the export of `downloadItems()` as a PSR-7 stream, so a large export can be read in chunks, for example piped to a file. It is not retried.
 - `pushItems(mixed $items): void`
-- `getStatistics(): ?array` — throws if the dataset itself does not exist (a 404 here cannot mean
-  anything else).
-- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null, ?DownloadItemsFormat $format = null, int|float|string|null $timeoutSecs = null): string` — builds a shareable URL for downloading this dataset's items (forwarding the given item filters); for a private dataset it appends an access signature, optionally bounded to `$expiresInSecs`, which must be positive (an `InvalidArgumentException` is thrown otherwise, before any request; omit it for a URL that never expires). `$timeoutSecs` applies to the request that fetches the dataset (default: the `long` tier). `$format` selects the served output format (defaults to `json`).
+- `getStatistics(): ?array`: throws if the dataset does not exist.
+- `createItemsPublicUrl(?DatasetListItemsOptions $options = null, ?int $expiresInSecs = null, ?DownloadItemsFormat $format = null, int|float|string|null $timeoutSecs = null): string`: builds a public URL for downloading the items, with the filters of the options. The URL of a private dataset is signed, and valid for `$expiresInSecs` if given. It must be positive, otherwise `InvalidArgumentException` is thrown before any request. Omit it for a URL that never expires. `$format` is the output format (default `json`). `$timeoutSecs` is for the request that fetches the dataset (default: the `long` tier).
 
 ```php
 $dataset = $client->datasets()->getOrCreate('my-dataset');
@@ -52,21 +50,21 @@ fclose($out);
 Collection — `$client->keyValueStores()`:
 
 - `list(?StorageListOptions $options = null): PaginationList`
-- `iterate(?StorageListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all stores, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
+- `iterate(?StorageListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the stores. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 - `getOrCreate(?string $name = null, ?array $schema = null): KeyValueStore`
 
 Single — `$client->keyValueStore($id)`:
 
 - `get(): ?KeyValueStore`, `update(mixed $newFields): KeyValueStore`, `delete(): void`
 - `listKeys(?ListKeysOptions $options = null): KeyValueStoreKeysPage`
-- `iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all keys, following cursor pagination (`exclusiveStartKey`/`nextExclusiveStartKey`). The options' `limit` caps the total number of keys yielded across all pages (unset = all); `$chunkSize` is the per-page size (unset = the remaining total cap, or the API's default page size when unbounded).
-- `recordExists(string $key): bool` — reports whether a record with the given key exists, without downloading its value (a `HEAD` request).
-- `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord` — the record value is never parsed: `getValue()` returns the exact bytes the API sent, whatever the content type, so a JSON record is decoded by the caller.
-- `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null, ?string $contentEncoding = null): void` — `$value` is sent exactly as given, also under `application/json`, so it has to be valid JSON already (use `setRecordJson()` to have an array encoded). `$contentEncoding`, if given, is sent as the `Content-Encoding` header, for a `$value` that is already compressed (gzip, br, ...); the client's own best-effort request compression always backs off when `Content-Encoding` is already set, so the bytes reach the API exactly as given.
-- `setRecordJson(string $key, mixed $value): void` — convenience over `setRecord()` that JSON-encodes `$value` and stores it with a JSON content type.
-- `deleteRecord(string $key): void` — permanently removes the record with the given key.
-- `getRecordPublicUrl(string $key, int|float|string|null $timeoutSecs = null): string` — builds a shareable URL for downloading a single record; for a private store it appends an access signature so the URL works without an API token.
-- `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null, int|float|string|null $timeoutSecs = null): string` — builds a shareable URL for listing this store's keys (forwarding the given key filters); for a private store it appends an access signature, optionally bounded to `$expiresInSecs`, which must be positive (an `InvalidArgumentException` is thrown otherwise, before any request; omit it for a URL that never expires). `$timeoutSecs` applies to the request that fetches the store (default: the `long` tier).
+- `iterateKeys(?ListKeysOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the keys, following the cursor pages. The `limit` option caps the total (unset for all), `$chunkSize` is the page size (unset for the remaining total, or the API's default without a limit).
+- `recordExists(string $key): bool`: returns whether the record exists, without downloading it (a `HEAD` request).
+- `getRecord(string $key, ?GetRecordOptions $options = null): ?KeyValueStoreRecord`: `getValue()` returns the bytes the API sent, whatever the content type, so decode a JSON record yourself.
+- `setRecord(string $key, string $value, string $contentType, ?SetRecordOptions $options = null, ?string $contentEncoding = null): void`: `$value` is sent as it is, also under `application/json`, so it must already be valid JSON. Use `setRecordJson()` to have a value encoded. `$contentEncoding` is the `Content-Encoding` of a `$value` that is already compressed, for example `gzip`, `br`, or `zstd`. The bytes are then sent as they are, without further compression.
+- `setRecordJson(string $key, mixed $value, ?SetRecordOptions $options = null): void`: JSON-encodes `$value` and stores it as a JSON record.
+- `deleteRecord(string $key): void`: deletes the record.
+- `getRecordPublicUrl(string $key, int|float|string|null $timeoutSecs = null): string`: builds a public URL of a record. The URL of a private store is signed, so it works without a token.
+- `createKeysPublicUrl(?ListKeysOptions $options = null, ?int $expiresInSecs = null, int|float|string|null $timeoutSecs = null): string`: builds a public URL for listing the keys, with the filters of the options. The URL of a private store is signed, and valid for `$expiresInSecs` if given. It must be positive, otherwise `InvalidArgumentException` is thrown before any request. Omit it for a URL that never expires. `$timeoutSecs` is for the request that fetches the store (default: the `long` tier).
 
 ```php
 $store = $client->keyValueStores()->getOrCreate('my-store');
@@ -91,7 +89,7 @@ $client->keyValueStore($store->getId())->setRecord('OUTPUT.json', $gzipped, 'app
 Collection — `$client->requestQueues()`:
 
 - `list(?StorageListOptions $options = null): PaginationList`
-- `iterate(?StorageListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all request queues, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
+- `iterate(?StorageListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the request queues. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 - `getOrCreate(?string $name = null): RequestQueue`
 
 A specific queue client is obtained with `$client->requestQueue($id, ?RequestQueueClientOptions $options = null)`.
@@ -102,20 +100,20 @@ Single — `$client->requestQueue($id)`:
 
 - `get(): ?RequestQueue`, `update(mixed $newFields): RequestQueue`, `delete(): void`
 - `listHead(?int $limit = null): RequestQueueHead`
-- `addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` — adds a request to the queue; when `$forefront` is `true` it is added to the front (handled before the rest) instead of the back.
-- `getRequest(string $id): ?RequestQueueRequest`, `updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` (with `$forefront` `true` the updated request is moved to the front of the queue), `deleteRequest(string $id): void`
-- `batchAddRequests(array $requests, bool $forefront = false, ?BatchAddRequestsOptions $options = null): BatchAddResult` — every request must have a non-empty `uniqueKey`; with `$forefront` `true` the requests are added to the front of the queue; input is split into batches of at most 25 requests that also respect the ~9 MiB payload limit.
-- `batchDeleteRequests(array $requests): BatchDeleteResult` — `$requests` is a `list<RequestQueueRequest>` (1-25 entries) where each entry identifies a request to delete via `setId()` or `setUniqueKey()` (other fields, if set, are ignored by the API); throws `InvalidArgumentException` if empty, over 25, or if any entry has neither a non-empty `id` nor `uniqueKey` set (unlike `batchAddRequests()`, oversized input is rejected rather than chunked, since delete is idempotent and can simply be called again).
+- `addRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo`: adds a request, at the front with `$forefront`.
+- `getRequest(string $id): ?RequestQueueRequest`, `updateRequest(RequestQueueRequest $request, bool $forefront = false): RequestQueueOperationInfo` (with `$forefront`, the request moves to the front), `deleteRequest(string $id): void`
+- `batchAddRequests(array $requests, bool $forefront = false, ?BatchAddRequestsOptions $options = null): BatchAddResult`: every request needs a non-empty `uniqueKey`. With `$forefront`, they are added at the front. The input is split into batches of at most 25 requests and about 9 MiB.
+- `batchDeleteRequests(array $requests): BatchDeleteResult`: `$requests` is a `list<RequestQueueRequest>` of 1 to 25 entries, each identified by `setId()` or `setUniqueKey()`. Throws `InvalidArgumentException` for an empty list, more than 25 entries, or an entry without an id and a uniqueKey. Larger input is rejected instead of split, since a delete can be repeated.
 - `listRequests(?ListRequestsOptions $options = null): RequestQueueRequestsPage`
-- `paginateRequests(?PaginateRequestsOptions $options = null): iterable` — lazily iterate the queue's requests, yielding `RequestQueueRequest` instances and following cursor pagination (see the options note below).
-- `listAndLockHead(int $lockSecs, ?int $limit = null): LockedRequestQueueHead` — atomically returns and locks up to `$limit` requests for `$lockSecs` seconds.
-- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): RequestLockInfo` — extends a request's lock by `$lockSecs`; with `$forefront` `true` the request is placed at the front of the queue once its lock expires.
-- `deleteRequestLock(string $id, bool $forefront = false): void` — releases the lock on a single request; with `$forefront` `true` the request is returned to the front of the queue.
-- `unlockRequests(): UnlockRequestsResult` — releases all locks the client holds on this queue.
+- `paginateRequests(?PaginateRequestsOptions $options = null): iterable`: lazily yields the `RequestQueueRequest`s, following the cursor pages. See the options below.
+- `listAndLockHead(int $lockSecs, ?int $limit = null): LockedRequestQueueHead`: returns up to `$limit` requests and locks them for `$lockSecs` seconds.
+- `prolongRequestLock(string $id, int $lockSecs, bool $forefront = false): RequestLockInfo`: extends the lock of a request by `$lockSecs`. With `$forefront`, the request moves to the front when the lock expires.
+- `deleteRequestLock(string $id, bool $forefront = false): void`: releases the lock of a request. With `$forefront`, it moves to the front of the queue.
+- `unlockRequests(): UnlockRequestsResult`: releases all locks that the client holds on the queue.
 - `withClientKey(string $clientKey): RequestQueueClient`
 
 `paginateRequests()` accepts a `PaginateRequestsOptions` with `limit` (total across all pages),
-`maxPageLimit` (page size), `exclusiveStartId`/`cursor` (starting point) and `filter`
+`maxPageLimit` (page size), `exclusiveStartId`/`cursor` (starting point), and `filter`
 (`locked`/`pending`).
 
 ```php

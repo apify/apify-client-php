@@ -4,22 +4,16 @@ declare(strict_types=1);
 
 namespace Apify\Client\Options;
 
-/**
- * Per-client options for a {@see \Apify\Client\Resource\RequestQueueClient}, mirroring the reference
- * client's {@code requestQueue(id, { clientKey, timeoutSecs })}.
- */
+/** Options of a {@see \Apify\Client\Resource\RequestQueueClient}. */
 final class RequestQueueClientOptions
 {
     public function __construct(
         /**
-         * A stable client key identifying this client to the queue. Required to operate on locks the
-         * client itself created, and lets the API detect whether multiple clients access the queue.
+         * A stable key that identifies the client to the queue. Needed to operate on locks the client created, and lets
+         * the API detect several clients on one queue.
          */
         public readonly ?string $clientKey = null,
-        /**
-         * Overall per-request timeout (seconds) for this queue client's calls. When {@code null} the
-         * shared client-wide timeout is used.
-         */
+        /** The request timeout in seconds for the calls of the client. {@code null} uses the client-wide timeout. */
         public readonly ?float $timeoutSecs = null,
     ) {
     }

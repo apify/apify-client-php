@@ -14,11 +14,7 @@ use Apify\Client\Options\ListOptions;
 use Apify\Client\Options\RunListOptions;
 use Generator;
 
-/**
- * A client for a run collection: the account-wide collection ({@code GET /v2/actor-runs}), an
- * Actor's runs ({@code GET /v2/actors/{id}/runs}), or a task's runs ({@code GET
- * /v2/actor-tasks/{id}/runs}).
- */
+/** A client for a run collection: all runs of the account, or the runs of an Actor or task. */
 final class RunCollectionClient
 {
     private ResourceContext $ctx;
@@ -43,9 +39,8 @@ final class RunCollectionClient
     }
 
     /**
-     * Lazily iterates over runs, fetching pages on demand and applying the run-specific filters to
-     * every page. The options' {@code limit} caps the total number of runs yielded across all pages
-     * ({@code null} = all); {@code $chunkSize} is the per-page size ({@code null} = the API's default page size).
+     * Lazily yields runs, with the filters applied to every page. The {@code limit} option caps the total
+     * ({@code null} for all) and {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
      * @return Generator<int,ActorRun>
      */

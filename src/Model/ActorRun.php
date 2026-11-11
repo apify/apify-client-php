@@ -36,9 +36,8 @@ final class ActorRun extends ApifyResource
     }
 
     /**
-     * The current run status. One of the eight {@code ActorJobStatus} values: {@code READY},
-     * {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT}, {@code TIMED-OUT},
-     * {@code ABORTING}, {@code ABORTED}.
+     * The run status: {@code READY}, {@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code TIMING-OUT},
+     * {@code TIMED-OUT}, {@code ABORTING}, or {@code ABORTED}.
      */
     public function getStatus(): ?string
     {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Internal;
 
 /**
- * Retry/timeout policy for the orchestrating HTTP client.
+ * The retry and timeout settings of the HTTP client.
  *
  * @internal
  */
@@ -20,7 +20,10 @@ final class RetryConfig
         public readonly float $maxDelayMillis,
         /** Overall per-request timeout budget, in seconds. Each attempt's timeout grows but is capped here. */
         public readonly float $timeoutSecs,
-        /** The configured timeout tiers (short/medium/long/max), used as the default when a call has no per-call override. */
+        /**
+         * The configured timeout tiers (short/medium/long/max), used as the default when a call has no per-call
+         * override.
+         */
         public readonly TimeoutTiers $timeoutTiers,
     ) {
     }

@@ -10,12 +10,7 @@ use Apify\Client\Model\RequestQueueRequest;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Offline behavioral tests for the {@see \Apify\Client\Resource\RequestQueueClient} operations that
- * return typed models instead of a raw decoded array: {@code listHead()}, {@code listAndLockHead()},
- * {@code listRequests()}, {@code prolongRequestLock()}, {@code unlockRequests()}, and
- * {@code batchDeleteRequests()}.
- */
+/** Offline tests of the {@see \Apify\Client\Resource\RequestQueueClient} operations that return typed models. */
 final class RequestQueueTypedResultsTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient

@@ -13,8 +13,8 @@ final class StoreListOptions
         /** Number of Actors to skip. */
         public readonly ?int $offset = null,
         /**
-         * Maximum number of Actors to return. When iterating, this caps the total number of Actors
-         * yielded across all pages (the per-page size is the separate {@code chunkSize} argument).
+         * The maximum number of Actors. When iterating, it caps the total over all pages, not the page size
+         * ({@code chunkSize}).
          */
         public readonly ?int $limit = null,
         /** Full-text search query. */
@@ -25,10 +25,7 @@ final class StoreListOptions
         public readonly ?string $category = null,
         /** Filter Actors by owner username. */
         public readonly ?string $username = null,
-        /**
-         * Filter Actors by pricing model ({@code FREE}, {@code PRICE_PER_DATASET_ITEM},
-         * {@code PAY_PER_EVENT}).
-         */
+        /** Filters by pricing model ({@code FREE}, {@code PRICE_PER_DATASET_ITEM}, {@code PAY_PER_EVENT}). */
         public readonly ?string $pricingModel = null,
         /** Include Actors the current user cannot run. */
         public readonly ?bool $includeUnrunnableActors = null,
@@ -36,18 +33,12 @@ final class StoreListOptions
         public readonly ?bool $allowsAgenticUsers = null,
         /** The response format ({@code full}, {@code agent}). */
         public readonly ?string $responseFormat = null,
-        /**
-         * Include the compact input schema of each Actor's default build in the listing (only
-         * returned when the default build succeeded and defines input properties).
-         */
+        /** Includes the compact input schema of the default build, when it succeeded and defines input properties. */
         public readonly ?bool $includeInputSchema = null,
     ) {
     }
 
-    /**
-     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving the other
-     * filters. Used by lazy iteration to request successive pages.
-     */
+    /** A copy with a new {@code offset} and {@code limit} and the same filters. Used to request successive pages. */
     public function withPagination(?int $offset, ?int $limit): self
     {
         return new self(

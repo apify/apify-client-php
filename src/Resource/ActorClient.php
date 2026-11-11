@@ -19,12 +19,7 @@ use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ValidateInputOptions;
 use InvalidArgumentException;
 
-/**
- * A client for a specific Actor.
- *
- * It provides CRUD methods plus convenience helpers to start/call the Actor, build it, and access
- * its runs, builds, versions and webhooks.
- */
+/** A client for an Actor: its CRUD calls, start, call, and build, and its runs, builds, versions, and webhooks. */
 final class ActorClient
 {
     private ResourceContext $ctx;
@@ -55,9 +50,9 @@ final class ActorClient
     }
 
     /**
-     * Updates the Actor with the given fields and returns the updated object.
+     * Updates the Actor and returns it.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Actor
     {
@@ -71,11 +66,10 @@ final class ActorClient
     }
 
     /**
-     * Starts the Actor and returns immediately with the created run.
+     * Starts the Actor and returns the created run without waiting.
      *
-     * @param mixed $input a JSON-serializable array (or {@code null} for no input), or a raw string
-     *                      of bytes sent exactly as given — pair it with a non-default
-     *                      {@code $options->contentType}
+     * @param mixed $input a JSON-serializable value, a string sent as it is (set a matching
+     *                      {@code $options->contentType}), or {@code null} for no input
      */
     public function start(
         mixed $input = null,
@@ -99,28 +93,26 @@ final class ActorClient
     }
 
     /**
-     * Starts the Actor and waits (client-side polling) for it to finish.
+     * Starts the Actor and polls until it finishes.
      *
-     * @param mixed    $input    a JSON-serializable array (or {@code null} for no input), or a raw
-     *                           string of bytes sent exactly as given — see {@see start()}
-     * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
-     *                           {@code $options->waitForResources} start does not count toward it.
-     * @param int|float|string|null $timeoutSecs timeout of the start request and of every poll (a number of
-     *                           seconds, a tier name or {@code 'noTimeout'}); default {@code 'noTimeout'}
+     * @param mixed    $input    the input, as for {@see start()}
+     * @param int|null $waitSecs bounds the wait ({@code null} waits indefinitely). Retries of a
+     *                           {@code $options->waitForResources} start do not count.
+     * @param int|float|string|null $timeoutSecs timeout of the start request and of each poll (default
+     *                           {@code 'noTimeout'})
      */
     public function call(mixed $input = null, ?ActorStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        // Like the reference client, the start request and every poll have no request timeout by default.
+        // The start request and every poll have no request timeout by default.
         $timeoutSecs ??= TimeoutTiers::NO_TIMEOUT;
         $run = $this->start($input, $options, $timeoutSecs);
         return $this->root->run((string) $run->getId())->waitForFinish($waitSecs, $timeoutSecs);
     }
 
     /**
-     * Validates {@code input} against the Actor's input schema and returns whether it is valid.
+     * Returns whether {@code input} is valid against the input schema of the Actor.
      *
-     * @param mixed $input a JSON-serializable array (or {@code null}), or a raw string of bytes sent
-     *                      exactly as given — see {@see start()}
+     * @param mixed $input the input, as for {@see start()}
      */
     public function validateInput(
         mixed $input = null,
@@ -144,7 +136,7 @@ final class ActorClient
     }
 
     /**
-     * Builds the given version of the Actor and returns the created build.
+     * Builds a version of the Actor and returns the build.
      *
      * @throws InvalidArgumentException if {@code $versionNumber} is empty
      */
@@ -170,8 +162,8 @@ final class ActorClient
     }
 
     /**
-     * Resolves the Actor's default build and returns a client for it. {@code $waitForFinish}
-     * optionally bounds how long (seconds) the API waits for the build to finish before responding.
+     * Returns a client for the default build. {@code $waitForFinish} is how many seconds the API holds the response
+     * until the build finishes.
      */
     public function defaultBuild(?int $waitForFinish = null, int|float|string|null $timeoutSecs = null): BuildClient
     {
@@ -222,13 +214,10 @@ final class ActorClient
     }
 
     /**
-     * Returns a client for the server interface of this Actor.
+     * Returns a client for the server interface of the Actor. Every call returns the same client, so the
+     * server URL it fetches is reused.
      *
-     * A Server Actor (formerly Actor Standby) runs a web server, its server interface, that is called over
-     * HTTP without starting a run for each call. Every call returns the same client, so the server URL it
-     * fetches is reused.
-     *
-     * @see https://docs.apify.com/platform/actors/running/standby
+     * @see https://docs.apify.com/platform/actors/running/server-actors
      */
     public function server(): ActorServerClient
     {

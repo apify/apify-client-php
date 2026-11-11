@@ -7,9 +7,8 @@ namespace Apify\Client\Internal;
 use Apify\Client\Http\HttpCompressorInterface;
 
 /**
- * Per-request deviations from the default behaviour of {@see HttpClientCore::call()}. The defaults describe
- * a call to the Apify API itself; {@see \Apify\Client\Resource\ActorServerClient} overrides them to talk to an
- * Actor's own web server, whose responses and side effects the client must not second-guess.
+ * Per-request deviations from the defaults of {@see HttpClientCore::call()}, which describe a call to the Apify
+ * API. {@see \Apify\Client\Resource\ActorServerClient} overrides them to call the web server of an Actor.
  *
  * @internal
  */
@@ -18,7 +17,9 @@ final class RequestPolicy
     /** The name of the header the API reads the token from. */
     public const AUTHORIZATION_HEADER = 'Authorization';
 
-    /** The header that carries the token to an Actor server. The platform removes it before the Actor sees the request. */
+    /**
+     * The header that carries the token to an Actor server. The platform removes it before the Actor sees the request.
+     */
     public const SERVER_AUTHORIZATION_HEADER = 'X-Apify-Authorization';
 
     /**

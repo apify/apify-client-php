@@ -17,9 +17,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the WHATWG URL normalization of the response fields the OpenAPI specification declares as
- * {@code format: uri} (the reference client's `#1045`). The expected values are what `new URL(x).href`
- * returns.
+ * Tests of the WHATWG URL normalization of the {@code format: uri} response fields. The expectations are what
+ * {@code new URL(x).href} returns.
  */
 final class UrlNormalizerTest extends TestCase
 {

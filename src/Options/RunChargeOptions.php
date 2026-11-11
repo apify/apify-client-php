@@ -13,16 +13,15 @@ final class RunChargeOptions
         /** The number of times to charge the event (defaults to 1). */
         public readonly ?int $count = null,
         /**
-         * A key that deduplicates the charge across retries. If unset, one is auto-generated as
-         * {@code "{runId}-{eventName}-{timestampMillis}-{random}"}, matching the reference client.
-         * The key expires 3 minutes after the charge; a later request reusing it creates a new
-         * charge instead of being deduplicated against the original.
+         * A key that deduplicates the charge across retries. By default
+         * {@code "{runId}-{eventName}-{timestampMillis}-{random}"}. It expires 3 minutes after the charge, and a later
+         * request that reuses it creates a new charge.
          */
         public readonly ?string $idempotencyKey = null,
         /**
-         * The ID of the Server Actor request being charged, taken from the {@code X-Actor-Request-ID}
-         * header of the incoming request. Required for multi-tenant Server Actor runs, where it maps the
-         * charge to the caller's account instead of the account that started the run. Ignored elsewhere.
+         * The ID of the Server Actor request being charged, from the {@code X-Actor-Request-ID} header of the
+         * incoming request. Required for runs of multi-tenant Server Actors, where it identifies the request the
+         * charge belongs to. Runs of single-tenant Server Actors ignore it.
          */
         public readonly ?string $requestId = null,
     ) {

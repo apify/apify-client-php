@@ -37,9 +37,8 @@ final class RequestQueueCollectionClient
     }
 
     /**
-     * Lazily iterates over request queues, fetching pages on demand. The options' {@code limit} caps
-     * the total number of queues yielded across all pages ({@code null} = all); {@code $chunkSize} is
-     * the per-page size ({@code null} = the API's default page size).
+     * Lazily yields request queues. The {@code limit} option caps the total ({@code null} for all) and
+     * {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
      * @return Generator<int,RequestQueue>
      */
@@ -54,10 +53,7 @@ final class RequestQueueCollectionClient
         );
     }
 
-    /**
-     * Gets the queue with the given name, creating it if it does not exist. An empty/{@code null}
-     * name creates a new unnamed queue.
-     */
+    /** Returns the queue with the name, creating it if needed. An empty name creates an unnamed queue. */
     public function getOrCreate(?string $name = null, int|float|string|null $timeoutSecs = null): RequestQueue
     {
         return new RequestQueue($this->ctx->getOrCreateNamed($name, null, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));

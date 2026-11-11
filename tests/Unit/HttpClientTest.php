@@ -90,8 +90,7 @@ final class HttpClientTest extends TestCase
 
     public function testMalformedJsonBodyOnSuccessThrowsWithoutRetry(): void
     {
-        // A successful (2xx) response arrived in full (a transfer cut short fails in the transport
-        // instead), so retrying would get the same unparsable body back. Matches the reference client.
+        // A success response arrived in full, so a retry would get the same unparsable body.
         $transport = (new MockTransport())
             ->queueResponse(200, 'not valid JSON {')
             ->queueResponse(200, Json::encode(['data' => ['id' => 'unused']]));
@@ -263,8 +262,7 @@ final class HttpClientTest extends TestCase
 
     public function testDatasetItemsDescHeaderTakesPrecedenceOverOption(): void
     {
-        // The server-reported X-Apify-Pagination-Desc header must win over the requested option
-        // (matches the reference JS client), so a page always reflects what the server actually did.
+        // The X-Apify-Pagination-Desc header wins over the requested option.
         $transport = (new MockTransport())->queueResponse(
             200,
             Json::encode([['n' => 1]]),

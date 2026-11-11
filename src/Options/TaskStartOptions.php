@@ -7,15 +7,13 @@ namespace Apify\Client\Options;
 use Apify\Client\Internal\QueryParams;
 
 /**
- * Configures starting a task run.
- *
- * It mirrors {@see ActorStartOptions} but omits the fields the task run endpoint does not accept
- * (the Actor-only {@code contentType} and {@code forcePermissionLevel}), matching the reference client.
+ * Options for starting a task run. Like {@see ActorStartOptions}, without the Actor-only {@code contentType} and
+ * {@code forcePermissionLevel}.
  */
 final class TaskStartOptions
 {
     /**
-     * @param list<mixed>|null $webhooks ad-hoc webhooks to attach (serialized to base64-encoded JSON)
+     * @param list<mixed>|null $webhooks ad-hoc webhooks, sent base64-encoded
      */
     public function __construct(
         /** The tag or number of the build to run (e.g. {@code "latest"}, {@code "0.1.2"}). */
@@ -33,10 +31,7 @@ final class TaskStartOptions
         /** If {@code true}, restart the run if it fails. */
         public readonly ?bool $restartOnError = null,
         public readonly ?array $webhooks = null,
-        /**
-         * Retry the start while the account lacks the resources for the run. See {@see
-         * \Apify\Client\Options\ActorStartOptions::$waitForResources} for the full behavior.
-         */
+        /** Retries the start while the account lacks resources. See {@see ActorStartOptions::$waitForResources}. */
         public readonly bool|int|null $waitForResources = null,
     ) {
     }

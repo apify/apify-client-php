@@ -11,12 +11,7 @@ use Apify\Client\Options\DatasetDownloadOptions;
 use Apify\Client\Options\DownloadItemsFormat;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Covers {@see \Apify\Client\Resource\DatasetClient::streamItems()}, this client's equivalent of the
- * reference client's {@code downloadItems(format, { stream: true })} (previously its own
- * {@code streamItems()} — apify/apify-client-js#1139, folded into the option a release later by
- * apify/apify-client-js#1152).
- */
+/** Tests of {@see \Apify\Client\Resource\DatasetClient::streamItems()}. */
 final class DatasetStreamItemsTest extends TestCase
 {
     private function client(MockTransport $transport): ApifyClient

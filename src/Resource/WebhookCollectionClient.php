@@ -8,11 +8,7 @@ use Apify\Client\Internal\QueryParams;
 use Apify\Client\Internal\TimeoutTiers;
 use Apify\Client\Model\Webhook;
 
-/**
- * A client for the account-wide webhook collection ({@code GET/POST /v2/webhooks}), supporting both
- * listing and creation. Webhooks nested under an Actor or task are read-only and use
- * {@see NestedWebhookCollectionClient} instead.
- */
+/** A client for the webhooks of the account, which lists and creates them. */
 final class WebhookCollectionClient extends AbstractWebhookCollectionClient
 {
     /**

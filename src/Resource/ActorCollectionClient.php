@@ -37,9 +37,8 @@ final class ActorCollectionClient
     }
 
     /**
-     * Lazily iterates over the account's Actors, fetching pages on demand. The options' {@code limit}
-     * caps the total number of Actors yielded across all pages ({@code null} = all); {@code $chunkSize}
-     * is the per-page size ({@code null} = the API's default page size).
+     * Lazily yields the account's Actors. The {@code limit} option caps the total ({@code null} for all) and
+     * {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
      * @return Generator<int,Actor>
      */

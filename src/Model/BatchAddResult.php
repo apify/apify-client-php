@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client\Model;
 
-/**
- * The result of a batch request-add: the accepted (processed) and the unprocessed requests.
- */
+/** The result of adding requests in a batch: the processed and the unprocessed ones. */
 final class BatchAddResult
 {
     /**
@@ -20,7 +18,7 @@ final class BatchAddResult
     }
 
     /**
-     * The requests the API successfully added.
+     * The requests that were added.
      *
      * @return list<RequestQueueOperationInfo>
      */
@@ -30,7 +28,7 @@ final class BatchAddResult
     }
 
     /**
-     * The requests the API did not process.
+     * The requests that were not processed.
      *
      * @return list<RequestQueueRequest>
      */
@@ -58,7 +56,7 @@ final class BatchAddResult
     }
 
     /**
-     * Appends another result's requests into this one (used to merge per-chunk batch results).
+     * Adds the requests of another result to this one.
      *
      * @internal
      */

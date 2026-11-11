@@ -8,8 +8,8 @@ use Apify\Client\Model\PaginationList;
 use Apify\Client\Options\DatasetListItemsOptions;
 
 /**
- * Reads one page of dataset items. The page's count is the number of rows the API scanned to produce
- * it, or the number of items returned when that is larger. Shared by {@see \Apify\Client\Resource\DatasetClient} and {@see \Apify\Client\Resource\RunClient}.
+ * Reads a page of dataset items for {@see \Apify\Client\Resource\DatasetClient} and
+ * {@see \Apify\Client\Resource\RunClient}.
  *
  * @internal
  */
@@ -20,10 +20,9 @@ final class DatasetItemsPage
     }
 
     /**
-     * Fetches one page of items and parses the pagination headers. The page's {@code count} is the
-     * {@code X-Apify-Pagination-Count} "scanned rows" count, or the number of items returned when that is
-     * larger (or when the response omits the header). The header is derived from the dataset's item count,
-     * which lags a fresh push, so it can fall below the items returned on an unfiltered page.
+     * Fetches a page of items and parses the pagination headers. The {@code count} of the page is the
+     * {@code X-Apify-Pagination-Count} scanned rows, or the number of items when that is larger or the header is
+     * missing. The header lags a fresh push, so it can be below the items of an unfiltered page.
      *
      * @return PaginationList<mixed>
      */
@@ -45,9 +44,7 @@ final class DatasetItemsPage
             $response->getHeaderLine('X-Apify-Pagination-Offset') === '' ? 0 : (int) $response->getHeaderLine('X-Apify-Pagination-Offset'),
             $response->getHeaderLine('X-Apify-Pagination-Limit') === '' ? $returned : (int) $response->getHeaderLine('X-Apify-Pagination-Limit'),
             max($scannedHeader === '' ? 0 : (int) $scannedHeader, $returned),
-            // Prefer the server-reported X-Apify-Pagination-Desc header (matches the reference JS
-            // client's `_createPaginationList`); fall back to the requested option when the header
-            // is absent, e.g. against an older API version that predates it.
+            // The header wins, the requested option applies when it is missing.
             self::headerBool($response->getHeaderLine('X-Apify-Pagination-Desc'), $options->desc ?? false),
         );
     }

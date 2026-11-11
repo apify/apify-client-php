@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace Apify\Client\Internal;
 
 /**
- * Normalizes the URL fields of API responses to the WHATWG URL serialization, so this client returns
- * the same string for the same field as the reference client (which parses them with {@code new URL()}).
+ * Normalizes the URL fields of API responses to the WHATWG URL serialization, as {@code new URL()} does.
  *
- * For a special-scheme URL ({@code http}, {@code https}, {@code ws}, {@code wss}, {@code ftp}) it
- * lowercases the scheme and host, converts an internationalized host to punycode (when the optional
- * {@code intl} extension is available), drops a default port, resolves dot segments, adds the {@code /}
- * of an empty path, and percent-encodes characters that are unsafe in the path, query and fragment. A
- * value that is not an absolute special-scheme URL is returned unchanged.
+ * A URL with a special scheme ({@code http}, {@code https}, {@code ws}, {@code wss}, {@code ftp}) gets a
+ * lowercase scheme and host, a punycode host (with the optional {@code intl} extension), no default port, no
+ * dot segments, a {@code /} for an empty path, and percent-encoded unsafe characters. Any other value is
+ * returned unchanged.
  *
  * @internal
  */
@@ -21,25 +19,24 @@ final class UrlNormalizer
     /** Default ports of the special schemes; a URL spelling its scheme's default port drops it. */
     private const DEFAULT_PORTS = ['http' => 80, 'https' => 443, 'ws' => 80, 'wss' => 443, 'ftp' => 21];
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in a path. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in a path. */
     private const PATH_UNSAFE = '"#<>?`{}';
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in a query. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in a query. */
     private const QUERY_UNSAFE = '"#<>\'';
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in a fragment. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in a fragment. */
     private const FRAGMENT_UNSAFE = '"<>`';
 
-    /** Characters (besides controls, space and non-ASCII) percent-encoded in the user name and password. */
+    /** Characters (besides controls, space, and non-ASCII) percent-encoded in the user name and password. */
     private const USERINFO_UNSAFE = '"#<>?`{}/:;=@[\\]^|';
 
-    /** An IPv6 literal in a host: the brackets around hexadecimal digits, colons and dots. */
+    /** An IPv6 literal in a host: the brackets around hexadecimal digits, colons, and dots. */
     private const IPV6_LITERAL_PATTERN = '/^\[[0-9a-f:.]+\]$/';
 
     /**
-     * The IDNA error bits that WHATWG URL parsing ignores (it turns {@code CheckHyphens} and
-     * {@code VerifyDnsLength} off): empty label, label too long, domain too long, leading hyphen,
-     * trailing hyphen and hyphens in positions 3 and 4.
+     * The IDNA errors that WHATWG URL parsing ignores, since it turns {@code CheckHyphens} and {@code VerifyDnsLength}
+     * off.
      */
     private const IGNORED_IDNA_ERRORS = IDNA_ERROR_EMPTY_LABEL | IDNA_ERROR_LABEL_TOO_LONG | IDNA_ERROR_DOMAIN_NAME_TOO_LONG
         | IDNA_ERROR_LEADING_HYPHEN | IDNA_ERROR_TRAILING_HYPHEN | IDNA_ERROR_HYPHEN_3_4;
@@ -60,10 +57,7 @@ final class UrlNormalizer
     {
     }
 
-    /**
-     * Returns the normalized form of {@code $url}, or {@code $url} itself when it is not an absolute
-     * special-scheme URL.
-     */
+    /** Returns the normalized {@code $url}, or {@code $url} itself when it is not an absolute special-scheme URL. */
     public static function normalize(string $url): string
     {
         $cleaned = preg_replace('/[\t\n\r]/', '', trim($url, "\x00..\x20"));
@@ -103,9 +97,8 @@ final class UrlNormalizer
     }
 
     /**
-     * Normalizes every URL field named by {@code $paths} in a decoded response object. A path is a
-     * dot-separated list of keys; the key {@code *} matches every entry of an object (for a map of
-     * URLs). Only string values are touched.
+     * Normalizes the URL fields named by {@code $paths} in a decoded response. A path is dot-separated keys,
+     * where {@code *} matches every entry of an object. Only strings are changed.
      *
      * @param array<string,mixed> $data
      * @param list<string>        $paths
@@ -203,7 +196,10 @@ final class UrlNormalizer
         return $userinfo . $host;
     }
 
-    /** Lowercases a domain host and converts it to punycode when {@code intl} can; {@code ''} when it is not a valid host. */
+    /**
+     * Lowercases a domain host and converts it to punycode when {@code intl} can; {@code ''} when it is not a valid
+     * host.
+     */
     private static function normalizeHost(string $host): string
     {
         $decoded = rawurldecode($host);
@@ -213,9 +209,8 @@ final class UrlNormalizer
         }
         if (preg_match('/[^\x20-\x7E]/', $lower) === 1 && function_exists('idn_to_ascii')) {
             $info = [];
-            // IDNA_CHECK_BIDI is off: Node's `new URL()` accepts hosts that ICU's RFC 5893 check rejects (such as
-            // `١.com`), and ICU flags both cases with the same error, so a host that Node rejects is punycoded
-            // instead, the smaller divergence.
+            // IDNA_CHECK_BIDI is off, since Node accepts hosts that the ICU check rejects, such as `١.com`.
+            // A host that Node rejects is punycoded instead.
             $flags = IDNA_NONTRANSITIONAL_TO_ASCII | IDNA_CHECK_CONTEXTJ;
             $ascii = idn_to_ascii($lower, $flags, INTL_IDNA_VARIANT_UTS46, $info);
             if ($ascii === false && (($info['errors'] ?? -1) & ~self::IGNORED_IDNA_ERRORS) === 0) {
@@ -256,10 +251,7 @@ final class UrlNormalizer
         return '/' . implode('/', $resolved);
     }
 
-    /**
-     * Percent-encodes every byte that is a control, a space, outside printable ASCII, or in
-     * {@code $unsafe}, leaving existing {@code %XX} escapes as they are.
-     */
+    /** Percent-encodes controls, spaces, non-ASCII bytes, and the {@code $unsafe} characters. Existing escapes stay. */
     private static function encode(string $value, string $unsafe): string
     {
         $encoded = '';

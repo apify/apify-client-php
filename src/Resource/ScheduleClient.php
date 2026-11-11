@@ -29,9 +29,9 @@ final class ScheduleClient
     }
 
     /**
-     * Updates the schedule with the given fields and returns the updated object.
+     * Updates the schedule and returns it.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Schedule
     {
@@ -45,11 +45,8 @@ final class ScheduleClient
     }
 
     /**
-     * Fetches the schedule's invocation log: one entry per invocation, each with {@code message},
-     * {@code level} and {@code createdAt}. The list is empty when the schedule has not run yet.
-     *
-     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
-     * this fixed sub-path 404s is the schedule itself being gone (matching the reference client).
+     * Fetches the invocation log of the schedule: one entry per invocation, with {@code message}, {@code level}
+     * and {@code createdAt}. A schedule that has not run has an empty log. A 404 is always thrown.
      *
      * @return list<array<string,mixed>>
      */

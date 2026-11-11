@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.0
+
+- Synced with Apify OpenAPI spec `v2-2026-11-09T143926Z`: `zstd` is a documented `Content-Encoding`.
+- Added `ZstdHttpCompressor` and `compression: 'zstd'`. Needs the PECL `zstd` extension.
+- **Breaking:** `compression: 'brotli'`, `'gzip'`, or `'zstd'`, and the three compressor classes, throw `RuntimeException` without their extension (PECL, or `zlib` for gzip), instead of sending bodies uncompressed.
+- Added an optional `SetRecordOptions` parameter to `KeyValueStoreClient::setRecordJson()`.
+- Added `ActorServerRequestOptions::$parentRequestId`, sent as the `X-Actor-Request-ID` header.
+- Shortened the documentation and code comments, and removed outdated ones.
+
 ## 0.13.0
 
 - Synced with Apify OpenAPI spec `v2-2026-11-06T140128Z`: `ActorVersion::getActorPath()` and `Actor::getStandbyUrl()`.

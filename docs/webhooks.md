@@ -5,13 +5,12 @@ Snippets assume `$client = new ApifyClient('my-api-token');` and imported types.
 ## Webhook collection — `$client->webhooks()`
 
 - `list(?ListOptions $options = null): PaginationList`
-- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all webhooks, paging on demand. The options' `limit` caps the total number yielded across all pages (unset = all); `$chunkSize` is the per-page size.
+- `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the webhooks. The `limit` option caps the total (unset for all), `$chunkSize` is the page size.
 - `create(mixed $webhook): Webhook`
 
-Webhooks nested under an Actor or task (`$client->actor($id)->webhooks()`,
-`$client->task($id)->webhooks()`) are **read-only** — they support `list(...)` and `iterate(...)`
-only. Create webhooks through the account-wide collection, targeting an Actor or task via the
-webhook's `condition`.
+The webhooks of an Actor or task (`$client->actor($id)->webhooks()`, `$client->task($id)->webhooks()`) are
+read-only, with `list()` and `iterate()`. Create a webhook in this collection, and target an Actor or task in its
+`condition`.
 
 ```php
 $webhook = $client->webhooks()->create([
@@ -24,7 +23,7 @@ $webhook = $client->webhooks()->create([
 ## A single webhook — `$client->webhook($id)`
 
 - `get(): ?Webhook`, `update(mixed $newFields): Webhook`, `delete(): void`
-- `test(): WebhookDispatch` — dispatch immediately.
+- `test(): WebhookDispatch`: dispatch immediately.
 - `dispatches(): WebhookDispatchCollectionClient`
 
 ```php
@@ -34,7 +33,7 @@ $client->webhook('WEBHOOK_ID')->dispatches()->list(new ListOptions(limit: 10));
 
 ## Webhook dispatches — `$client->webhookDispatches()` / `$client->webhookDispatch($id)`
 
-- Collection: `list(?ListOptions $options = null): PaginationList`, `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable` — lazily iterate all dispatches, paging on demand (options' `limit` caps the total; `$chunkSize` is the per-page size).
+- Collection: `list(?ListOptions $options = null): PaginationList`, `iterate(?ListOptions $options = null, ?int $chunkSize = null): iterable`: lazily yields the dispatches. The `limit` option caps the total, `$chunkSize` is the page size.
 - Single: `get(): ?WebhookDispatch`.
 
 ```php

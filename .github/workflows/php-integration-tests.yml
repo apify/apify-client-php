@@ -1,7 +1,7 @@
 name: PHP integration tests
 
-# Language-specific workflow: only runs for the PHP client. Triggers on PRs to master that touch
-# PHP client, test, example, or documentation code, and can be dispatched manually from any branch.
+# Runs the PHP client tests for PRs to master that touch PHP code, tests, examples or documentation, and on
+# manual dispatch from any branch.
 on:
   pull_request:
     branches: [master]
@@ -12,49 +12,83 @@ on:
       - '.php-cs-fixer.dist.php'
       - 'phpstan.neon.dist'
       - 'phpunit.xml.dist'
-      # The "Test examples" step validates the in-documentation snippets, so doc changes must
-      # re-run the workflow even though Markdown is not PHP code.
+      # The "Test examples" step checks the documentation snippets.
       - 'docs/**'
       - 'README.md'
       - '.github/workflows/php-integration-tests.yml'
   workflow_dispatch:
 
-# Avoid concurrent runs of the same ref racing on the shared test account.
+# One run per ref at a time, since the runs share the test account.
 concurrency:
   group: php-integration-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Offline unit tests on a build WITH the PECL brotli extension, so the real brotli codec round-trip
-  # (testRealBrotliRoundTripsWhenExtensionPresent) actually runs instead of self-skipping. The main
-  # `test` job deliberately omits brotli, so between the two jobs both request-compression codecs
-  # (brotli and the gzip fallback) get genuine real-codec coverage in CI. This job needs no API token.
-  unit-brotli:
+  # Unit tests with the PECL brotli and zstd extensions, so their real codec tests run instead of skipping.
+  # The `test` job has neither, which covers the gzip fallback. Needs no API token.
+  unit-codecs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up PHP (with brotli)
+      - name: Set up PHP (with brotli and zstd)
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          extensions: mbstring, json, curl, zlib, brotli
+          extensions: mbstring, json, curl, zlib, brotli, zstd
           coverage: none
           tools: composer:v2
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Fail if brotli extension missing
+      - name: Fail if a codec extension is missing
         run: |
-          if ! php -r "exit(extension_loaded('brotli') ? 0 : 1);"; then
-            echo "::error::brotli extension failed to load; the real brotli codec test would silently skip."
+          if ! php -r "exit(extension_loaded('brotli') && extension_loaded('zstd') ? 0 : 1);"; then
+            echo "::error::The brotli or zstd extension failed to load; the real codec tests would skip."
             exit 1
           fi
 
-      - name: Unit tests (brotli path)
+      - name: Unit tests (brotli and zstd)
         run: vendor/bin/phpunit --testsuite unit
+
+  # The zstd integration tests, with the PECL zstd extension that the `test` job lacks. They skip themselves
+  # without the extension or the token, so both are checked first.
+  integration-zstd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP (with zstd)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, json, curl, zlib, zstd
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Require the zstd extension and APIFY_TOKEN
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          if ! php -r "exit(extension_loaded('zstd') ? 0 : 1);"; then
+            echo "::error::The zstd extension failed to load; the zstd integration tests would skip."
+            exit 1
+          fi
+          if [ -z "${APIFY_TOKEN}" ]; then
+            echo "::error::APIFY_TOKEN secret is empty or missing; the zstd integration tests would skip."
+            exit 1
+          fi
+
+      - name: Integration tests (zstd)
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: vendor/bin/phpunit --testsuite integration --filter ZstdCompressionIntegrationTest
 
   test:
     runs-on: ubuntu-latest
@@ -66,7 +100,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          # intl is optional for users but loaded here so the punycode host normalization test runs.
+          # intl is optional, and loaded so that the punycode test runs.
           extensions: mbstring, json, curl, zlib, intl
           coverage: none
           tools: composer:v2
@@ -74,21 +108,19 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      # The formatter/lint gate mandated by the coding rules (PSR-12 via php-cs-fixer).
+      # Formatting (PSR-12, php-cs-fixer).
       - name: Check formatting (php-cs-fixer)
         run: composer lint
 
-      # Static-analysis gate mandated by the coding rules.
+      # Static analysis.
       - name: Static analysis (PHPStan)
         run: composer stan
 
-      # Offline unit tests (mock transport): prove the retry/error/signature logic without the API.
+      # Offline unit tests with a mock transport.
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite unit
 
-      # Fail fast if the integration-test secret is missing or empty. Without this guard the
-      # integration tests silently "pass" (they self-skip when APIFY_TOKEN is unset), so a green run
-      # would not prove the API logic actually executed.
+      # The integration tests skip themselves without APIFY_TOKEN, so fail here instead of passing silently.
       - name: Require APIFY_TOKEN secret
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
@@ -100,13 +132,11 @@ jobs:
 
       - name: Integration tests
         env:
-          # The integration-test token is stored as a repository secret.
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: vendor/bin/phpunit --testsuite integration
 
-      # Standalone CI step that verifies the documentation examples work end-to-end against the live
-      # API (ExamplesTest runs each example) and that every in-documentation PHP snippet is valid,
-      # runnable code (DocSnippetsTest lints each fenced block).
+      # Runs the documentation examples against the live API (ExamplesTest) and lints every PHP snippet
+      # of the documentation (DocSnippetsTest).
       - name: Test examples
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}

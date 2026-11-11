@@ -18,11 +18,8 @@ final class SignatureTest extends TestCase
     }
 
     /**
-     * Known-answer vectors: the base62 HMAC and the base64url storage-content envelope are pinned to
-     * values independently computed with an arbitrary-precision bignum oracle (matching the upstream
-     * {@code @apify/utilities} algorithm). This guards the byte-wise base62 long division
-     * (leading-zero handling, alphabet ordering) and the base64url envelope against regressions that
-     * determinism/charset checks alone would miss.
+     * Known-answer vectors, computed with an arbitrary-precision oracle. They guard the base62 long division
+     * (leading zeros, alphabet order) and the base64url envelope.
      */
     public function testKnownAnswerVectors(): void
     {

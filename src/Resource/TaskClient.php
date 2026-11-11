@@ -17,10 +17,8 @@ use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\TaskStartOptions;
 
 /**
- * A client for a specific Actor task.
- *
- * Tasks are pre-configured Actor runs with stored input. The client provides CRUD methods plus
- * convenience helpers to start/call the task and access its input, runs and webhooks.
+ * A client for a task, an Actor run with a stored input: its CRUD calls, start and call, and its input, runs, and
+ * webhooks.
  */
 final class TaskClient
 {
@@ -44,9 +42,9 @@ final class TaskClient
     }
 
     /**
-     * Updates the task with the given fields and returns the updated object.
+     * Updates the task and returns it.
      *
-     * @param mixed $newFields any JSON-serializable set of fields to update
+     * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): Task
     {
@@ -60,14 +58,12 @@ final class TaskClient
     }
 
     /**
-     * Publishes the task on its public landing page, by setting {@code isPublic} through
-     * {@see update()}. Requires write permission to the task's Actor.
+     * Publishes the task on its public landing page by setting {@code isPublic}. Needs write permission to the
+     * Actor of the task.
      *
-     * To publish, the task's Actor must be public and its {@code publicConfig.inputSchemaFields}
-     * and {@code publicConfig.datasetView} must be set. An Actor can have up to 10 published
-     * tasks and an account up to 100. If any of these conditions are not met, the request fails
-     * and nothing is changed (including fields unrelated to publishing). Publishing an already
-     * published task does nothing.
+     * The Actor must be public and the task needs {@code publicConfig.inputSchemaFields} and
+     * {@code publicConfig.datasetView}. An Actor can have 10 published tasks and an account 100. If a condition
+     * fails, nothing changes. Publishing a published task does nothing.
      */
     public function publish(): Task
     {
@@ -75,12 +71,8 @@ final class TaskClient
     }
 
     /**
-     * Unpublishes the task from its public landing page, by setting {@code isPublic} through
-     * {@see update()}. Like {@see publish()}, this requires write permission to the task's Actor:
-     * the API requires Actor write permission for both {@code isPublic} and {@code publicConfig}.
-     *
-     * The public display configuration ({@code publicConfig}) is preserved, so the task can be
-     * published again without re-entering it. Unpublishing a task that is not published does
+     * Unpublishes the task by setting {@code isPublic}. Needs write permission to the Actor of the task. The
+     * {@code publicConfig} is kept, so the task can be published again. Unpublishing an unpublished task does
      * nothing.
      */
     public function unpublish(): Task
@@ -89,9 +81,9 @@ final class TaskClient
     }
 
     /**
-     * Starts the task and returns immediately with the created run.
+     * Starts the task and returns the created run without waiting.
      *
-     * @param mixed $input optionally overrides the task's stored input ({@code null} to use it)
+     * @param mixed $input overrides the stored input ({@code null} keeps it)
      */
     public function start(
         mixed $input = null,
@@ -115,29 +107,25 @@ final class TaskClient
     }
 
     /**
-     * Starts the task and waits (client-side polling) for it to finish.
+     * Starts the task and polls until it finishes.
      *
-     * @param mixed    $input    optionally overrides the task's stored input
-     * @param int|null $waitSecs bounds the wait; {@code null} waits indefinitely. Time spent retrying a
-     *                           {@code $options->waitForResources} start does not count toward it.
-     * @param int|float|string|null $timeoutSecs timeout of the start request and of every poll (a number of
-     *                           seconds, a tier name or {@code 'noTimeout'}); default {@code 'noTimeout'}
+     * @param mixed    $input    overrides the stored input
+     * @param int|null $waitSecs bounds the wait ({@code null} waits indefinitely). Retries of a
+     *                           {@code $options->waitForResources} start do not count.
+     * @param int|float|string|null $timeoutSecs timeout of the start request and of each poll (default
+     *                           {@code 'noTimeout'})
      */
     public function call(mixed $input = null, ?TaskStartOptions $options = null, ?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun
     {
-        // Like the reference client, the start request and every poll have no request timeout by default.
+        // The start request and every poll have no request timeout by default.
         $timeoutSecs ??= TimeoutTiers::NO_TIMEOUT;
         $run = $this->start($input, $options, $timeoutSecs);
         return $this->root->run((string) $run->getId())->waitForFinish($waitSecs, $timeoutSecs);
     }
 
     /**
-     * Fetches the task's stored input.
-     *
-     * Unlike {@see get()}, a 404 here is not swallowed: it always throws instead, since the only way
-     * this fixed sub-path 404s is the task itself being gone (matching the reference client). A
-     * {@code null} return means the task's stored input JSON itself decoded to {@code null} (or the
-     * response body was empty) — not a missing task, which throws.
+     * Fetches the stored input of the task. A 404 is always thrown, never turned into {@code null}. A
+     * {@code null} result means the input itself is {@code null} or empty.
      *
      * @return mixed
      */
@@ -148,7 +136,7 @@ final class TaskClient
     }
 
     /**
-     * Replaces the task's stored input and returns the updated input.
+     * Replaces the stored input and returns the updated input.
      *
      * @param mixed $input any JSON-serializable value
      * @return mixed

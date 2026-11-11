@@ -5,24 +5,18 @@ declare(strict_types=1);
 namespace Apify\Client\Http;
 
 /**
- * A pluggable request-body compressor, matching the reference client's {@code HttpCompressor}. Pass
- * an implementation (or one of the built-ins, {@see BrotliHttpCompressor}/{@see GzipHttpCompressor})
- * as {@code ApifyClient}'s {@code compression} constructor option to control which algorithm —  and at
- * what quality — compresses request bodies, instead of the client's default best-effort choice.
+ * Compresses request bodies. Pass an implementation, or a built-in one ({@see BrotliHttpCompressor},
+ * {@see GzipHttpCompressor}, {@see ZstdHttpCompressor}), as the {@code compression} option of
+ * {@see \Apify\Client\ApifyClient} to choose the algorithm and its quality.
  *
- * Only bodies that already pass the client's other compression gates reach {@see compress()}: at
- * least {@see \Apify\Client\Internal\Compression::MIN_COMPRESS_BYTES}, a compressible content type,
- * and no caller-supplied {@code Content-Encoding}.
+ * Only bodies of at least {@see \Apify\Client\Internal\Compression::MIN_COMPRESS_BYTES} with a compressible
+ * content type and no caller-set {@code Content-Encoding} reach {@see compress()}.
  */
 interface HttpCompressorInterface
 {
-    /** The value sent in the {@code Content-Encoding} header for a body this compressor encoded. */
+    /** The {@code Content-Encoding} value of a body this compressor encoded. */
     public function contentEncoding(): string;
 
-    /**
-     * Compresses {@code $body}, or returns {@code null} to send it uncompressed (e.g. the codec is
-     * unavailable in this PHP build). A compressor is never required to succeed: compression is
-     * always a best-effort optimization, never a correctness requirement.
-     */
+    /** Compresses {@code $body}, or returns {@code null} to send it uncompressed. */
     public function compress(string $body): ?string;
 }

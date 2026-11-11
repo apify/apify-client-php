@@ -13,8 +13,7 @@ use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 
 /**
- * The resolved context for a resource client: its base URL and the shared HTTP client. The methods
- * here implement the CRUD primitives once, so each resource client stays small and consistent (DRY).
+ * The URL and HTTP client of a resource client, with the CRUD calls they share.
  *
  * @internal
  */
@@ -23,29 +22,24 @@ final class ResourceContext
     public const CONTENT_TYPE_JSON = 'application/json';
     public const CONTENT_TYPE_JSON_CHARSET = 'application/json; charset=utf-8';
 
-    /** How long to wait between polls while waiting for a run/build to finish, in seconds. */
+    /** Seconds between polls while waiting for a run or build to finish. */
     private const WAIT_POLL_INTERVAL_SECS = 0.25;
 
-    /** Server-side waitForFinish chunk size (the API caps server waiting at 60 seconds). */
+    /** Seconds of one {@code waitForFinish} request. The API holds a response for at most 60. */
     private const WAIT_REQUEST_SECS = 60;
 
     /**
-     * Largest safety margin subtracted from the per-request timeout when choosing the server-side
-     * {@code waitForFinish} value, so the server responds before the client's socket timeout fires.
-     * The margin never exceeds half of the timeout, so a short timeout still gets a positive hold.
+     * The most that is subtracted from the request timeout to get the {@code waitForFinish} value, so the API
+     * answers before the socket times out. Never more than half the timeout.
      */
     private const WAIT_TIMEOUT_MARGIN_SECS = 5;
 
-    /**
-     * Finite upper bound used when the caller asks to wait "indefinitely" ({@code waitSecs === null}).
-     * The API will not accept "Infinity" and an unbounded loop can spin forever on a transient 404;
-     * 999999s (~11.5 days) is effectively indefinite while guaranteeing termination.
-     */
+    /** Stands in for waiting indefinitely, which the API cannot express. About 11.5 days. */
     private const MAX_WAIT_FOR_FINISH_SECS = 999999;
 
     /**
-     * How long {@see waitForFinish()} keeps polling a job that returns 404, to ride out replica lag,
-     * before it gives up and throws. A successful poll in between resets this window.
+     * How long {@see waitForFinish()} keeps polling a job that returns 404, to ride out replica lag. A
+     * successful poll resets it.
      */
     private const MAX_WAIT_WHEN_JOB_NOT_FOUND_MILLIS = 3000;
 
@@ -54,26 +48,18 @@ final class ResourceContext
     private string $apiOrigin;
     private string $publicOrigin;
 
-    /**
-     * Optional overall per-request timeout (seconds) applied to every call made through this context.
-     * {@code null} means "use the shared client-wide timeout". Set per resource client (e.g. a request
-     * queue client created with an explicit {@code timeoutSecs}).
-     */
+    /** A timeout for every call of this context, set per resource client. {@code null} uses the client-wide one. */
     private ?float $requestTimeoutSecs = null;
 
     private function __construct(
         public HttpClientCore $http,
-        /** Fully-qualified base URL of the resource, e.g. https://api.apify.com/v2/actors/ID. */
+        /** The URL of the resource, for example {@code https://api.apify.com/v2/actors/ID}. */
         public string $url,
         string $baseUrl,
         /**
-         * Whether this context addresses a resource by an explicit ID ({@see single()}) rather than a
-         * fixed, ID-less sub-path ({@see collection()}, used e.g. by {@code run.dataset()}). Gates
-         * whether {@see getResource()}/{@see getRaw()}/{@see deleteResource()} swallow a 404 on the
-         * resource itself ({@code $subPath === ''}): an ID-addressed resource that is missing resolves
-         * to {@code null}/no-op, but a 404 on an ID-less chained resource (e.g. a run's default
-         * dataset) can mean either the parent or the sub-resource is gone, so it is rethrown instead —
-         * matching the reference client's {@code catchNotFoundForResourceOrThrow}.
+         * Whether the resource is addressed by an ID ({@see single()}) or by a fixed sub-path ({@see collection()}).
+         * A 404 on a missing ID-addressed resource resolves to {@code null}, but a 404 on a sub-path resource
+         * is rethrown, since the parent may be the one that is gone.
          */
         private bool $hasId = true,
     ) {
@@ -82,40 +68,40 @@ final class ResourceContext
         $this->publicOrigin = $this->apiOrigin;
     }
 
-    /** Sets an overall per-request timeout (seconds) for every call made through this context. */
+    /** Sets the timeout of every call of this context. */
     public function withTimeout(?float $timeoutSecs): self
     {
         $this->requestTimeoutSecs = $timeoutSecs;
         return $this;
     }
 
-    /** Creates a context for a collection endpoint: {@code {base}/{resourcePath}}. */
+    /** A context for a collection or sub-path: {@code {base}/{resourcePath}}. */
     public static function collection(HttpClientCore $http, string $baseUrl, string $resourcePath): self
     {
         return new self($http, $baseUrl . '/' . $resourcePath, $baseUrl, hasId: false);
     }
 
-    /** Creates a context for a single resource: {@code {base}/{resourcePath}/{safeId}}. */
+    /** A context for a resource: {@code {base}/{resourcePath}/{id}}. */
     public static function single(HttpClientCore $http, string $baseUrl, string $resourcePath, string $id): self
     {
         $segment = self::encodePathSegment(self::toSafeId($id));
         return new self($http, $baseUrl . '/' . $resourcePath . '/' . $segment, $baseUrl, hasId: true);
     }
 
-    /** Overrides the origin used when building public URLs. */
+    /** Sets the origin of public URLs. */
     public function withPublicOrigin(string $publicBaseUrl): self
     {
         $this->publicOrigin = self::originOf($publicBaseUrl);
         return $this;
     }
 
-    /** This resource's URL with an optional extra path segment appended. */
+    /** The URL of the resource, with an optional sub-path. */
     public function subUrl(string $subPath = ''): string
     {
         return $subPath === '' ? $this->url : $this->url . '/' . $subPath;
     }
 
-    /** The public (shareable) form of this resource's URL, swapping the API origin for the public one. */
+    /** The shareable URL of the resource, with the public origin in place of the API one. */
     public function publicUrl(string $subPath): string
     {
         $apiUrl = $this->subUrl($subPath);
@@ -128,19 +114,13 @@ final class ResourceContext
         return $apiUrl;
     }
 
-    /** Merges the inherited base params with per-call params. */
+    /** The base params extended with the params of the call. */
     public function mergedParams(?QueryParams $params): QueryParams
     {
         return $this->baseParams->copy()->extend($params);
     }
 
-    // ---- CRUD primitives ------------------------------------------------------
-
-    /**
-     * GET a single resource, returning its decoded {@code data}, or {@code null} on not-found.
-     *
-     * @return mixed
-     */
+    /** GETs a resource and returns its decoded {@code data}, or {@code null} if it is not found. */
     public function getResource(string $subPath, QueryParams $params, ?float $timeoutSecs = null): mixed
     {
         try {
@@ -153,11 +133,7 @@ final class ResourceContext
         }
     }
 
-    /**
-     * GET a single resource, returning its decoded {@code data} (propagates errors).
-     *
-     * @return mixed
-     */
+    /** GETs a resource and returns its decoded {@code data}. Any error is thrown. */
     public function getResourceRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null): mixed
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
@@ -166,7 +142,7 @@ final class ResourceContext
     }
 
     /**
-     * PUT to update a resource with a JSON-serializable body, returning the decoded {@code data}.
+     * PUTs a JSON body and returns the decoded {@code data}.
      *
      * @return array<string,mixed>
      */
@@ -177,11 +153,7 @@ final class ResourceContext
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
-    /**
-     * Performs a DELETE; a not-found is treated as a successful no-op when this context addresses its
-     * resource by ID ({@see $hasId}). A DELETE on an ID-less chained resource (e.g. {@code
-     * run.dataset()->delete()}) rethrows instead, since the 404 could mean the parent run is gone.
-     */
+    /** DELETEs a resource. A 404 is ignored when the resource is addressed by an ID. */
     public function deleteResource(string $subPath, ?float $timeoutSecs = null): void
     {
         $url = $this->mergedParams(new QueryParams())->applyToUrl($this->subUrl($subPath));
@@ -194,27 +166,16 @@ final class ResourceContext
         }
     }
 
-    /**
-     * A per-call timeout override (seconds), falling back to this context's own configured timeout
-     * ({@see withTimeout()}) when {@code null}, which in turn falls back to the client-wide default.
-     */
+    /** The timeout of the call, else the one of this context. */
     private function effectiveTimeout(?float $timeoutSecs): ?float
     {
         return $timeoutSecs ?? $this->requestTimeoutSecs;
     }
 
     /**
-     * Resolves a per-call {@code $timeoutSecs} option (a number of seconds, a timeout tier name, {@see
-     * \Apify\Client\Internal\TimeoutTiers::NO_TIMEOUT}, or {@code null} for {@code $defaultTier}'s
-     * configured duration) against the client's configured {@see TimeoutTiers}, matching the reference
-     * client's per-method tier assignment. See {@see TimeoutTiers} for the tiers and their defaults.
-     *
-     * When this context carries its own timeout ({@see withTimeout()} — e.g. the per-queue {@code
-     * timeoutSecs} of {@code requestQueue(id, options)}), the tier-resolved value is additionally
-     * capped at it, matching the reference client ("caps the default tier of every request that queue
-     * client sends"). {@see TimeoutTiers::INFINITE_SECS} (from an explicit {@code 'noTimeout'}) is
-     * treated as unbounded for that comparison, so a context-level cap still applies to it, rather than
-     * "no timeout" winning outright over a cap the caller configured for a reason.
+     * Resolves a per-call {@code $timeoutSecs} (seconds, a tier name, {@see TimeoutTiers::NO_TIMEOUT} or
+     * {@code null} for the default tier) to seconds. A timeout set on this context caps the result, even
+     * a {@code 'noTimeout'} one.
      *
      * @param int|float|string|null $timeoutSecs
      */
@@ -230,11 +191,10 @@ final class ResourceContext
     }
 
     /**
-     * Picks the timeout of a request that asks the API to hold its response with {@code waitForFinish}:
-     * the hold the caller asked for (the API holds a response for at most {@see WAIT_REQUEST_SECS}
-     * seconds) plus the round trip the method's tier allows, so the client does not abort a request the
-     * API is still holding, which for {@code start()} and {@code build()} would retry a call that
-     * creates a resource. An explicit per-call {@code $timeoutSecs} is used as given.
+     * The timeout of a request that asks the API to hold its response with {@code waitForFinish}: the hold
+     * (at most {@see WAIT_REQUEST_SECS}) plus the timeout of the tier. A request that is still being held is
+     * then not aborted and retried, which would create a second resource for {@code start()} and
+     * {@code build()}. An explicit {@code $timeoutSecs} is used as given.
      *
      * @param int|float|string|null $timeoutSecs
      */
@@ -252,7 +212,7 @@ final class ResourceContext
     }
 
     /**
-     * GET a paginated listing and build a {@see PaginationList} with each item hydrated.
+     * GETs a paginated listing as a {@see PaginationList} of hydrated items.
      *
      * @template T
      * @param callable(array<string,mixed>):T $hydrate
@@ -265,21 +225,15 @@ final class ResourceContext
     }
 
     /**
-     * Lazily iterates over every item of an offset/limit-paginated listing, fetching pages on demand.
+     * Lazily yields the items of an offset-paginated listing, fetching pages on demand.
      *
-     * Ports the reference client's paginated iterator ({@code _listPaginatedFromCallback}):
-     * {@code $limit} caps the TOTAL number of items yielded across all pages ({@code null} = no cap,
-     * i.e. all items), while {@code $chunkSize} caps how many items are requested per page
-     * ({@code null} = the API's default page size, capped by the remaining {@code $limit}). The two are
-     * independent: {@code $limit} is never reused as the page size. {@code $startOffset} is the offset
-     * of the first page.
+     * {@code $limit} caps the total number of items ({@code null} for all), {@code $chunkSize} the items per
+     * page ({@code null} for the API's default), and {@code $startOffset} is the offset of the first page.
      *
-     * The next offset and the stop condition follow the page's {@see PaginationList::getCount()} (or
-     * the items it returned when larger), capped at the limit requested for that page, never the
-     * listing's reported {@code total}, which can grow while the iteration runs. A page whose
-     * filtered-out entries were still counted (the Store, dataset filters) therefore neither repeats
-     * entries nor ends the iteration early. With no {@code $limit} the loop always ends with one
-     * request that advances by nothing, matching the reference client.
+     * The offset advances by the page's count, or by its items when there are more, capped at the limit asked
+     * for. The listing's {@code total} is not used, since it can grow during the iteration. Entries the API
+     * counted and then filtered out are therefore neither repeated nor cut the iteration short. Without
+     * {@code $limit}, the last request advances by nothing.
      *
      * @template T
      * @param callable(int,?int):PaginationList<T> $fetchPage receives (offset, pageLimit) and returns that page
@@ -288,11 +242,10 @@ final class ResourceContext
     public static function paginateOffset(int $startOffset, ?int $limit, ?int $chunkSize, callable $fetchPage): Generator
     {
         $currentOffset = $startOffset;
-        // Items still to yield, or null for "unbounded" (no $limit given).
+        // Items still to yield, or null without a $limit.
         $remaining = ($limit !== null && $limit > 0) ? $limit : null;
         do {
-            // A null/0 on either bound means "unbounded", so the other bound wins (mirrors the
-            // reference client's minForLimitParam).
+            // A null or 0 bound is unbounded, so the other one wins.
             $pageLimit = self::minLimit($remaining, $chunkSize);
             $page = $fetchPage($currentOffset, $pageLimit);
             foreach ($page->getItems() as $item) {
@@ -303,20 +256,17 @@ final class ResourceContext
             if ($remaining !== null) {
                 $remaining -= $advance;
             }
-            // Two distinct ways to stop: a page that advances by nothing (the listing is exhausted), or
-            // $remaining having reached 0 (the caller's $limit is satisfied).
+            // Stops when a page advances by nothing (the listing is exhausted) or the $limit is reached.
         } while ($advance > 0 && ($remaining === null || $remaining > 0));
     }
 
     /**
-     * How far a page advances the offset: its count or the items it returned, whichever is larger,
-     * capped at the limit requested for it ({@code null} = uncapped).
+     * How far a page advances the offset: its count or its items, whichever is larger, capped at the limit asked
+     * for ({@code null} for no cap).
      *
-     * The count can exceed the returned items because the API drops entries after counting them (Store
-     * Actors, the dataset {@code skipEmpty} and {@code clean} filters). The items can exceed the count
-     * with {@code unwind}, which returns one item per unwound element. The server never walks more
-     * entries than the requested limit, so the cap keeps such an inflated item count from skipping the
-     * entries between the real and the inflated advance.
+     * The count exceeds the items when the API drops entries after counting them (Store Actors, the dataset
+     * {@code skipEmpty} and {@code clean} filters). The items exceed the count with {@code unwind}. The cap
+     * keeps inflated items from skipping entries.
      *
      * @template T
      * @param PaginationList<T> $page
@@ -328,8 +278,8 @@ final class ResourceContext
     }
 
     /**
-     * Returns the smaller of two optional positive bounds, treating {@code null} or {@code 0} as
-     * "unbounded" (the API treats {@code limit=0} as unset). Mirrors the reference minForLimitParam.
+     * The smaller of two bounds. {@code null} and {@code 0} are unbounded, as the API treats {@code limit=0} as
+     * unset.
      *
      * @internal
      */
@@ -351,7 +301,7 @@ final class ResourceContext
     }
 
     /**
-     * POST to create a resource with a JSON-serializable body, returning the decoded {@code data}.
+     * POSTs a JSON body to create a resource and returns the decoded {@code data}.
      *
      * @return array<string,mixed>
      */
@@ -363,9 +313,7 @@ final class ResourceContext
     }
 
     /**
-     * POST that gets-or-creates a named resource ({@code POST {collection}?name=...}). An optional
-     * {@code $schema} is sent in the request body as {@code {"schema": ...}}, matching the reference
-     * client's {@code getOrCreate(name, { schema })}.
+     * POSTs to get or create a named resource, with an optional schema in the body.
      *
      * @param array<string,mixed>|null $schema
      * @return array<string,mixed>
@@ -385,7 +333,7 @@ final class ResourceContext
     }
 
     /**
-     * POST with an optional raw body and content type, unwrapping the data envelope.
+     * POSTs a raw body and returns the decoded {@code data}.
      *
      * @return array<string,mixed>
      */
@@ -396,12 +344,7 @@ final class ResourceContext
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
-    /**
-     * POST with a raw body, parsing the response directly <em>without</em> unwrapping a data
-     * envelope. Used by endpoints (e.g. actor input validation) whose response is a plain object.
-     *
-     * @return mixed
-     */
+    /** POSTs a raw body and returns the decoded response, for endpoints that answer without a {@code data} envelope. */
     public function postWithBodyNoEnvelope(string $subPath, QueryParams $params, ?string $body, string $contentType, ?float $timeoutSecs = null): mixed
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
@@ -410,7 +353,7 @@ final class ResourceContext
     }
 
     /**
-     * DELETE with a JSON body (used for batch request deletion), unwrapping the data envelope.
+     * DELETEs with a JSON body and returns the decoded {@code data}.
      *
      * @return array<string,mixed>
      */
@@ -421,11 +364,7 @@ final class ResourceContext
         return self::asArray(Json::decodeData((string) $response->getBody()));
     }
 
-    /**
-     * GET returning the raw response (no data envelope). Returns {@code null} on not-found, unless
-     * this context addresses an ID-less chained resource ({@see $hasId}) and {@code $subPath} is the
-     * resource itself ({@code ''}), in which case the 404 is rethrown (see {@see deleteResource()}).
-     */
+    /** GETs the raw response, or returns {@code null} if the resource is not found (see {@see deleteResource()}). */
     public function getRaw(string $subPath, QueryParams $params, ?float $timeoutSecs = null): ?ResponseInterface
     {
         try {
@@ -438,10 +377,7 @@ final class ResourceContext
         }
     }
 
-    /**
-     * GET returning the raw response (no data envelope). Propagates every error, including a 404.
-     * The caller decodes the body itself, if it is JSON.
-     */
+    /** GETs the raw response. Any error is thrown, a 404 included. */
     public function getRawRequired(string $subPath, QueryParams $params, ?float $timeoutSecs = null): ResponseInterface
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
@@ -449,17 +385,15 @@ final class ResourceContext
     }
 
     /**
-     * Whether a 404 on {@code $subPath} should resolve to "not found" ({@code null}/no-op) rather than
-     * being rethrown. True for any fixed sub-path of an ID-addressed resource, and for the resource
-     * itself only when it is addressed by ID; an ID-less chained resource's own 404 is ambiguous
-     * between "parent missing" and "sub-resource missing" and is always rethrown.
+     * Whether a 404 on {@code $subPath} resolves to "not found" instead of being rethrown. A 404 on a sub-path
+     * always does, on the resource itself only when it is addressed by an ID.
      */
     private function swallowsNotFound(string $subPath): bool
     {
         return $subPath !== '' || $this->hasId;
     }
 
-    /** HEAD request; returns whether the resource exists. */
+    /** Sends a HEAD request and returns whether the resource exists. */
     public function headExists(string $subPath, QueryParams $params, ?float $timeoutSecs = null): bool
     {
         $url = $this->mergedParams($params)->applyToUrl($this->subUrl($subPath));
@@ -475,15 +409,8 @@ final class ResourceContext
     }
 
     /**
-     * Opens a live, streaming connection to {@code $subPath} and returns its body as a stream, for
-     * incremental consumption instead of buffering the whole response in memory. Bypasses the
-     * buffered/retrying transport ({@see HttpClientCore::stream()}), so because the response is
-     * consumed incrementally, it is not retried: a non-2xx status is read eagerly and thrown as the
-     * matching {@see ApifyApiException} (there is nothing to stream in that case anyway).
-     *
-     * Shared by {@see \Apify\Client\Resource\LogClient::stream()} and
-     * {@see \Apify\Client\Resource\DatasetClient::streamItems()}, the two endpoints that expose a
-     * streamed read alongside their buffered one.
+     * Opens a streaming GET and returns the body, which is read incrementally. It is not retried, and an error
+     * status is thrown as the matching {@see ApifyApiException}.
      */
     public function streamRaw(string $subPath, QueryParams $params): StreamInterface
     {
@@ -503,11 +430,9 @@ final class ResourceContext
     }
 
     /**
-     * PUT with raw bytes and a content type, with an explicit per-request timeout and retry control.
+     * PUTs raw bytes.
      *
-     * @param array<string,string> $extraHeaders additional request headers, e.g. a caller-supplied
-     *                                            {@code Content-Encoding} ({@see
-     *                                            \Apify\Client\Resource\KeyValueStoreClient::setRecord()})
+     * @param array<string,string> $extraHeaders additional headers, for example a caller-set {@code Content-Encoding}
      */
     public function putRaw(
         string $subPath,
@@ -522,13 +447,9 @@ final class ResourceContext
         $this->http->call('PUT', $url, $body, $contentType, $timeoutSecs ?? $this->requestTimeoutSecs, $doNotRetryTimeouts, $extraHeaders);
     }
 
-    // ---- Wait-for-finish ------------------------------------------------------
-
     /**
-     * The largest server-side {@code waitForFinish} value that is safe to send for a request whose
-     * timeout is {@code $requestTimeoutSecs}: below it by a safety margin, and never above the 60 seconds
-     * the API holds a response for. {@see TimeoutTiers::INFINITE_SECS} (no request timeout) allows the
-     * full 60 seconds.
+     * The largest {@code waitForFinish} value that is safe for a request timeout: the timeout less a margin,
+     * and at most 60 seconds. With no request timeout it is 60.
      */
     private static function serverWaitCapSecs(float $requestTimeoutSecs): int
     {
@@ -539,12 +460,7 @@ final class ResourceContext
         return min(self::WAIT_REQUEST_SECS, max(0, (int) floor($requestTimeoutSecs - $margin)));
     }
 
-    /**
-     * Clamps a caller-supplied server-side {@code waitForFinish} value (seconds) so a synchronous get
-     * never asks the API to hold the connection for longer than a request can last: the value is capped
-     * at 60 seconds, and below the {@code timeoutMaxSecs} cap of a single attempt by a safety margin.
-     * Returns {@code null} for a {@code null} input.
-     */
+    /** Clamps a {@code waitForFinish} value to what a request can last. {@code null} stays {@code null}. */
     public function clampServerWait(?int $waitForFinishSecs): ?int
     {
         if ($waitForFinishSecs === null) {
@@ -554,17 +470,14 @@ final class ResourceContext
     }
 
     /**
-     * Polls a GET endpoint with {@code waitForFinish} until the resource reaches a terminal state or
-     * the wait budget elapses. {@code waitSecs === null} means "wait indefinitely", implemented as a
-     * finite but very large bound so the loop always terminates.
+     * Polls a resource with {@code waitForFinish} until {@code $isTerminal} accepts it or {@code $waitSecs}
+     * elapse. A {@code null} {@code $waitSecs} waits indefinitely.
      *
-     * A 404 is treated as "not yet available" (replica lag) rather than failing immediately, but only
-     * for {@see MAX_WAIT_WHEN_JOB_NOT_FOUND_MILLIS}: if the resource keeps 404ing for that long, the
-     * wait gives up and rethrows that 404 instead of polling for the rest of {@code $waitSecs} (which
-     * defaults to effectively indefinite). A successful poll in between resets this grace window.
+     * A 404 counts as replica lag. If it lasts {@see MAX_WAIT_WHEN_JOB_NOT_FOUND_MILLIS}, the 404 is rethrown.
+     * A successful poll resets that window.
      *
-     * Each poll's request timeout is {@code $timeoutSecs} (a number of seconds, a tier name or
-     * {@code 'noTimeout'}; default {@code 'noTimeout'}), and the server-side hold of a poll stays below it.
+     * Each poll uses {@code $timeoutSecs} as its request timeout (default {@code 'noTimeout'}) and holds the
+     * response for less than that.
      *
      * @param callable(array<string,mixed>):bool $isTerminal
      * @param int|float|string|null $timeoutSecs
@@ -637,9 +550,7 @@ final class ResourceContext
     }
 
     /**
-     * Coerces a decoded value to an associative array. Endpoints that return a resource object
-     * always decode to an array; a non-array (e.g. an unexpected {@code null} data field) becomes an
-     * empty array so model construction stays type-safe.
+     * The value as an array, or an empty one if it is not.
      *
      * @return array<string,mixed>
      */
@@ -648,17 +559,7 @@ final class ResourceContext
         return is_array($value) ? $value : [];
     }
 
-    /**
-     * Encodes an Actor run input body for {@code ActorClient::start()/validateInput()} and
-     * {@code RunClient::metamorph()}: {@code null} stays {@code null}, a {@code string} is sent as
-     * raw bytes exactly as given (pair it with a non-default {@code contentType}), and anything else
-     * — the normal case, an associative array — is JSON-encoded.
-     *
-     * Mirrors the reference client's {@code ActorInput}, which accepts a plain object/array of them
-     * (serialized to JSON) or raw bytes such as a {@code Buffer} (sent as they are). A PHP string is
-     * this client's idiomatic stand-in for the reference client's raw-bytes case, since PHP strings
-     * are already byte sequences and the language has no separate binary-buffer type.
-     */
+    /** Encodes a run input: {@code null} stays {@code null}, a string is sent as it is, and anything else as JSON. */
     public static function encodeInputBody(mixed $input): ?string
     {
         if ($input === null) {
@@ -667,14 +568,9 @@ final class ResourceContext
         return is_string($input) ? $input : Json::encode($input);
     }
 
-    // ---- URL / id helpers -----------------------------------------------------
-
     /**
-     * Encodes a resource id so it is safe to embed in a URL path. Apify uses the {@code
-     * username~resourcename} form, so every {@code /} in the id is replaced with {@code ~} — not just
-     * the first — matching the reference client. Replacing only the first occurrence would leave any
-     * further {@code /} in the id as literal path separators once interpolated into a URL, letting an
-     * id such as {@code "a/../.."} introduce extra, attacker-controlled path segments.
+     * Turns {@code username/name} into the {@code username~name} form of an ID. Every {@code /} is replaced,
+     * so an ID cannot add path segments to the URL.
      */
     public static function toSafeId(string $id): string
     {
@@ -682,15 +578,10 @@ final class ResourceContext
     }
 
     /**
-     * Percent-encodes a single URL path segment, so values interpolated into the path (resource ids,
-     * record keys, request ids) cannot break out of the segment or restructure the request path.
+     * Percent-encodes a path segment, so an ID or key cannot restructure the path. An empty segment, {@code "."}
+     * and {@code ".."} are rejected, since a URL parser would collapse them to the parent resource.
      *
-     * Rejects an empty segment and the dot-segments {@code "."}/{@code ".."} instead of encoding them:
-     * a URL parser (client-side proxy, CDN, or the server itself) resolves dot segments ({@code
-     * RFC 3986 §5.2.4}) from the decoded path, so a literal {@code .}/{@code ..} segment can still
-     * collapse to the parent resource even though the string itself contains no {@code /}.
-     *
-     * @throws InvalidArgumentException if {@code $input} is empty or is {@code "."}/{@code ".."}
+     * @throws InvalidArgumentException if {@code $input} is empty, {@code "."}, or {@code ".."}
      */
     public static function encodePathSegment(string $input): string
     {
@@ -702,7 +593,7 @@ final class ResourceContext
         return rawurlencode($input);
     }
 
-    /** Extracts the origin ({@code scheme://host[:port]}) from a URL, dropping any path. */
+    /** The origin of a URL: {@code scheme://host[:port]}. */
     public static function originOf(string $rawUrl): string
     {
         $rest = $rawUrl;

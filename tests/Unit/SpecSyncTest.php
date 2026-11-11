@@ -13,9 +13,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Offline tests for the endpoint parameters the OpenAPI specification added to endpoints this client
- * implements, for the by-ID user endpoints, for the schedule log, and for responses that carry a
- * documented {@code null} where a value used to be.
+ * Offline tests of the parameters that the specification added to endpoints of this client, the by-ID user
+ * endpoints, the schedule log, and responses with a documented {@code null}.
  */
 final class SpecSyncTest extends TestCase
 {
@@ -24,7 +23,7 @@ final class SpecSyncTest extends TestCase
         return new ApifyClient(token: 't', minDelayBetweenRetriesMillis: 1, timeoutSecs: 5, httpClient: $transport);
     }
 
-    /** @return array<string,string> */
+    /** @return array<int|string,array<mixed>|string> */
     private static function queryOf(MockTransport $transport): array
     {
         parse_str($transport->lastRequest()->getUri()->getQuery(), $query);

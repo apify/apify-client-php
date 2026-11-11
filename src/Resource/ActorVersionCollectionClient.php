@@ -24,8 +24,8 @@ final class ActorVersionCollectionClient
     }
 
     /**
-     * Lists the Actor's versions. The endpoint takes no filtering or pagination parameters: it always
-     * returns every version in one response.
+     * Lists the versions of the Actor. The endpoint has no filter or pagination parameters and returns all
+     * versions at once.
      *
      * @return PaginationList<ActorVersion>
      */
@@ -35,12 +35,8 @@ final class ActorVersionCollectionClient
     }
 
     /**
-     * Lazily iterates over the Actor's versions.
-     *
-     * This endpoint ignores {@code offset}/{@code limit} and always returns every version in one
-     * response, so iteration makes exactly one request — unlike the offset/limit collection iterators,
-     * there is no per-page {@code chunkSize} to request fewer at a time, and a generic paginating loop
-     * would re-request (and re-yield) the same full list forever.
+     * Lazily yields the versions of the Actor. The endpoint returns all versions in one response, so this makes
+     * one request.
      *
      * @return Generator<int,ActorVersion>
      */
@@ -50,7 +46,7 @@ final class ActorVersionCollectionClient
     }
 
     /**
-     * Creates a new Actor version.
+     * Creates a version of the Actor.
      *
      * @param mixed $version any JSON-serializable version definition
      */

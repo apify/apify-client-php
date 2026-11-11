@@ -8,10 +8,7 @@ use Apify\Client\Exception\ApifyClientException;
 use Apify\Client\Exception\NotFoundException;
 use Apify\Client\Options\ActorServerRequestOptions;
 
-/**
- * Runs {@see \Apify\Client\Resource\ActorServerClient} against a temporary Server Actor that echoes every request
- * it receives.
- */
+/** Runs {@see \Apify\Client\Resource\ActorServerClient} against a temporary Server Actor that echoes every request. */
 final class ActorServerIntegrationTest extends IntegrationTestCase
 {
     private const BUILD_WAIT_SECS = 300;

@@ -9,12 +9,8 @@ use IteratorAggregate;
 use Traversable;
 
 /**
- * A single page of an offset/limit-paginated list.
- *
- * The pagination metadata ({@see getTotal()}, {@see getOffset()}, {@see getLimit()},
- * {@see getCount()}, {@see isDesc()}) accompanies the {@see getItems()} items. Note: {@code total}
- * reflects the API's reported total, which can briefly lag immediately after a write (the count is
- * computed asynchronously) — re-read after a short delay if you need an exact post-write total.
+ * A page of an offset-paginated list. {@see getTotal()} can lag right after a write, since the API counts
+ * asynchronously.
  *
  * @template T
  * @implements IteratorAggregate<int,T>
@@ -60,8 +56,8 @@ final class PaginationList implements IteratorAggregate, \Countable
     }
 
     /**
-     * Builds a page directly from items and metadata (used by the dataset-items endpoint, which
-     * returns a bare array with pagination in response headers).
+     * Builds a page from items and metadata. Used by the dataset items endpoint, which reports the pagination
+     * in headers.
      *
      * @template TItem
      * @param list<TItem> $items
@@ -73,7 +69,7 @@ final class PaginationList implements IteratorAggregate, \Countable
     }
 
     /**
-     * The items of this page (never {@code null}).
+     * The items of the page.
      *
      * @return list<T>
      */
@@ -101,11 +97,9 @@ final class PaginationList implements IteratorAggregate, \Countable
     }
 
     /**
-     * Number of entries on this page. On a page from {@see \Apify\Client\Resource\DatasetClient::listItems()}
-     * it is the number of dataset rows the API scanned for it, or the number of items returned when that is
-     * larger: filters ({@code clean}, {@code skipEmpty}) can leave it above the number of items. The next
-     * page starts at {@code offset + min(count, limit)}; the cap matters only with {@code unwind}, which can
-     * return more items than the rows scanned.
+     * The number of entries on the page. For {@see \Apify\Client\Resource\DatasetClient::listItems()}, it is
+     * the number of rows the API scanned, or the number of items when that is larger. The next page starts at
+     * {@code offset + min(count, limit)}.
      */
     public function getCount(): int
     {

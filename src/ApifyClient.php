@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Apify\Client;
 
-use Apify\Client\Http\BrotliHttpCompressor;
 use Apify\Client\Http\GuzzleHttpClient;
-use Apify\Client\Http\GzipHttpCompressor;
 use Apify\Client\Http\HttpClientInterface;
 use Apify\Client\Http\HttpCompressorInterface;
 use Apify\Client\Internal\Compression;
@@ -45,33 +43,28 @@ use Psr\Http\Message\StreamFactoryInterface;
 use RuntimeException;
 
 /**
- * The entry point for interacting with the Apify API.
+ * The entry point to the Apify API. Create it with an API token, then get a resource client from one of
+ * its accessors, for example {@see actor()}, {@see dataset()}, or {@see run()}.
  *
- * Construct it with an API token (and optional settings via named arguments), then obtain resource
- * clients via the accessor methods, e.g. {@see actor()}, {@see dataset()}, {@see run()}.
- *
- * <b>Architecture.</b> The public interface is this class and the resource clients it returns. The
- * replaceable transport is the {@see HttpClientInterface} (default {@see GuzzleHttpClient}); pass a
- * custom one via the {@code httpClient} argument. Cross-cutting behaviour (auth, User-Agent, retries
- * with exponential backoff, timeouts) lives in the internal HTTP client and is applied to every
- * request.
+ * Requests go through an {@see HttpClientInterface}, by default {@see GuzzleHttpClient}. Pass another one as
+ * {@code httpClient}.
  */
 final class ApifyClient
 {
-    /** Default base URL of the Apify API (without the {@code /v2} suffix). */
+    /** The default API base URL, without the {@code /v2} suffix. */
     public const DEFAULT_BASE_URL = 'https://api.apify.com';
 
     public const DEFAULT_MAX_RETRIES = 8;
     public const DEFAULT_MIN_DELAY_MILLIS = 500;
     public const DEFAULT_TIMEOUT_SECS = 360;
 
-    /** The API version path this client targets; appended to {@code $baseUrl}/{@code $publicBaseUrl} when absent. */
+    /** The API version path, appended to the base URLs when absent. */
     private const API_VERSION_PATH = '/v2';
 
-    /** Environment variable that signals the client is running on the Apify platform. */
+    /** Set to a non-empty value on the Apify platform. */
     private const ENV_IS_AT_HOME = 'APIFY_IS_AT_HOME';
 
-    /** Addresses the current user ({@code /users/me}). */
+    /** The ID that addresses the current user. */
     private const ME_USER_PLACEHOLDER = 'me';
 
     private HttpClientCore $http;
@@ -80,12 +73,9 @@ final class ApifyClient
 
     /**
      * @param string|null              $token                        API token, sent as a Bearer token
-     * @param string                   $baseUrl                      API base URL, with or without the trailing
-     *                                                               {@code /v2} version path — appended automatically
-     *                                                               when not already present
-     * @param string|null              $publicBaseUrl                base URL for building public, shareable resource
-     *                                                               URLs (defaults to {@code $baseUrl}); like
-     *                                                               {@code $baseUrl}, {@code /v2} is appended when absent
+     * @param string                   $baseUrl                      API base URL, with or without {@code /v2}
+     * @param string|null              $publicBaseUrl                base URL of public resource URLs (defaults to
+     *                                                               {@code $baseUrl})
      * @param int                      $maxRetries                   maximum retries for failed requests (default 8)
      * @param int                      $minDelayBetweenRetriesMillis minimum delay between retries in ms (default 500)
      * @param int|null                 $maxDelayBetweenRetriesMillis upper bound for the growing inter-retry delay
@@ -93,22 +83,26 @@ final class ApifyClient
      * @param int                      $timeoutSecs                  overall per-request timeout in seconds (default
      *                                                               360); the default of the {@code long} tier and of
      *                                                               {@code $timeoutMaxSecs}
-     * @param int|null                 $timeoutShortSecs             duration (seconds) of the {@code short} timeout
-     *                                                               tier (metadata reads/writes); defaults to 5
-     * @param int|null                 $timeoutMediumSecs            duration (seconds) of the {@code medium} timeout
-     *                                                               tier (listing/batch/trigger calls); defaults to 30
-     * @param int|null                 $timeoutLongSecs              duration (seconds) of the {@code long} timeout
-     *                                                               tier (downloads/uploads/streaming); defaults to
-     *                                                               {@code $timeoutSecs}
-     * @param int|null                 $timeoutMaxSecs               upper bound on any single request attempt's
-     *                                                               timeout, including a per-call override and the
-     *                                                               growth across retries; defaults to
-     *                                                               {@code $timeoutSecs}
+     * @param int|null                 $timeoutShortSecs             timeout of the {@code short} tier, for metadata
+     *                                                               reads and writes (default 5)
+     * @param int|null                 $timeoutMediumSecs            timeout of the {@code medium} tier, for listing,
+     *                                                               batch and trigger calls (default 30)
+     * @param int|null                 $timeoutLongSecs              timeout of the {@code long} tier, for downloads,
+     *                                                               uploads and streaming (default {@code $timeoutSecs})
+     * @param int|null                 $timeoutMaxSecs               cap on the timeout of any attempt, per-call
+     *                                                               overrides and growth across retries included
+     *                                                               (default {@code $timeoutSecs})
      * @param string|null              $userAgentSuffix              custom suffix appended to the User-Agent header
      * @param HttpClientInterface|null $httpClient                   replaces the default transport (Guzzle)
      * @param RequestFactoryInterface|null $requestFactory           PSR-17 request factory (defaults to Guzzle's)
      * @param StreamFactoryInterface|null  $streamFactory            PSR-17 stream factory (defaults to Guzzle's)
-     * @param callable():bool|null     $isAtHomeFn                   test seam overriding the isAtHome flag detection
+     * @param callable():bool|null     $isAtHomeFn                   replaces the detection of the {@code isAtHome} flag
+     * @param string|HttpCompressorInterface|null $compression       request-body compression: {@code 'brotli'},
+     *                                                               {@code 'gzip'}, {@code 'zstd'}, or a custom compressor,
+     *                                                               which also sets the quality. A codec whose extension
+     *                                                               is not loaded throws {@see RuntimeException}.
+     *                                                               {@code null} picks brotli when its extension is
+     *                                                               loaded, gzip otherwise.
      */
     public function __construct(
         ?string $token = null,
@@ -127,14 +121,6 @@ final class ApifyClient
         ?RequestFactoryInterface $requestFactory = null,
         ?StreamFactoryInterface $streamFactory = null,
         ?callable $isAtHomeFn = null,
-        /**
-         * Overrides request-body compression: {@code 'brotli'}, {@code 'gzip'}, or a custom {@see
-         * HttpCompressorInterface}. {@code null} (the default) keeps the client's existing best-effort
-         * choice (brotli when the optional PECL extension is loaded, falling back to gzip), unchanged
-         * from before this option existed, so a client constructed without it sends the same requests
-         * as always. Pass an explicit {@see BrotliHttpCompressor}/{@see GzipHttpCompressor} instance to
-         * also choose the compression quality.
-         */
         string|HttpCompressorInterface|null $compression = null,
     ) {
         $transport = $httpClient ?? new GuzzleHttpClient();
@@ -166,21 +152,19 @@ final class ApifyClient
         $this->publicBaseUrl = self::toApiBaseUrl($publicBaseUrl ?? $baseUrl);
     }
 
-    /** Returns the {@code User-Agent} header value this client sends. */
+    /** The {@code User-Agent} header value of the requests. */
     public function getUserAgent(): string
     {
         return $this->http->userAgent();
     }
 
-    /** Returns the fully-qualified API base URL this client targets (including the {@code /v2} suffix). */
+    /** The API base URL, including {@code /v2}. */
     public function getApiBaseUrl(): string
     {
         return $this->baseUrl;
     }
 
-    // ----- Actor accessors -----------------------------------------------------
-
-    /** A client for the Actor collection (list & create Actors). */
+    /** A client for the Actor collection. */
     public function actors(): ActorCollectionClient
     {
         return new ActorCollectionClient($this->http, $this->baseUrl);
@@ -192,49 +176,41 @@ final class ApifyClient
         return new ActorClient($this, $this->http, $this->baseUrl, $id);
     }
 
-    // ----- Build accessors -----------------------------------------------------
-
-    /** A client for the Actor build collection (list builds). */
+    /** A client for the build collection. */
     public function builds(): BuildCollectionClient
     {
         return new BuildCollectionClient($this->http, $this->baseUrl, 'actor-builds');
     }
 
-    /** A client for a specific Actor build. */
+    /** A client for a build. */
     public function build(string $id): BuildClient
     {
         return new BuildClient($this->http, $this->baseUrl, $id);
     }
 
-    // ----- Run accessors -------------------------------------------------------
-
-    /** A client for the Actor run collection (list runs). */
+    /** A client for the run collection. */
     public function runs(): RunCollectionClient
     {
         return new RunCollectionClient($this->http, $this->baseUrl, 'actor-runs');
     }
 
-    /** A client for a specific Actor run. */
+    /** A client for a run. */
     public function run(string $id): RunClient
     {
         return new RunClient($this, $this->http, $this->baseUrl, 'actor-runs', $id);
     }
 
-    // ----- Dataset accessors ---------------------------------------------------
-
-    /** A client for the dataset collection (list & get-or-create datasets). */
+    /** A client for the dataset collection. */
     public function datasets(): DatasetCollectionClient
     {
         return new DatasetCollectionClient($this->http, $this->baseUrl);
     }
 
-    /** A client for a specific dataset, addressed by ID or name. */
+    /** A client for a dataset, addressed by ID or name. */
     public function dataset(string $id): DatasetClient
     {
         return DatasetClient::forId($this->http, $this->baseUrl, $id)->withPublicBase($this->publicBaseUrl);
     }
-
-    // ----- Key-value store accessors -------------------------------------------
 
     /** A client for the key-value store collection. */
     public function keyValueStores(): KeyValueStoreCollectionClient
@@ -242,13 +218,11 @@ final class ApifyClient
         return new KeyValueStoreCollectionClient($this->http, $this->baseUrl);
     }
 
-    /** A client for a specific key-value store, addressed by ID or name. */
+    /** A client for a key-value store, addressed by ID or name. */
     public function keyValueStore(string $id): KeyValueStoreClient
     {
         return KeyValueStoreClient::forId($this->http, $this->baseUrl, $id)->withPublicBase($this->publicBaseUrl);
     }
-
-    // ----- Request queue accessors ---------------------------------------------
 
     /** A client for the request queue collection. */
     public function requestQueues(): RequestQueueCollectionClient
@@ -257,52 +231,45 @@ final class ApifyClient
     }
 
     /**
-     * A client for a specific request queue, addressed by ID or name. Optionally pass a
-     * {@see RequestQueueClientOptions} to set a stable {@code clientKey} and/or a per-request
-     * {@code timeoutSecs} for this queue's calls.
+     * A client for a request queue, addressed by ID or name. The options set a stable {@code clientKey} and a
+     * timeout for the calls of this client.
      */
     public function requestQueue(string $id, ?RequestQueueClientOptions $options = null): RequestQueueClient
     {
         return RequestQueueClient::forId($this->http, $this->baseUrl, $id, $options);
     }
 
-    // ----- Task accessors ------------------------------------------------------
-
-    /** A client for the Actor task collection (list & create tasks). */
+    /** A client for the task collection. */
     public function tasks(): TaskCollectionClient
     {
         return new TaskCollectionClient($this->http, $this->baseUrl);
     }
 
-    /** A client for a specific Actor task. */
+    /** A client for a task. */
     public function task(string $id): TaskClient
     {
         return new TaskClient($this, $this->http, $this->baseUrl, $id);
     }
 
-    // ----- Schedule accessors --------------------------------------------------
-
-    /** A client for the schedule collection (list & create schedules). */
+    /** A client for the schedule collection. */
     public function schedules(): ScheduleCollectionClient
     {
         return new ScheduleCollectionClient($this->http, $this->baseUrl);
     }
 
-    /** A client for a specific schedule. */
+    /** A client for a schedule. */
     public function schedule(string $id): ScheduleClient
     {
         return new ScheduleClient($this->http, $this->baseUrl, $id);
     }
 
-    // ----- Webhook accessors ---------------------------------------------------
-
-    /** A client for the webhook collection (list & create webhooks). */
+    /** A client for the webhook collection. */
     public function webhooks(): WebhookCollectionClient
     {
         return new WebhookCollectionClient($this->http, $this->baseUrl);
     }
 
-    /** A client for a specific webhook. */
+    /** A client for a webhook. */
     public function webhook(string $id): WebhookClient
     {
         return new WebhookClient($this->http, $this->baseUrl, $id);
@@ -314,45 +281,41 @@ final class ApifyClient
         return new WebhookDispatchCollectionClient($this->http, $this->baseUrl, 'webhook-dispatches');
     }
 
-    /** A client for a specific webhook dispatch. */
+    /** A client for a webhook dispatch. */
     public function webhookDispatch(string $id): WebhookDispatchClient
     {
         return new WebhookDispatchClient($this->http, $this->baseUrl, $id);
     }
 
-    // ----- Misc accessors ------------------------------------------------------
-
-    /** A client for browsing the Apify Store. */
+    /** A client for the Apify Store. */
     public function store(): StoreCollectionClient
     {
         return new StoreCollectionClient($this->http, $this->baseUrl);
     }
 
-    /** A client for accessing a build's or run's log. */
+    /** A client for the log of a build or run. */
     public function log(string $buildOrRunId): LogClient
     {
         return LogClient::forId($this->http, $this->baseUrl, $buildOrRunId);
     }
 
-    /** A client for the current user ({@code /users/me}). */
+    /** A client for the user the token belongs to. */
     public function me(): UserClient
     {
         return new UserClient($this->http, $this->baseUrl, self::ME_USER_PLACEHOLDER);
     }
 
-    /** A client for a specific user by ID or username. */
+    /** A client for a user, addressed by ID or username. */
     public function user(string $id): UserClient
     {
         return new UserClient($this->http, $this->baseUrl, $id);
     }
 
     /**
-     * Sets the status message of the current Actor run.
+     * Sets the status message of the run in the {@code ACTOR_RUN_ID} environment variable. A terminal message
+     * is final and is not overwritten.
      *
-     * This convenience method updates the run identified by the {@code ACTOR_RUN_ID} environment
-     * variable, so it only works when called from inside an Actor run. If {@code $isTerminal} is
-     * true, the message becomes final and won't be overwritten. Throws {@see RuntimeException} if
-     * {@code ACTOR_RUN_ID} is not set.
+     * @throws RuntimeException if {@code ACTOR_RUN_ID} is not set
      */
     public function setStatusMessage(string $message, bool $isTerminal = false): ActorRun
     {
@@ -371,32 +334,20 @@ final class ApifyClient
         return rtrim($value, '/');
     }
 
-    /**
-     * Resolves the {@code compression} constructor option to a concrete compressor, or {@code null} to
-     * keep the client's own default best-effort choice.
-     */
+    /** Resolves the {@code compression} option to a compressor, or {@code null} for the default choice. */
     private static function resolveCompressor(string|HttpCompressorInterface|null $compression): ?HttpCompressorInterface
     {
         return Compression::resolveCompressor($compression, 'ApifyClient');
     }
 
-    /**
-     * Appends the {@code /v2} API version path to {@code $url}, unless it already ends with one, so
-     * passing a URL that already includes it (e.g. {@code https://api.apify.com/v2}) does not produce
-     * {@code .../v2/v2}. A trailing slash is stripped first, matching the reference client's
-     * {@code toApiBaseUrl}. Only an exact {@code /v2} suffix counts; another {@code /vN} is left alone,
-     * since every endpoint this client calls exists only under {@code v2}.
-     */
+    /** Appends {@code /v2} to a URL that does not end with it. Another version suffix is left alone. */
     private static function toApiBaseUrl(string $url): string
     {
         $path = self::trimTrailingSlash($url);
         return str_ends_with($path, self::API_VERSION_PATH) ? $path : $path . self::API_VERSION_PATH;
     }
 
-    /**
-     * Reports whether the client is running on the Apify platform, by reading the
-     * {@code APIFY_IS_AT_HOME} environment variable (set to a non-empty value on the platform).
-     */
+    /** Whether the client runs on the Apify platform. */
     private static function defaultIsAtHome(): bool
     {
         $value = getenv(self::ENV_IS_AT_HOME);
@@ -404,8 +355,7 @@ final class ApifyClient
     }
 
     /**
-     * Builds the {@code User-Agent} header value mandated by the client requirements:
-     * {@code ApifyClient/{version} ({os}; PHP/{phpVersion}); isAtHome/{true|false}}.
+     * Builds the {@code User-Agent} value: {@code ApifyClient/{version} ({os}; PHP/{phpVersion}); isAtHome/{true|false}}.
      *
      * @param callable():bool $isAtHomeFn
      */

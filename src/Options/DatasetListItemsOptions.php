@@ -6,18 +6,15 @@ namespace Apify\Client\Options;
 
 use Apify\Client\Internal\QueryParams;
 
-/**
- * Configures listing or downloading dataset items ({@code GET /v2/datasets/{datasetId}/items}).
- * All fields are optional.
- */
+/** Options for listing or downloading dataset items. */
 final class DatasetListItemsOptions
 {
     /**
-     * @param list<string>|null $fields       restrict the output to these fields
-     * @param list<string>|null $outputFields positionally rename the selected {@code fields} (requires {@code fields})
-     * @param list<string>|null $omit         exclude these fields from the output
-     * @param list<string>|null $unwind       expand these fields (each array element becomes a separate item)
-     * @param list<string>|null $flatten      flatten these nested fields into dot-notation keys
+     * @param list<string>|null $fields       limits the output to these fields
+     * @param list<string>|null $outputFields renames the selected {@code fields} by position (needs {@code fields})
+     * @param list<string>|null $omit         leaves these fields out
+     * @param list<string>|null $unwind       turns each element of these array fields into its own item
+     * @param list<string>|null $flatten      flattens these nested fields into dot-notation keys
      */
     public function __construct(
         /** Number of items to skip. */
@@ -49,8 +46,8 @@ final class DatasetListItemsOptions
     }
 
     /**
-     * Returns a copy of these options with a new {@code offset}/{@code limit}, preserving every other
-     * field. Used by {@see \Apify\Client\Resource\DatasetClient::iterateItems()} to request pages.
+     * A copy with a new {@code offset} and {@code limit} and the same other fields. Used by
+     * {@see \Apify\Client\Resource\DatasetClient::iterateItems()}.
      */
     public function withPagination(?int $offset, ?int $limit): self
     {

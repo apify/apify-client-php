@@ -12,10 +12,7 @@ use Apify\Client\Model\ActorEnvVar;
 use Apify\Client\Model\PaginationList;
 use Generator;
 
-/**
- * A client for an Actor version's environment variable collection ({@code GET/POST
- * /v2/actors/{actorId}/versions/{versionNumber}/env-vars}).
- */
+/** A client for the environment variables of an Actor version. */
 final class ActorEnvVarCollectionClient
 {
     private ResourceContext $ctx;
@@ -42,12 +39,8 @@ final class ActorEnvVarCollectionClient
     }
 
     /**
-     * Lazily iterates over the version's environment variables.
-     *
-     * This endpoint ignores {@code offset}/{@code limit} and always returns every environment
-     * variable in one response, so iteration makes exactly one request — unlike the offset/limit
-     * collection iterators, there is no per-page {@code chunkSize} to request fewer at a time, and a
-     * generic paginating loop would re-request (and re-yield) the same full list forever.
+     * Lazily yields the environment variables of the version. The endpoint returns all of them in one response,
+     * so this makes one request.
      *
      * @return Generator<int,ActorEnvVar>
      */

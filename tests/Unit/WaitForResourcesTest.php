@@ -14,15 +14,11 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests for the {@code waitForResources} option of {@see \Apify\Client\Resource\ActorClient} and
- * {@see \Apify\Client\Resource\TaskClient}'s {@code start()}/{@code call()}. Mirrors the reference
- * client's {@code startWaitingForResources} behavior.
+ * Tests of the {@code waitForResources} option of {@see \Apify\Client\Resource\ActorClient} and
+ * {@see \Apify\Client\Resource\TaskClient}.
  *
- * The retry/backoff mechanism itself is exercised directly against {@see WaitForResources::start()}
- * with a near-zero {@code $cooldownSecs} override (a parameter that exists solely for this), so the
- * suite does not sleep through real 10-second cooldowns. That {@code $cooldownSecs} is never passed by
- * {@see \Apify\Client\Resource\ActorClient}/{@see \Apify\Client\Resource\TaskClient} themselves, so the
- * real cooldown is exercised only by the integration suite.
+ * The retries are tested on {@see WaitForResources::start()} with a tiny {@code $cooldownSecs}, which only
+ * tests pass, so the suite does not wait for real 10-second cooldowns.
  */
 final class WaitForResourcesTest extends TestCase
 {
@@ -71,22 +67,14 @@ final class WaitForResourcesTest extends TestCase
             throw self::rejectionError('actor-memory-limit-exceeded');
         };
 
-        // $start rejects unconditionally, so WaitForResources::start() is guaranteed to exhaust the
-        // 1-second budget and rethrow the last rejection; expectException() (rather than a try/catch
-        // with a fail()-on-fallthrough branch) asserts that, since PHPUnit itself fails the test if the
-        // call below returns instead of throwing, keeping the "it must throw" assertion live without a
-        // branch that PHPStan can (correctly, given this always-throwing $start) prove unreachable.
+        // The start always rejects, so the call exhausts the budget and rethrows the last rejection.
         $this->expectException(ApifyApiException::class);
         $this->expectExceptionMessage('rejected: actor-memory-limit-exceeded');
         try {
             WaitForResources::start($start, 1, cooldownSecs: 0.001);
         } finally {
-            // Roughly 1 / 0.001 attempts before the 1-second budget runs out; a wide range keeps this
-            // robust to scheduling jitter while still proving it bounds the retrying rather than
-            // retrying forever. $waitForResources only accepts a whole number of seconds, so 1 is the
-            // smallest nonzero budget this can exercise without hitting the (already separately tested)
-            // "0 makes a single attempt" case. The `finally` runs before the exception propagates out
-            // of this test method to PHPUnit's expectException() machinery above.
+            // About 1 / 0.001 attempts fit the 1-second budget. A wide range tolerates scheduling jitter. 1 is
+            // the smallest nonzero budget, since only whole seconds are accepted.
             self::assertGreaterThan(10, $attempts);
             self::assertLessThan(10000, $attempts);
         }
@@ -94,10 +82,7 @@ final class WaitForResourcesTest extends TestCase
 
     public function testActorStartAndTaskStartWireTheOptionIntoWaitForResources(): void
     {
-        // Succeeding on the very first attempt needs no cooldown at all, so this confirms
-        // ActorClient/TaskClient actually construct the WaitForResources::start() call (rather than,
-        // say, silently dropping the option) without the suite paying for even one real sleep; the
-        // retry/cooldown mechanism itself is exercised above, directly against WaitForResources.
+        // A start that succeeds at once needs no cooldown, which shows that the clients pass the option on.
         $actorTransport = (new MockTransport())->queueResponse(201, self::runBody());
         $run = $this->client($actorTransport)->actor('a1')->start(null, new ActorStartOptions(waitForResources: true));
         self::assertSame('run1', $run->getId());

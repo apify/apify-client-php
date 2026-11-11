@@ -13,10 +13,7 @@ final class RequestQueueOperationInfo extends ApifyResource
         return $this->getString('requestId');
     }
 
-    /**
-     * The unique key of the affected request. Populated for batch-add results; may be {@code null}
-     * for single add/update operations.
-     */
+    /** The unique key of the request. Set for batch-add results, possibly {@code null} for single operations. */
     public function getUniqueKey(): ?string
     {
         return $this->getString('uniqueKey');

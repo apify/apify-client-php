@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Apify\Client\Internal;
 
 /**
- * An ordered collection of query parameters that omits absent ({@code null}) values and encodes
- * booleans as {@code 1}/{@code 0}, matching the Apify API conventions.
+ * Ordered query parameters. A {@code null} value is left out, and a boolean is sent as {@code 1} or {@code 0}.
  *
  * @internal
  */
@@ -43,11 +42,7 @@ final class QueryParams
         return $this;
     }
 
-    /**
-     * Adds a boolean parameter, encoded as {@code 1}/{@code 0}, if the value is non-null. This
-     * matches the JS reference client, whose axios {@code paramsSerializer} converts booleans via
-     * {@code Number(value)} (so {@code true}→{@code 1}, {@code false}→{@code 0}).
-     */
+    /** Adds a boolean as {@code 1} or {@code 0}, unless it is {@code null}. */
     public function addBool(string $key, ?bool $value): self
     {
         if ($value !== null) {

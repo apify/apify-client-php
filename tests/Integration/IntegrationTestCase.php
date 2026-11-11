@@ -5,19 +5,18 @@ declare(strict_types=1);
 namespace Apify\Client\Tests\Integration;
 
 use Apify\Client\ApifyClient;
+use Apify\Client\Http\HttpClientInterface;
+use Apify\Client\Http\HttpCompressorInterface;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Resource\DatasetClient;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Shared setup for the integration test suite.
+ * Shared setup of the integration tests. They need an {@code APIFY_TOKEN}. The API URL comes from
+ * {@code APIFY_API_URL}, with the {@code /v2} suffix, and defaults to {@code https://api.apify.com/v2}.
  *
- * All integration tests require a valid {@code APIFY_TOKEN} for the test account. The API base URL
- * is taken from {@code APIFY_API_URL} (which includes the {@code /v2} suffix) and falls back to
- * {@code https://api.apify.com/v2}.
- *
- * Tests are designed to run concurrently — including against the same test account from several
- * language clients at once — so every test creates uniquely-named resources and cleans them up.
+ * Tests may run concurrently on the same account, also from other language clients, so each one creates
+ * uniquely named resources and cleans them up.
  */
 abstract class IntegrationTestCase extends TestCase
 {
@@ -25,9 +24,7 @@ abstract class IntegrationTestCase extends TestCase
     private const DEFAULT_API_URL = 'https://api.apify.com/v2';
 
     /**
-     * Derives the client base URL from an optional {@code APIFY_API_URL}. The variable includes the
-     * {@code /v2} suffix (per the integration-test contract) and falls back to the default. Since the
-     * client appends {@code /v2} itself, the suffix is stripped here.
+     * Derives the client base URL from {@code APIFY_API_URL}. The client adds {@code /v2} itself, so it is stripped.
      */
     protected static function resolveBaseUrl(?string $apiUrl): string
     {
@@ -42,17 +39,17 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
-     * How many times, and how many seconds apart, a listing is re-read while a resource the test just
-     * created is missing from it. The list endpoints read from database secondaries that may lag by up
-     * to 90 seconds, so 30 attempts 3 seconds apart cover that window; a pass returns as soon as every
-     * expected ID shows up.
+     * How many times, and how many seconds apart, a listing is re-read while a resource the test just created is
+     * missing from it. The list endpoints read from secondaries that can lag by up to 90 seconds.
      */
     private const LISTING_MAX_ATTEMPTS = 30;
     private const LISTING_RETRY_DELAY_SECS = 3;
 
     /** Returns a configured client, or skips the test if {@code APIFY_TOKEN} is unset. */
-    protected function requireClient(): ApifyClient
-    {
+    protected function requireClient(
+        string|HttpCompressorInterface|null $compression = null,
+        ?HttpClientInterface $httpClient = null,
+    ): ApifyClient {
         $token = getenv('APIFY_TOKEN');
         if ($token === false || $token === '') {
             self::markTestSkipped('skipping: APIFY_TOKEN is not set');
@@ -61,33 +58,25 @@ abstract class IntegrationTestCase extends TestCase
         return new ApifyClient(
             token: $token,
             baseUrl: self::resolveBaseUrl($apiUrl === false ? null : $apiUrl),
+            httpClient: $httpClient,
+            compression: $compression,
         );
     }
 
-    /**
-     * Generates a collision-resistant resource name for test isolation. The random component lets
-     * the same test run in parallel (across processes and languages) without clobbering shared state.
-     */
+    /** Generates a unique resource name, so that the same test can run in parallel. */
     protected static function uniqueName(string $prefix): string
     {
         return 'php-test-' . $prefix . '-' . bin2hex(random_bytes(6));
     }
 
     /**
-     * Repeatedly re-runs an iterate()-and-collect pass (via {@code $collect}) until every ID in
-     * {@code $expectedIds} has been seen, or a bounded number of attempts with backoff is exhausted.
-     *
-     * Apify's list/pagination endpoints are eventually consistent, and this suite is designed to run
-     * concurrently with other test runs (including other language clients) against the same shared
-     * test account; under that load, a resource created immediately before an {@code iterate()} call
-     * can take a while to be reflected in a collection listing. Retrying the whole pass (rather
-     * than looping forever or giving up after one try) keeps the test genuinely exercising
-     * {@code iterate()} while tolerating that lag: it still fails, with the same diagnostic message,
-     * if a resource never appears within the bounded timeout.
+     * Repeats an iterate-and-collect pass ({@code $collect}) until every ID in {@code $expectedIds} was seen,
+     * or the attempts run out. The list endpoints are eventually consistent, so a resource that was just
+     * created can be missing at first.
      *
      * @param list<string> $expectedIds identifiers that must all be present in a collected pass
-     * @param callable(): array<string,bool> $collect performs one iterate() pass and returns the set
-     *        (map of identifier => true) of everything it saw
+     * @param callable(): array<string,bool> $collect performs one pass and returns the set (identifier => true)
+     *        of everything it saw
      */
     protected static function assertEventuallyIterated(array $expectedIds, callable $collect, string $label): void
     {
@@ -108,9 +97,8 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
-     * Waits until the dataset reports at least {@code $expectedItems} items. The dataset's item count,
-     * which its total and its scanned-rows count come from, is computed asynchronously and lags a fresh
-     * push. It re-reads as often as {@see assertEventuallyIterated()} does.
+     * Waits until the dataset reports at least {@code $expectedItems} items. Its item count is computed
+     * asynchronously and lags a fresh push. It re-reads as often as {@see assertEventuallyIterated()}.
      */
     protected static function waitForDatasetItemCount(DatasetClient $dataset, int $expectedItems): void
     {

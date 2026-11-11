@@ -4,11 +4,36 @@ declare(strict_types=1);
 
 namespace Apify\Client\Tests\Unit;
 
+use Apify\Client\Http\HttpCompressorInterface;
 use Apify\Client\Internal\Compression;
 use PHPUnit\Framework\TestCase;
 
 final class CompressionTest extends TestCase
 {
+    /** A compressor that encodes with {@code $encode}, or fails when it returns {@code null}. */
+    private static function compressor(string $encoding, callable $encode): HttpCompressorInterface
+    {
+        return new class ($encoding, $encode) implements HttpCompressorInterface {
+            /** @var callable(string): ?string */
+            private $encode;
+
+            public function __construct(private string $encoding, callable $encode)
+            {
+                $this->encode = $encode;
+            }
+
+            public function contentEncoding(): string
+            {
+                return $this->encoding;
+            }
+
+            public function compress(string $body): ?string
+            {
+                return ($this->encode)($body);
+            }
+        };
+    }
+
     /** True when at least one compression codec is available in this PHP build. */
     private static function hasCodec(): bool
     {
@@ -26,8 +51,7 @@ final class CompressionTest extends TestCase
         if (!self::hasCodec()) {
             self::markTestSkipped('no compression codec available in this PHP build');
         }
-        // A body of exactly MIN_COMPRESS_BYTES is compressed (the below-threshold case is covered by
-        // testSmallBodyIsNotCompressed).
+        // The size just below the threshold is covered by testSmallBodyIsNotCompressed.
         $result = Compression::maybeCompress(str_repeat('a', Compression::MIN_COMPRESS_BYTES));
         self::assertNotNull($result);
         [$encoding, $data] = $result;
@@ -72,10 +96,9 @@ final class CompressionTest extends TestCase
         if (!function_exists('gzencode')) {
             self::markTestSkipped('zlib (gzencode) not available in this PHP build');
         }
-        // Deterministically exercise the gzip fallback (brotli encoder absent) without depending on
-        // the host lacking the PECL brotli extension.
+        // Gzip alone, whether or not the host has the brotli extension.
         $original = str_repeat('payload-', 500);
-        $result = Compression::compressWith($original, null, static fn (string $b) => gzencode($b));
+        $result = Compression::compressWith($original, [self::compressor('gzip', static fn (string $b) => gzencode($b) ?: null)]);
         self::assertNotNull($result);
         [$encoding, $data] = $result;
         self::assertSame('gzip', $encoding);
@@ -85,16 +108,13 @@ final class CompressionTest extends TestCase
 
     public function testBrotliPathIsPreferredWhenAvailable(): void
     {
-        // Deterministically exercise the brotli path (and its preference over gzip) without depending
-        // on the host having the PECL brotli extension: inject a stand-in brotli encoder and assert it
-        // is chosen and its output used, while a real gzip encoder is also available.
+        // A stand-in brotli compressor in front of gzip is chosen, whether or not the host has the extension.
         $original = str_repeat('payload-', 500);
         $marker = 'BR:' . $original;
-        $result = Compression::compressWith(
-            $original,
-            static fn (string $b) => 'BR:' . $b,
-            static fn (string $b) => gzencode($b),
-        );
+        $result = Compression::compressWith($original, [
+            self::compressor('br', static fn (string $b) => 'BR:' . $b),
+            self::compressor('gzip', static fn (string $b) => gzencode($b) ?: null),
+        ]);
         self::assertNotNull($result);
         [$encoding, $data] = $result;
         self::assertSame('br', $encoding);
@@ -106,7 +126,6 @@ final class CompressionTest extends TestCase
         if (!function_exists('brotli_compress')) {
             self::markTestSkipped('PECL brotli extension not loaded');
         }
-        // When the real extension is present, verify the actual brotli codec produces decodable bytes.
         $original = str_repeat('payload-', 500);
         $result = Compression::maybeCompress($original);
         self::assertNotNull($result);
@@ -121,13 +140,12 @@ final class CompressionTest extends TestCase
         if (!function_exists('gzencode')) {
             self::markTestSkipped('zlib (gzencode) not available in this PHP build');
         }
-        // A brotli encoder that fails (returns a non-string) must not abort compression: gzip is used.
+        // A failing brotli compressor does not abort the compression: gzip is used.
         $original = str_repeat('payload-', 500);
-        $result = Compression::compressWith(
-            $original,
-            static fn (string $b) => false,
-            static fn (string $b) => gzencode($b),
-        );
+        $result = Compression::compressWith($original, [
+            self::compressor('br', static fn (string $b) => null),
+            self::compressor('gzip', static fn (string $b) => gzencode($b) ?: null),
+        ]);
         self::assertNotNull($result);
         [$encoding, $data] = $result;
         self::assertSame('gzip', $encoding);
@@ -137,18 +155,16 @@ final class CompressionTest extends TestCase
     public function testReturnsNullWhenNoCodecAvailable(): void
     {
         $original = str_repeat('payload-', 500);
-        self::assertNull(Compression::compressWith($original, null, null));
+        self::assertNull(Compression::compressWith($original, []));
     }
 
     public function testSmallBodyIsNotCompressedEvenWithCodecs(): void
     {
-        // The size gate applies before codec selection, so a below-threshold body is never compressed.
+        // The size gate applies before the compressors.
         $small = str_repeat('a', Compression::MIN_COMPRESS_BYTES - 1);
-        self::assertNull(Compression::compressWith(
-            $small,
-            static fn (string $b) => 'BR:' . $b,
-            static fn (string $b) => gzencode($b),
-        ));
+        self::assertNull(Compression::compressWith($small, [
+            self::compressor('br', static fn (string $b) => 'BR:' . $b),
+        ]));
     }
 
     /**
@@ -184,8 +200,7 @@ final class CompressionTest extends TestCase
     {
         if ($encoding === 'br') {
             self::assertTrue(function_exists('brotli_uncompress'), 'brotli extension needed to decode');
-            // Called indirectly: the symbol only exists when the PECL brotli extension is loaded,
-            // so a direct call would be an unresolved reference for static analysis.
+            // Called by name, so static analysis does not flag builds without the extension.
             $brotliUncompress = 'brotli_uncompress';
             $decoded = $brotliUncompress($data);
         } else {

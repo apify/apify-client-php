@@ -7,15 +7,15 @@ namespace Apify\Client\Tests\Unit;
 use Apify\Client\ApifyClient;
 use Apify\Client\Http\BrotliHttpCompressor;
 use Apify\Client\Http\GzipHttpCompressor;
+use Apify\Client\Http\ZstdHttpCompressor;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * Covers the configurable {@code compression} constructor option (matches the reference client's
- * `#1065`): choosing {@code 'gzip'}/{@code 'brotli'} by name, a custom quality via an explicit
- * compressor instance, and that the client's default best-effort choice is unchanged when the option
- * is left out.
+ * Tests of the {@code compression} constructor option: algorithm by name, quality through a compressor, and the
+ * default when it is omitted.
  */
 final class CompressionConfigTest extends TestCase
 {
@@ -49,6 +49,62 @@ final class CompressionConfigTest extends TestCase
         $client->keyValueStore('s1')->setRecordJson('k', $this->largeBody());
 
         self::assertSame('br', $transport->lastRequest()->getHeaderLine('Content-Encoding'));
+    }
+
+    public function testZstdByNameIsUsedWhenExtensionAvailable(): void
+    {
+        if (!function_exists('zstd_compress')) {
+            self::markTestSkipped('PECL zstd extension not loaded');
+        }
+        $transport = (new MockTransport())->queueResponse(200, '{"data":{}}');
+        $client = new ApifyClient(token: 't', compression: 'zstd', httpClient: $transport);
+
+        $client->keyValueStore('s1')->setRecordJson('k', $this->largeBody());
+
+        self::assertSame('zstd', $transport->lastRequest()->getHeaderLine('Content-Encoding'));
+    }
+
+    /** @return array<string,array{string,string}> */
+    public static function codecsWithAnExtension(): array
+    {
+        return [
+            'brotli' => ['brotli', 'brotli_compress'],
+            'zstd' => ['zstd', 'zstd_compress'],
+        ];
+    }
+
+    #[DataProvider('codecsWithAnExtension')]
+    public function testChoosingACodecWithoutItsExtensionFailsAtConstruction(string $name, string $function): void
+    {
+        if (function_exists($function)) {
+            self::markTestSkipped("the $name extension is loaded");
+        }
+        $this->expectException(RuntimeException::class);
+        new ApifyClient(token: 't', compression: $name, httpClient: new MockTransport());
+    }
+
+    public function testZstdCompressorRoundTrips(): void
+    {
+        if (!function_exists('zstd_uncompress')) {
+            self::markTestSkipped('PECL zstd extension not loaded');
+        }
+        $compressor = new ZstdHttpCompressor();
+        self::assertSame('zstd', $compressor->contentEncoding());
+        $zstdUncompress = 'zstd_uncompress';
+        self::assertSame('payload', $zstdUncompress((string) $compressor->compress('payload')));
+    }
+
+    /** @return array<string,array{int}> */
+    public static function outOfRangeZstdQualities(): array
+    {
+        return ['below the minimum' => [0], 'above the maximum' => [20]];
+    }
+
+    #[DataProvider('outOfRangeZstdQualities')]
+    public function testZstdCompressorRejectsOutOfRangeQuality(int $quality): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new ZstdHttpCompressor($quality);
     }
 
     public function testCustomCompressorInstanceIsUsed(): void

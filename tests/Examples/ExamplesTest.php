@@ -9,8 +9,8 @@ use PHPUnit\Framework\TestCase;
 use Throwable;
 
 /**
- * Runs each documentation example end-to-end against the live API, proving the snippets in the docs
- * actually work. Skipped when {@code APIFY_TOKEN} is not set. This is the "Test examples" CI step.
+ * Runs each documentation example against the live API. Skipped without {@code APIFY_TOKEN}. This is the "Test
+ * examples" CI step.
  */
 final class ExamplesTest extends TestCase
 {

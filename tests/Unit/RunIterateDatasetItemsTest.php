@@ -10,8 +10,8 @@ use Apify\Client\Options\RunIterateDatasetItemsOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Offline tests for {@see \Apify\Client\Resource\RunClient::iterateDatasetItems()}, driven by a
- * scripted transport. Each test queues the exact request sequence the algorithm is expected to make.
+ * Offline tests of {@see \Apify\Client\Resource\RunClient::iterateDatasetItems()}. Each test queues the request
+ * sequence it expects.
  */
 final class RunIterateDatasetItemsTest extends TestCase
 {
@@ -42,13 +42,13 @@ final class RunIterateDatasetItemsTest extends TestCase
         return ['X-Apify-Pagination-Count' => (string) $count];
     }
 
-    /** @return list<array<string,string>> the offset/limit query of every request, in order */
+    /** @return list<array<int|string,string>> the query and path of every request, in order */
     private static function queries(MockTransport $transport): array
     {
         $queries = [];
         foreach ($transport->received as $request) {
             parse_str($request->getUri()->getQuery(), $query);
-            $queries[] = $query + ['path' => $request->getUri()->getPath()];
+            $queries[] = array_filter($query, 'is_string') + ['path' => $request->getUri()->getPath()];
         }
         return $queries;
     }

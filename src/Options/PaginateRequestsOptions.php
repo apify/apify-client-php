@@ -6,14 +6,10 @@ namespace Apify\Client\Options;
 
 use InvalidArgumentException;
 
-/**
- * Configures lazy iteration over a request queue's requests
- * ({@see \Apify\Client\Resource\RequestQueueClient::paginateRequests()}), mirroring the reference
- * client's {@code paginateRequests({ limit, maxPageLimit, exclusiveStartId, cursor, filter })}.
- */
+/** Options for {@see \Apify\Client\Resource\RequestQueueClient::paginateRequests()}. */
 final class PaginateRequestsOptions
 {
-    /** Default maximum number of requests fetched per page (matches the reference client). */
+    /** The default maximum number of requests per page. */
     public const DEFAULT_MAX_PAGE_LIMIT = 1000;
 
     /** Filter value: currently locked requests. */
@@ -23,8 +19,8 @@ final class PaginateRequestsOptions
     public const FILTER_PENDING = 'pending';
 
     /**
-     * @param list<string>|null $filter restrict the iteration to requests in the given states; each
-     *                                  value must be {@see FILTER_LOCKED} or {@see FILTER_PENDING}
+     * @param list<string>|null $filter iterates only requests in these states, {@see FILTER_LOCKED} or
+     *                                  {@see FILTER_PENDING}
      */
     public function __construct(
         /** Maximum total number of requests to iterate across all pages ({@code null} for no bound). */

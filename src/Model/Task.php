@@ -58,9 +58,8 @@ final class Task extends ApifyResource
     }
 
     /**
-     * Whether the task is published on its public landing page. Derived from
-     * {@code publicConfig.publishedAt} — use {@see TaskClient::publish()} and
-     * {@see TaskClient::unpublish()} to change it.
+     * Whether the task is published, from {@code publicConfig.publishedAt}. Change it with {@see TaskClient::publish()}
+     * and {@see TaskClient::unpublish()}.
      */
     public function isPublic(): ?bool
     {
@@ -68,9 +67,8 @@ final class Task extends ApifyResource
     }
 
     /**
-     * The public-facing display configuration of the task's public landing page, or {@code null}
-     * if the task is not published. Contains fields such as {@code publishedAt}, {@code seoTitle}
-     * and {@code datasetView}.
+     * The display configuration of the public landing page, or {@code null} if the task is not published. It has
+     * fields such as {@code publishedAt}, {@code seoTitle}, and {@code datasetView}.
      *
      * @return array<string,mixed>|null
      */

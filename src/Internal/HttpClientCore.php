@@ -24,26 +24,26 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Throwable;
 
 /**
- * The orchestrating HTTP client shared by every resource client. It owns the transport, the optional
- * API token, the {@code User-Agent}, and the retry/timeout policy, and applies them to every request.
+ * The HTTP client shared by every resource client. Adds the token, {@code User-Agent}, compression, retries and
+ * timeouts to each request.
  *
  * @internal
  */
 final class HttpClientCore
 {
-    /** Status returned when the per-resource rate limit is hit. */
+    /** Status of a rate-limited request. */
     private const RATE_LIMIT_EXCEEDED = 429;
 
-    /** Statuses at or above this value are treated as retryable internal server errors. */
+    /** Statuses from this value up are server errors, retried by default. */
     private const MIN_SERVER_ERROR = 500;
 
-    /** Responses with a status below this value are treated as success. */
+    /** Statuses below this value are successes. */
     public const MAX_SUCCESS_STATUS = 300;
 
-    /** Exponential-backoff multiplier applied to the inter-retry delay after each attempt. */
+    /** Multiplier of the delay between retries. */
     private const BACKOFF_FACTOR = 2;
 
-    /** Multiplier applied to the per-attempt timeout on each retry (independent of {@see BACKOFF_FACTOR}). */
+    /** Multiplier of the timeout on each retry. */
     private const TIMEOUT_BACKOFF_FACTOR = 2;
 
     private const NOT_FOUND = 404;
@@ -55,11 +55,7 @@ final class HttpClientCore
         private ?string $token,
         private string $userAgent,
         private RetryConfig $retry,
-        /**
-         * Overrides the client's default best-effort compression (brotli, falling back to gzip) with a
-         * single configured algorithm. {@code null} keeps the default. See
-         * {@see \Apify\Client\Http\HttpCompressorInterface}.
-         */
+        /** Replaces the default compression (brotli, then gzip). */
         private ?HttpCompressorInterface $compressor = null,
     ) {
     }
@@ -69,14 +65,14 @@ final class HttpClientCore
         return $this->userAgent;
     }
 
-    /** The configured timeout tiers (short/medium/long/max). See {@see TimeoutTiers}. */
+    /** The configured timeout tiers. */
     public function timeoutTiers(): TimeoutTiers
     {
         return $this->retry->timeoutTiers;
     }
 
     /**
-     * Sends a request with auth, User-Agent and the retry policy applied.
+     * Sends a request with auth, User-Agent, and the retry policy applied.
      *
      * @param array<string,string> $extraHeaders
      * @param RequestPolicy|null   $policy       per-request deviations from the defaults of a call to the API
@@ -104,7 +100,7 @@ final class HttpClientCore
             ));
         }
 
-        // Compress the body once, up front, so every retry reuses the already-compressed payload.
+        // Compressed once, so every retry reuses the compressed body.
         if ($policy->compression !== false) {
             [$body, $extraHeaders] = $this->maybeCompressBody($body, $contentType, $extraHeaders, $policy->compression ?? $this->compressor);
         }
@@ -139,8 +135,7 @@ final class HttpClientCore
                 $response->getBody()->close();
             } catch (TransportException $e) {
                 $lastError = $e;
-                // Network/timeout failures are retryable, unless the caller opted out of retrying timeouts or
-                // of retrying transport errors at all.
+                // Retried unless the caller opted out of retrying timeouts or transport errors.
                 $retryable = $policy->retryTransportErrors && !($doNotRetryTimeouts && $e->isTimeout());
             }
 
@@ -152,24 +147,16 @@ final class HttpClientCore
             $delayMillis = min($delayMillis * self::BACKOFF_FACTOR, $this->retry->maxDelayMillis);
         }
 
-        // Unreachable in practice (maxAttempts >= 1); defensive.
         throw $lastError ?? new TransportException('request failed with no attempts');
     }
 
     /**
-     * Compresses the request body when it is large enough to be worth it, returning the possibly
-     * replaced body together with the (possibly extended) header map. A caller that already set a
-     * {@code Content-Encoding} header is left untouched, so an explicitly-encoded body is never
-     * double-compressed. A body whose {@code $contentType} already carries its own compression (media,
-     * archives, fonts, ...) is left uncompressed too — see {@see Compression::isCompressibleContentType()}.
-     *
-     * Uses {@code $compressor} when one is given: the one the caller configured on the constructor (the
-     * {@code compression} option of {@see \Apify\Client\ApifyClient}) or a per-request one; otherwise falls back to the client's
-     * default best-effort choice ({@see Compression::maybeCompress()}: brotli, falling back to gzip).
+     * Compresses the body when it is large enough and compressible. A body with a caller-set
+     * {@code Content-Encoding} is left as it is, so it is never compressed twice.
      *
      * @param array<string,string> $extraHeaders
      * @param HttpCompressorInterface|null $compressor the compressor to use, {@code null} for the default choice
-     * @return array{0: string|null, 1: array<string,string>}
+     * @return array{0: string|null, 1: array<string,string>} the body and the headers to send
      */
     private function maybeCompressBody(?string $body, string $contentType, array $extraHeaders, ?HttpCompressorInterface $compressor): array
     {
@@ -180,20 +167,9 @@ final class HttpClientCore
             return [$body, $extraHeaders];
         }
 
-        if ($compressor !== null) {
-            // A configured compressor has no built-in size gate of its own (unlike
-            // Compression::maybeCompress() below), so it is applied here.
-            if (strlen($body) < Compression::MIN_COMPRESS_BYTES) {
-                return [$body, $extraHeaders];
-            }
-            $compressedBody = $compressor->compress($body);
-            if ($compressedBody === null) {
-                return [$body, $extraHeaders];
-            }
-            return [$compressedBody, self::withContentEncoding($extraHeaders, $compressor->contentEncoding())];
-        }
-
-        $compressed = Compression::maybeCompress($body);
+        $compressed = $compressor !== null
+            ? Compression::compressWith($body, [$compressor])
+            : Compression::maybeCompress($body);
         if ($compressed === null) {
             return [$body, $extraHeaders];
         }
@@ -203,8 +179,8 @@ final class HttpClientCore
     }
 
     /**
-     * Marks a body as compressed and drops any caller-set {@code Content-Length}, which describes the
-     * uncompressed body; the transport computes the real one.
+     * Sets {@code Content-Encoding} and drops a caller-set {@code Content-Length}, which describes the
+     * uncompressed body.
      *
      * @param array<string,string> $headers
      * @return array<string,string>
@@ -220,18 +196,14 @@ final class HttpClientCore
         return $headers;
     }
 
-    /**
-     * Case-insensitive check for a header key, since HTTP header names are case-insensitive.
-     *
-     * @param array<string,string> $headers
-     */
+    /** @param array<string,string> $headers */
     private static function hasHeader(array $headers, string $name): bool
     {
         return self::headerValue($headers, $name) !== null;
     }
 
     /**
-     * Case-insensitive lookup of a header value, {@code null} if the header is not set.
+     * The value of a header, or {@code null} if it is not set. Header names are compared case-insensitively.
      *
      * @param array<string,string> $headers
      */
@@ -245,7 +217,7 @@ final class HttpClientCore
         return null;
     }
 
-    /** Opens a live streaming response (single attempt, no retry). Used by log streaming. */
+    /** Opens a streaming response. Makes a single attempt. */
     public function stream(string $url): ResponseInterface
     {
         $request = $this->buildRequest('GET', $url, null, '', [], RequestPolicy::AUTHORIZATION_HEADER);
@@ -253,7 +225,7 @@ final class HttpClientCore
     }
 
     /**
-     * Builds a fully-prepared PSR-7 request with auth, User-Agent, content type and extra headers.
+     * Builds a PSR-7 request with the token, User-Agent, content type, and extra headers.
      *
      * @param array<string,string> $extraHeaders
      * @param string               $authorizationHeader the header that carries the token
@@ -296,7 +268,6 @@ final class HttpClientCore
         RequestPolicy $policy
     ): ResponseInterface {
         $request = $this->buildRequest($method, $url, $body, $contentType, $extraHeaders, $policy->authorizationHeader);
-        // `call()` has already checked that a transport asked not to follow redirects can do that.
         if (!$policy->followRedirects && $this->transport instanceof NoRedirectHttpClientInterface) {
             return $this->transport->sendWithoutRedirects($request, $timeoutSecs, $policy->stream);
         }
@@ -305,14 +276,7 @@ final class HttpClientCore
             : $this->transport->send($request, $timeoutSecs);
     }
 
-    /**
-     * Returns {@code min(cap, base * TIMEOUT_BACKOFF_FACTOR^(attempt-1))}: the first attempt uses the
-     * base timeout; each retry scales it up by {@see TIMEOUT_BACKOFF_FACTOR} (a slow-but-progressing
-     * connection gets more time) while never exceeding {@code $cap} — the configured {@code
-     * timeoutMaxSecs} ({@see TimeoutTiers::$maxSecs}), which defaults to the legacy overall {@code
-     * timeoutSecs} when not explicitly raised, so a tier/per-call timeout above the legacy default
-     * still grows and is honored rather than being silently clipped back down to it.
-     */
+    /** The timeout of an attempt: the base timeout, scaled up on each retry and capped at {@code timeoutMaxSecs}. */
     private function attemptTimeout(float $base, int $attempt): float
     {
         $cap = $this->retry->timeoutTiers->maxSecs;
@@ -340,7 +304,7 @@ final class HttpClientCore
         return $status === self::RATE_LIMIT_EXCEEDED || $status >= self::MIN_SERVER_ERROR;
     }
 
-    /** Returns a delay chosen randomly from {@code [delay, 2*delay)} (exponential backoff + jitter). */
+    /** A random delay in {@code [delay, 2*delay)}, so retries do not arrive in lockstep. */
     private function randomizedDelayMillis(float $delayMillis): float
     {
         if ($delayMillis <= 0) {
@@ -358,10 +322,8 @@ final class HttpClientCore
     }
 
     /**
-     * Maps an HTTP status code to the {@see ApifyApiException} subclass that represents it, mirroring
-     * the reference client's {@code ApifyApiError.fromResponse()}. Any status with no dedicated
-     * subclass below (and no 5xx) stays a plain {@see ApifyApiException}, so {@code instanceof
-     * ApifyApiException} keeps matching every error regardless of status.
+     * The exception class of each status. Other statuses give {@see ServerException} from 500 up and a plain
+     * {@see ApifyApiException} below.
      *
      * @var array<int,class-string<ApifyApiException>>
      */
@@ -374,7 +336,7 @@ final class HttpClientCore
         429 => RateLimitException::class,
     ];
 
-    /** Builds an {@see ApifyApiException} (or the subclass matching the status) from an API error response body. */
+    /** Builds the exception for an API error response. */
     public static function buildApiError(int $status, string $body, int $attempt, string $method, string $path): ApifyApiException
     {
         $type = null;
@@ -403,7 +365,7 @@ final class HttpClientCore
         return new $exceptionClass($status, $type, $message, $attempt, $method, $path, $data);
     }
 
-    /** Returns the path+query portion of a URL, for error reporting. */
+    /** The path and query of a URL, for error messages. */
     public static function extractPath(string $url): string
     {
         $rest = $url;
@@ -415,15 +377,7 @@ final class HttpClientCore
         return $slash !== false ? substr($rest, $slash) : '';
     }
 
-    /**
-     * Reports whether an exception represents a "resource not found" API error — any HTTP 404,
-     * whatever its machine-readable {@code type}. Matches the reference client's {@code
-     * catchNotFoundOrThrow()}, which checks only {@code instanceof NotFoundError}: earlier versions of
-     * both clients swallowed only the {@code record-not-found}/{@code record-or-token-not-found} types
-     * (plus every HEAD request), which meant a 404 with any other type — for example on an endpoint
-     * added after that type list was written — incorrectly propagated as an error instead of resolving
-     * to "not found" like every other 404.
-     */
+    /** Whether the exception is an API error with status 404, whatever its type. */
     public static function isNotFound(Throwable $e): bool
     {
         return $e instanceof ApifyApiException && $e->getStatusCode() === self::NOT_FOUND;

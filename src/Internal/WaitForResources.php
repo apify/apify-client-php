@@ -8,27 +8,17 @@ use Apify\Client\Exception\ApifyApiException;
 use InvalidArgumentException;
 
 /**
- * Backs the {@code waitForResources} option of {@see \Apify\Client\Resource\ActorClient::start()}/
- * {@code call()} and {@see \Apify\Client\Resource\TaskClient::start()}/{@code call()}: retries a run
- * start that the API rejects for lack of account resources, mirroring the reference client's
- * {@code startWaitingForResources}.
+ * Retries a run start that the API rejects for lack of account resources. Backs the {@code waitForResources}
+ * option of the Actor and task {@code start()} and {@code call()}.
  *
  * @internal
  */
 final class WaitForResources
 {
-    /**
-     * Error types the API rejects a run start with while the account has no free memory or
-     * concurrent-run slot for it. Both clear as other runs or builds finish.
-     */
+    /** The errors for a start that finds no free memory or concurrent run slot. Both clear as other runs finish. */
     private const RESOURCE_LIMIT_ERROR_TYPES = ['actor-memory-limit-exceeded', 'concurrent-runs-limit-exceeded'];
 
-    /**
-     * Cooldown between two attempts to start a run that was rejected for lack of resources. Real
-     * callers ({@see \Apify\Client\Resource\ActorClient}/{@see \Apify\Client\Resource\TaskClient}) use
-     * this default; {@see start()}'s {@code $cooldownSecs} parameter exists only so tests can shrink it
-     * instead of making the suite sleep through real 10-second cooldowns.
-     */
+    /** Seconds between two attempts. {@see start()} takes its own value so tests need not wait. */
     public const COOLDOWN_SECS = 10.0;
 
     private function __construct()
@@ -36,16 +26,15 @@ final class WaitForResources
     }
 
     /**
-     * Calls {@code $start}, retrying it every {@code $cooldownSecs} while it fails with an {@see
-     * ApifyApiException} of one of {@see RESOURCE_LIMIT_ERROR_TYPES}. {@code true} retries until the
-     * call succeeds; a number of seconds bounds the retrying, after which the last error is thrown;
-     * {@code null}/{@code false} makes exactly one attempt. Any other error is thrown right away.
+     * Calls {@code $start}, retrying every {@code $cooldownSecs} while it fails with one of
+     * {@see RESOURCE_LIMIT_ERROR_TYPES}. {@code true} retries until it succeeds, a number of seconds for that
+     * long, then the last error is thrown. {@code null} and {@code false} make one attempt. Any other error is
+     * thrown at once.
      *
      * @template T
      * @param callable():T $start
-     * @throws InvalidArgumentException if {@code $waitForResources} is a negative number
-     * @throws ApifyApiException the last rejection, once the retry budget is bounded and exhausted, or
-     *         immediately for any error that is not a resource-limit rejection
+     * @throws InvalidArgumentException if {@code $waitForResources} is negative
+     * @throws ApifyApiException the last rejection once a bounded retry is exhausted, or any other error
      * @return T
      */
     public static function start(callable $start, bool|int|null $waitForResources, float $cooldownSecs = self::COOLDOWN_SECS): mixed

@@ -61,10 +61,7 @@ final class Actor extends ApifyResource
         return $this->getString('modifiedAt');
     }
 
-    /**
-     * The URL for sending requests to the Actor in Standby mode (a Server Actor), or {@code null} if Standby
-     * mode is not enabled.
-     */
+    /** The URL for sending requests to the Server Actor, or {@code null} if it has no server interface. */
     public function getStandbyUrl(): ?string
     {
         return $this->getString('standbyUrl');
