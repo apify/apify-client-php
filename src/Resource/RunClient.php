@@ -156,7 +156,10 @@ final class RunClient
     /**
      * Charges for events of a pay-per-event Actor run.
      *
-     * The request always carries an idempotency key, so a retried charge is applied once.
+     * Call it from the Actor run itself, with a client that uses the token the run received in its
+     * {@code APIFY_TOKEN} environment variable. The request always carries an idempotency key, so a retried
+     * charge is applied once. To charge a request to a multi-tenant Server Actor, set
+     * {@see RunChargeOptions::$requestId} to the request's {@code X-Actor-Request-ID} header value.
      */
     public function charge(RunChargeOptions $options, int|float|string|null $timeoutSecs = null): void
     {

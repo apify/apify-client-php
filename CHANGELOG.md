@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1
+
+- Synced with Apify OpenAPI spec `v2-2026-11-10T140017Z`, which only changes descriptions.
+- Documented that `RunClient::charge()` is called from the Actor run with the `APIFY_TOKEN` of the run, and how to charge a multi-tenant Server Actor request.
+- Documented that the Console shows an API token only once.
+
 ## 0.14.0
 
 - Synced with Apify OpenAPI spec `v2-2026-11-09T143926Z`: `zstd` is a documented `Content-Encoding`.
