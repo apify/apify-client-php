@@ -26,7 +26,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun`: `$input` is as for `ActorClient::start()`.
 - `reboot(): ActorRun`
 - `resurrect(?RunResurrectOptions $options = null): ActorRun`
-- `charge(RunChargeOptions $options): void`: for pay-per-event Actors.
+- `charge(RunChargeOptions $options): void`: for pay-per-event Actors. Call it from the Actor run itself, with the token the run received in `APIFY_TOKEN`. For a multi-tenant Server Actor, set `requestId` to the request's `X-Actor-Request-ID` header value.
 - `waitForFinish(?int $waitSecs = null, int|float|string|null $timeoutSecs = null): ActorRun`: `$timeoutSecs` is the timeout of each poll request (default `'noTimeout'`).
 - `dataset(): DatasetClient`, `keyValueStore(): KeyValueStoreClient`, `requestQueue(): RequestQueueClient`: a 404 from `get()` or `delete()` is thrown, since the client cannot tell a missing run from a missing storage.
 - `iterateDatasetItems(?RunIterateDatasetItemsOptions $options = null, int|float|string|null $timeoutSecs = null): Generator`: lazily yields the items of the default dataset while the run is producing them, and returns when the run has finished and the dataset is drained. `$timeoutSecs` is the timeout of each request, polls included (default: the `long` tier). See [below](#reading-a-dataset-while-the-run-is-running).

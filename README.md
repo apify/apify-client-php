@@ -34,7 +34,8 @@ echo 'Item count: ' . $items->getCount() . PHP_EOL;
 ```
 
 The client does not read `APIFY_TOKEN`. Pass it yourself, for example `new ApifyClient(getenv('APIFY_TOKEN'))`.
-You can find your token in [Apify Console → Settings → API & Integrations](https://console.apify.com/settings/integrations).
+You can create a token in [Apify Console → Settings → API & Integrations](https://console.apify.com/settings/integrations).
+Apify Console shows a token only once, right after you create or rotate it, so store it somewhere safe.
 
 ## Configuration
 
