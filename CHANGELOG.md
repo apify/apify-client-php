@@ -2,11 +2,10 @@
 
 ## 0.14.1
 
-- Synced with Apify OpenAPI spec `v2-2026-11-18T151559Z`: a user fetched with a proxy password has only `plan.availableProxyGroups`, `effectivePlatformFeatures` and `isPaying`, and a schedule's `uiState` can be `null`. Earlier spec changes since `v2-2026-11-09T143926Z` only change descriptions and tags.
-- Documented that `RunClient::charge()` is called from the Actor run with the `APIFY_TOKEN` of the run, and how to charge a multi-tenant Server Actor request.
-- Documented that Apify Console shows an API token only once.
-- Documented that `RunClient::metamorph()` needs the run's own token, and that `UserClient::get()` returns reduced data for a proxy password.
-- Added integration tests for `metamorph()` with the run's own token, and a unit test for a user fetched with a proxy password.
+- Synced with Apify OpenAPI spec `v2-2026-11-18T151559Z`: `UserClient::get()` returns only `plan.availableProxyGroups`, `effectivePlatformFeatures` and `isPaying` for a proxy password.
+- Documented that `RunClient::metamorph()` and `RunClient::charge()` need the run's own token.
+- Documented that Apify Console shows an API token only once, and that a schedule's `uiState` can be `null`.
+- Added a `metamorph()` integration test and a unit test for a user fetched with a proxy password.
 
 ## 0.14.0
 

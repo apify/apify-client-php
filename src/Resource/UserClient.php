@@ -23,7 +23,9 @@ final class UserClient
     }
 
     /**
-     * Fetches the user: the private account details for {@code me}, the public profile for others. Returns
+     * Fetches the user: the public profile, plus the private account details for {@code me} and for a user ID
+     * fetched with a token of that account. A token with limited permissions never gets the private details, and
+     * {@code me} omits {@code plan}, {@code email} and {@code profile} when called from an Actor run. Returns
      * {@code null} if the user does not exist. With a proxy password as the token, the API returns only
      * {@code plan.availableProxyGroups}, {@code effectivePlatformFeatures} and {@code isPaying}, so
      * {@see User::getId()} and {@see User::getUsername()} are {@code null}; read the fields from {@see User::toArray()}.

@@ -146,7 +146,7 @@ final class SpecSyncTest extends TestCase
     {
         // The API returns only the fields Apify Proxy reads when the caller authenticates with a proxy password.
         $proxyInfo = [
-            'plan' => ['availableProxyGroups' => ['GOOGLE_SERP']],
+            'plan' => ['availableProxyGroups' => ['GOOGLE_SERP' => 200]],
             'effectivePlatformFeatures' => [],
             'isPaying' => true,
         ];
@@ -157,7 +157,7 @@ final class SpecSyncTest extends TestCase
         self::assertNotNull($user);
         self::assertNull($user->getId());
         self::assertNull($user->getUsername());
-        self::assertSame(['GOOGLE_SERP'], $user->toArray()['plan']['availableProxyGroups']);
+        self::assertSame(200, $user->toArray()['plan']['availableProxyGroups']['GOOGLE_SERP']);
         self::assertTrue($user->get('isPaying'));
     }
 
