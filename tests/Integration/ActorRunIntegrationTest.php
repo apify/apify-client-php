@@ -16,14 +16,20 @@ use Apify\Client\Resource\RunCollectionClient;
 
 final class ActorRunIntegrationTest extends IntegrationTestCase
 {
+    /** Memory of the metamorph Actor run, enough for a script that makes one request. */
     private const METAMORPH_RUN_MEMORY_MBYTES = 256;
+    /** Timeout of the metamorph run. It must exceed {@see METAMORPH_ACTOR_WAIT_SECS} plus the hello-world run. */
     private const METAMORPH_RUN_TIMEOUT_SECS = 300;
     /** How long the metamorph Actor waits after storing its token. */
     private const METAMORPH_ACTOR_WAIT_SECS = 240;
+    /** How long the test polls for the stored token. It must stay below {@see METAMORPH_ACTOR_WAIT_SECS}, or the run could end first. */
+    private const METAMORPH_TOKEN_POLL_BUDGET_SECS = 120;
+    /** Seconds between two reads of the stored token. */
     private const METAMORPH_TOKEN_POLL_SECS = 2;
-    /** The polling budget (120 seconds) is shorter than the wait of the Actor, so the run is still alive when the token is read. */
-    private const METAMORPH_TOKEN_MAX_ATTEMPTS = 60;
-    private const METAMORPH_FINISH_WAIT_SECS = 60;
+    /** How long hello-world, which replaces the waiting Actor, gets to finish the run after the metamorph. */
+    private const METAMORPH_HELLO_WORLD_WAIT_SECS = 300;
+    /** How long the cleanup waits for an aborted run to finish. */
+    private const METAMORPH_ABORT_WAIT_SECS = 60;
 
     public function testListRuns(): void
     {
@@ -173,10 +179,11 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
             $runId = (string) $run->getId();
             $runClient = $client->run($runId);
             try {
-                $tokenRecord = $client->keyValueStore((string) $run->getDefaultKeyValueStoreId());
+                $store = $client->keyValueStore((string) $run->getDefaultKeyValueStoreId());
                 $runToken = null;
-                for ($attempt = 1; $attempt <= self::METAMORPH_TOKEN_MAX_ATTEMPTS && $runToken === null; $attempt++) {
-                    $runToken = $tokenRecord->getRecord('TOKEN')?->getValue();
+                $maxAttempts = intdiv(self::METAMORPH_TOKEN_POLL_BUDGET_SECS, self::METAMORPH_TOKEN_POLL_SECS);
+                for ($attempt = 1; $attempt <= $maxAttempts && $runToken === null; $attempt++) {
+                    $runToken = $store->getRecord('TOKEN')?->getValue();
                     if ($runToken === null) {
                         self::assertContains($runClient->get()?->getStatus(), ['READY', 'RUNNING'], 'The run ended without storing its token.');
                         sleep(self::METAMORPH_TOKEN_POLL_SECS);
@@ -184,14 +191,14 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
                 }
                 self::assertNotEmpty($runToken, 'The run did not store its token in time.');
                 // The token must not stay in storage.
-                $tokenRecord->deleteRecord('TOKEN');
+                $store->deleteRecord('TOKEN');
 
                 $metamorphed = $this->requireClient(token: $runToken)->run($runId)
                     ->metamorph('apify/hello-world', ['message' => 'Hello from metamorph!']);
                 self::assertSame($runId, $metamorphed->getId());
 
                 // Hello-world replaces the waiting Actor, so the run finishes on its own.
-                $finished = $runClient->waitForFinish(self::METAMORPH_FINISH_WAIT_SECS);
+                $finished = $runClient->waitForFinish(self::METAMORPH_HELLO_WORLD_WAIT_SECS);
                 self::assertSame('SUCCEEDED', $finished->getStatus());
                 $helloWorldId = $client->actor('apify/hello-world')->get()?->getId();
                 self::assertNotNull($helloWorldId);
@@ -202,7 +209,7 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
             } finally {
                 // Aborting a finished run returns it unchanged.
                 $runClient->abort();
-                $runClient->waitForFinish(self::METAMORPH_FINISH_WAIT_SECS);
+                $runClient->waitForFinish(self::METAMORPH_ABORT_WAIT_SECS);
                 $runClient->delete();
             }
         } finally {
