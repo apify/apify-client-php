@@ -142,6 +142,25 @@ final class SpecSyncTest extends TestCase
         self::assertArrayHasKey('uiState', $schedule->toArray());
     }
 
+    public function testUserFetchedWithAProxyPasswordHasNoIdOrUsername(): void
+    {
+        // The API returns only the fields Apify Proxy reads when the caller authenticates with a proxy password.
+        $proxyInfo = [
+            'plan' => ['availableProxyGroups' => ['GOOGLE_SERP']],
+            'effectivePlatformFeatures' => [],
+            'isPaying' => true,
+        ];
+        $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => $proxyInfo]));
+
+        $user = $this->client($transport)->me()->get();
+
+        self::assertNotNull($user);
+        self::assertNull($user->getId());
+        self::assertNull($user->getUsername());
+        self::assertSame(['GOOGLE_SERP'], $user->toArray()['plan']['availableProxyGroups']);
+        self::assertTrue($user->get('isPaying'));
+    }
+
     public function testPendingStoredRequestWithANullHandledAtIsReadAsIs(): void
     {
         $transport = (new MockTransport())->queueResponse(200, Json::encode(['data' => [

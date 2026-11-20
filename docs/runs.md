@@ -23,7 +23,7 @@ An Actor's or task's runs are available at `$client->actor($id)->runs()` / `$cli
 - `update(mixed $newFields): ActorRun`
 - `delete(): void`
 - `abort(?bool $gracefully = null): ActorRun`: with `$gracefully` `true`, the run can finish its current request first. `false` and `null` (the default) abort at once.
-- `metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun`: `$input` is as for `ActorClient::start()`.
+- `metamorph(string $targetActorId, mixed $input = null, ?MetamorphOptions $options = null): ActorRun`: `$input` is as for `ActorClient::start()`. Only the run itself can metamorph: call it from the Actor run, with the token the run received in `APIFY_TOKEN`. Any other token is rejected.
 - `reboot(): ActorRun`
 - `resurrect(?RunResurrectOptions $options = null): ActorRun`
 - `charge(RunChargeOptions $options): void`: for pay-per-event Actors. Call it from the Actor run itself, with the token the run received in `APIFY_TOKEN`. For a multi-tenant Server Actor, set `requestId` to the request's `X-Actor-Request-ID` header value.

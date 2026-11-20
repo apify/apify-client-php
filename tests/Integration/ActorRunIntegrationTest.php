@@ -6,6 +6,7 @@ namespace Apify\Client\Tests\Integration;
 
 use Apify\Client\ApifyClient;
 use Apify\Client\Internal\UrlNormalizer;
+use Apify\Client\Options\ActorStartOptions;
 use Apify\Client\Options\DatasetListItemsOptions;
 use Apify\Client\Options\LastRunOptions;
 use Apify\Client\Options\ListOptions;
@@ -132,6 +133,61 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
             self::assertContains($statusWhenReceived[0], ['READY', 'RUNNING']);
             self::assertTrue($runClient->get()?->isTerminal());
         } finally {
+            $client->actor($actorId)->delete();
+        }
+    }
+
+    public function testMetamorphWithTheRunsOwnTokenTransformsTheRunKeepingItsId(): void
+    {
+        $client = $this->requireClient();
+        // An Actor that stores its run token under `TOKEN` in its key-value store, then waits for 240 seconds.
+        $script = <<<'JS'
+            const base = (process.env.APIFY_API_PUBLIC_BASE_URL || 'https://api.apify.com').replace(/\/$/, '');
+            const url = `${base}/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/TOKEN?token=${process.env.APIFY_TOKEN}`;
+            (async () => {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'content-type': 'text/plain' },
+                    body: process.env.APIFY_TOKEN,
+                });
+                if (!response.ok) throw new Error(`storing the token failed: ${response.status}`);
+                await new Promise((resolve) => setTimeout(resolve, 240000));
+            })();
+            JS;
+        $actorId = $this->createBuiltActor($client, 'metamorph', $script);
+        $runId = null;
+        try {
+            $run = $client->actor($actorId)->start(null, new ActorStartOptions(memoryMbytes: 256, timeoutSecs: 300));
+            $runId = (string) $run->getId();
+            $runClient = $client->run($runId);
+
+            // The token is read well within the 240 seconds the Actor waits after storing it.
+            $runToken = null;
+            for ($attempt = 1; $attempt <= 60 && $runToken === null; $attempt++) {
+                $runToken = $client->keyValueStore((string) $run->getDefaultKeyValueStoreId())->getRecord('TOKEN')?->getValue();
+                if ($runToken === null) {
+                    self::assertContains($runClient->get()?->getStatus(), ['READY', 'RUNNING'], 'The run ended without storing its token.');
+                    sleep(2);
+                }
+            }
+            self::assertNotEmpty($runToken, 'The run did not store its token in time.');
+
+            $metamorphed = $this->requireClient(token: $runToken)->run($runId)->metamorph('apify/hello-world', ['message' => 'Hello from metamorph!']);
+            self::assertSame($runId, $metamorphed->getId());
+
+            // Hello-world replaces the waiting Actor, so the run finishes on its own.
+            $finished = $runClient->waitForFinish(300);
+            self::assertSame('SUCCEEDED', $finished->getStatus());
+            self::assertIsArray($finished->get('metamorphs'));
+            self::assertCount(1, $finished->get('metamorphs'));
+        } finally {
+            if ($runId !== null) {
+                $runClient = $client->run($runId);
+                // Aborting a finished run returns it unchanged.
+                $runClient->abort();
+                $runClient->waitForFinish(60);
+                $runClient->delete();
+            }
             $client->actor($actorId)->delete();
         }
     }

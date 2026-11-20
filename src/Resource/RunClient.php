@@ -107,7 +107,9 @@ final class RunClient
     }
 
     /**
-     * Transforms the run into a run of another Actor with a new input.
+     * Transforms the run into a run of another Actor with a new input. Only the run itself can metamorph: the client
+     * must use the run's own API token, which the run gets in the {@code APIFY_TOKEN} environment variable. With any
+     * other token, the API rejects the request.
      *
      * @param string $targetActorId the Actor to metamorph into
      * @param mixed  $input         the new input: a JSON-serializable value, a string sent as it is (set a
