@@ -45,18 +45,22 @@ abstract class IntegrationTestCase extends TestCase
     private const LISTING_MAX_ATTEMPTS = 30;
     private const LISTING_RETRY_DELAY_SECS = 3;
 
-    /** Returns a configured client, or skips the test if {@code APIFY_TOKEN} is unset. */
+    /**
+     * Returns a configured client, or skips the test if {@code APIFY_TOKEN} is unset. The client uses
+     * {@code $token} instead of {@code APIFY_TOKEN} if given, for example the token of an Actor run.
+     */
     protected function requireClient(
         string|HttpCompressorInterface|null $compression = null,
         ?HttpClientInterface $httpClient = null,
+        ?string $token = null,
     ): ApifyClient {
-        $token = getenv('APIFY_TOKEN');
-        if ($token === false || $token === '') {
+        $envToken = getenv('APIFY_TOKEN');
+        if ($envToken === false || $envToken === '') {
             self::markTestSkipped('skipping: APIFY_TOKEN is not set');
         }
         $apiUrl = getenv('APIFY_API_URL');
         return new ApifyClient(
-            token: $token,
+            token: $token ?? $envToken,
             baseUrl: self::resolveBaseUrl($apiUrl === false ? null : $apiUrl),
             httpClient: $httpClient,
             compression: $compression,

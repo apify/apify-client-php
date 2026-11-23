@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1
+
+- Synced with Apify OpenAPI spec `v2-2026-11-18T151559Z`: `UserClient::get()` returns only `plan.availableProxyGroups`, `effectivePlatformFeatures` and `isPaying` for a proxy password.
+- Documented that `RunClient::metamorph()` and `RunClient::charge()` need the run's own token.
+- Documented that Apify Console shows an API token only once, and that a schedule's `uiState` can be `null`.
+- Added a `metamorph()` integration test and a unit test for a user fetched with a proxy password.
+
 ## 0.14.0
 
 - Synced with Apify OpenAPI spec `v2-2026-11-09T143926Z`: `zstd` is a documented `Content-Encoding`.

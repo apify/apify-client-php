@@ -96,6 +96,8 @@ kept as received.
 | `getCronExpression(): ?string` | The cron expression that triggers the schedule. |
 | `isEnabled(): ?bool` | Whether the schedule is enabled. |
 
+The `uiState` field in `toArray()` is `null` after an API update changes the cron expression or timezone.
+
 ### `Webhook`
 | Getter | Description |
 |---|---|
@@ -116,7 +118,7 @@ kept as received.
 | `getId(): ?string` | The user ID. |
 | `getUsername(): ?string` | The username. |
 
-Private account details (plan, email, etc.) returned by `me()->get()` are available via `toArray()`.
+Private account details (plan, email, etc.) are available via `toArray()` for `me()` and for a user ID fetched with a token of that account. A proxy password gets only `plan.availableProxyGroups`, `effectivePlatformFeatures` and `isPaying`, so the ID and username are `null`.
 
 ### `ActorStoreListItem`
 Returned when listing/iterating the Apify Store.

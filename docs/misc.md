@@ -22,7 +22,7 @@ foreach ($client->store()->iterate(new StoreListOptions(search: 'scraper'), 50) 
 
 ## Users — `$client->me()` / `$client->user($id)`
 
-- `get(): ?User`: for `me()`, the private account details are in `toArray()`.
+- `get(): ?User`: the private account details, such as the plan and email, are in `toArray()` for `me()` and for a user ID fetched with a token of that account. A token with limited permissions never gets them, and `me()` omits `plan`, `email` and `profile` when called from an Actor run. With a proxy password as the token, the API returns only `plan.availableProxyGroups`, `effectivePlatformFeatures` and `isPaying`, so `getId()` and `getUsername()` are `null`.
 - `monthlyUsage(?string $date = null): array`: the monthly usage of the cycle that contains `$date` (`YYYY-MM-DD`), by default the current month.
 - `limits(): array`, `updateLimits(mixed $newLimits): void`: the account limits. These three methods work for `me()` and for any user ID the token may access.
 

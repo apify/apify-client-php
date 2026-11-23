@@ -107,7 +107,9 @@ final class RunClient
     }
 
     /**
-     * Transforms the run into a run of another Actor with a new input.
+     * Transforms the run into a run of another Actor with a new input. Only the run itself can metamorph: the client
+     * must use the run's own API token, which the run gets in the {@code APIFY_TOKEN} environment variable. With any
+     * other token, the API rejects the request.
      *
      * @param string $targetActorId the Actor to metamorph into
      * @param mixed  $input         the new input: a JSON-serializable value, a string sent as it is (set a
@@ -156,7 +158,10 @@ final class RunClient
     /**
      * Charges for events of a pay-per-event Actor run.
      *
-     * The request always carries an idempotency key, so a retried charge is applied once.
+     * Call it from the Actor run itself, with a client that uses the token the run received in its
+     * {@code APIFY_TOKEN} environment variable. The request always carries an idempotency key, so a retried
+     * charge is applied once. To charge a request to a multi-tenant Server Actor, set
+     * {@see RunChargeOptions::$requestId} to the request's {@code X-Actor-Request-ID} header value.
      */
     public function charge(RunChargeOptions $options, int|float|string|null $timeoutSecs = null): void
     {
