@@ -30,10 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Set up PHP (with brotli and zstd)
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.40.0
         with:
           php-version: '8.1'
           extensions: mbstring, json, curl, zlib, brotli, zstd
@@ -61,10 +61,10 @@ jobs:
     environment: tests
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Set up PHP (with zstd)
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.40.0
         with:
           php-version: '8.1'
           extensions: mbstring, json, curl, zlib, zstd
@@ -98,10 +98,10 @@ jobs:
     environment: tests
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.40.0
         with:
           php-version: '8.1'
           # intl is optional, and loaded so that the punycode test runs.
