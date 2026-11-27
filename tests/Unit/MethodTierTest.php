@@ -29,7 +29,8 @@ final class MethodTierTest extends TestCase
         yield 'Actor env var list' => [static fn (ApifyClient $c) => $c->actor('a')->version('0.1')->envVars()->list(), self::SHORT, self::PAGE_BODY];
         yield 'Actor env var create' => [static fn (ApifyClient $c) => $c->actor('a')->version('0.1')->envVars()->create(new ActorEnvVar('N', 'v')), self::SHORT, self::ITEM_BODY];
         yield 'Actor version list' => [static fn (ApifyClient $c) => $c->actor('a')->versions()->list(), self::SHORT, self::PAGE_BODY];
-        yield 'Actor version create' => [static fn (ApifyClient $c) => $c->actor('a')->versions()->create(['versionNumber' => '0.1']), self::SHORT, self::ITEM_BODY];
+        yield 'Actor version create' => [static fn (ApifyClient $c) => $c->actor('a')->versions()->create(['versionNumber' => '0.1']), self::LONG, self::ITEM_BODY];
+        yield 'Actor version update' => [static fn (ApifyClient $c) => $c->actor('a')->version('0.1')->update(['buildTag' => 'latest']), self::LONG, self::ITEM_BODY];
         yield 'Dataset getOrCreate' => [static fn (ApifyClient $c) => $c->datasets()->getOrCreate('d'), self::SHORT, self::ITEM_BODY];
         yield 'Key-value store getOrCreate' => [static fn (ApifyClient $c) => $c->keyValueStores()->getOrCreate('s'), self::SHORT, self::ITEM_BODY];
         yield 'Request queue getOrCreate' => [static fn (ApifyClient $c) => $c->requestQueues()->getOrCreate('q'), self::SHORT, self::ITEM_BODY];

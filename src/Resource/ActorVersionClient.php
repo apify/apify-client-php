@@ -31,13 +31,14 @@ final class ActorVersionClient
     }
 
     /**
-     * Updates the version and returns it.
+     * Updates the version and returns it. The default timeout is the {@code long} tier, since the version can
+     * carry its source files.
      *
      * @param mixed $newFields any JSON-serializable fields
      */
     public function update(mixed $newFields, int|float|string|null $timeoutSecs = null): ActorVersion
     {
-        return new ActorVersion($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
+        return new ActorVersion($this->ctx->updateResource('', $newFields, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)));
     }
 
     /** Deletes the version. */

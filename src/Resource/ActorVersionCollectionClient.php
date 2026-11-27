@@ -46,12 +46,13 @@ final class ActorVersionCollectionClient
     }
 
     /**
-     * Creates a version of the Actor.
+     * Creates a version of the Actor. The default timeout is the {@code long} tier, since the version can carry
+     * its source files.
      *
      * @param mixed $version any JSON-serializable version definition
      */
     public function create(mixed $version, int|float|string|null $timeoutSecs = null): ActorVersion
     {
-        return new ActorVersion($this->ctx->createResource(new QueryParams(), $version, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_SHORT)));
+        return new ActorVersion($this->ctx->createResource(new QueryParams(), $version, $this->ctx->resolveTimeout($timeoutSecs, TimeoutTiers::TIER_LONG)));
     }
 }
