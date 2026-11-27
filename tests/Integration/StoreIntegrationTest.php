@@ -31,6 +31,26 @@ final class StoreIntegrationTest extends IntegrationTestCase
         self::assertNotEmpty($schemas, 'at least one Store Actor carries its input schema');
     }
 
+    public function testListStoreAcceptsTheDeprecatedSortBy(): void
+    {
+        $client = $this->requireClient();
+        // The API accepts `sortBy` and ignores it, so the order is not asserted.
+        $page = $client->store()->list(new StoreListOptions(limit: 10, sortBy: 'popularity'));
+        self::assertNotEmpty($page->getItems());
+    }
+
+    public function testIterateStoreSearchReturnsOnePage(): void
+    {
+        $client = $this->requireClient();
+        $ids = [];
+        foreach ($client->store()->iterate(new StoreListOptions(search: 'website content crawler', limit: 20), 5) as $item) {
+            $ids[] = $item->getId();
+        }
+        self::assertNotEmpty($ids);
+        self::assertLessThanOrEqual(20, count($ids));
+        self::assertSame($ids, array_unique($ids), 'a search must not repeat its page');
+    }
+
     public function testIterateStore(): void
     {
         $client = $this->requireClient();

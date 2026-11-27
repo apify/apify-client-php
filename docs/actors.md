@@ -118,7 +118,8 @@ $response = $server->request('/search', new ActorServerRequestOptions(
 - Single: `get(): ?ActorVersion`, `update(mixed $newFields): ActorVersion`, `delete(): void`.
 
 The endpoint returns all versions in one response, so `list()` and `iterate()` take no options and `iterate()`
-makes one request.
+makes one request. `create()` and `update()` use the `long` timeout tier by default, since a version can carry its
+source files.
 
 ```php
 $version = $client->actor('me~my-actor')->versions()->create([

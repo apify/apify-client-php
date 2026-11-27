@@ -139,6 +139,7 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
             $statusWhenReceived = [];
             $items = [];
             foreach ($runClient->iterateDatasetItems(new RunIterateDatasetItemsOptions(pollIntervalSecs: 1)) as $item) {
+                /** @var array<string,mixed> $item */
                 $items[] = $item['n'];
                 $statusWhenReceived[] = $runClient->get()?->getStatus();
             }
@@ -223,6 +224,7 @@ final class ActorRunIntegrationTest extends IntegrationTestCase
      */
     private function createBuiltActor(ApifyClient $client, string $label, string $mainJs): string
     {
+        /** @var array{versions: list<array{sourceFiles: list<array<string,mixed>>}>} $definition */
         $definition = self::minimalActor(self::uniqueName($label));
         $definition['versions'][0]['sourceFiles'][1]['content'] = $mainJs;
         $actorId = (string) $client->actors()->create($definition)->getId();

@@ -64,7 +64,9 @@ final class ZstdCompressionIntegrationTest extends IntegrationTestCase
             self::waitForDatasetItemCount($items, 2);
             $stored = $items->listItems()->getItems();
             self::assertSame([1, 2], array_column($stored, 'n'));
-            self::assertSame($padding, $stored[0]['padding']);
+            /** @var array<string,mixed> $firstStored */
+            $firstStored = $stored[0];
+            self::assertSame($padding, $firstStored['padding']);
             self::assertContains('zstd', $this->recorder->encodings);
         } finally {
             $client->dataset((string) $dataset->getId())->delete();

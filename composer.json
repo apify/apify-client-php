@@ -1,6 +1,6 @@
 {
     "name": "apify/apify-client",
-    "description": "Official, experimental (AI-generated and AI-maintained) Apify API client for PHP: run Actors, manage storages (datasets, key-value stores, request queues), schedules, webhooks and more.",
+    "description": "Apify API client for PHP: run Actors, manage storages (datasets, key-value stores, request queues), schedules, webhooks and more.",
     "type": "library",
     "keywords": [
         "apify",

@@ -61,6 +61,7 @@ final class RunIterateDatasetItemsTest extends TestCase
     {
         $ids = [];
         foreach ($items as $item) {
+            /** @var array{id: int} $item */
             $ids[] = $item['id'];
         }
         return $ids;

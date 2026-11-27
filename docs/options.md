@@ -17,11 +17,11 @@ The offset-based options classes — `ListOptions`, `ActorListOptions`, `Storage
 
 It returns a copy of the options with the given `offset` and `limit`, preserving every other field.
 The `iterate()` helpers use it internally to request successive pages, but you can also call it to
-page manually through `list()` results — most useful for the Apify Store, whose collection is
-otherwise only pageable via `iterate()`:
+page manually through `list()` results, for example the Apify Store. A Store `search` is one page that ignores
+`offset`, so page by a filter such as `category`:
 
 ```php
-$options = new StoreListOptions(search: 'scraper');
+$options = new StoreListOptions(category: 'AI_AND_ML');
 for ($offset = 0; ; $offset += 100) {
     $page = $client->store()->list($options->withPagination($offset, 100));
     foreach ($page->getItems() as $item) {
@@ -80,11 +80,11 @@ Extra filters for `runs()->list()`, combined with a `ListOptions`.
 For `store()->list()` / `store()->iterate()`.
 | Field | Type | Description |
 |---|---|---|
-| `offset` | `?int` | Number of Actors to skip. |
-| `limit` | `?int` | Maximum number of Actors to return. When iterating, caps the total across all pages (the per-page size is `iterate()`'s separate `$chunkSize` argument). |
-| `search` | `?string` | Full-text search query. |
-| `sortBy` | `?string` | The sort field (e.g. `popularity`, `newest`). |
-| `category` | `?string` | Filter Actors by category. |
+| `offset` | `?int` | Number of Actors to skip. The API ignores it with `search`. |
+| `limit` | `?int` | Maximum number of Actors to return. When iterating, caps the total across all pages (the per-page size is `iterate()`'s separate `$chunkSize` argument). With `search`, the API returns at most 100. |
+| `search` | `?string` | Full-text search query. The API ranks the results by relevance and returns one page of at most 100 Actors. |
+| `sortBy` | `?string` | Deprecated: the API accepts it and ignores it. Sort the results on the client instead. |
+| `category` | `?string` | Filter Actors by one or more comma-separated category IDs, such as `AI_AND_ML`. An Actor must match all of them. |
 | `username` | `?string` | Filter Actors by owner username. |
 | `pricingModel` | `?string` | Filter by pricing model (`FREE`, `PRICE_PER_DATASET_ITEM`, `PAY_PER_EVENT`). |
 | `includeUnrunnableActors` | `?bool` | Include Actors the current user cannot run. |

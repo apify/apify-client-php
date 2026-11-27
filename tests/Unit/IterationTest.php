@@ -172,6 +172,23 @@ final class IterationTest extends TestCase
         self::assertStringContainsString('offset=2', (string) $transport->received[1]->getUri());
     }
 
+    public function testStoreSearchIsASinglePageThatIgnoresTheOffset(): void
+    {
+        // With `search` the API ignores the offset, so a second request would repeat the first page forever.
+        $transport = (new MockTransport())
+            ->queueResponse(200, self::pageWithCount(self::actors(1, 2), 2, 0));
+        $ids = [];
+        foreach ($this->client($transport)->store()->iterate(new StoreListOptions(search: 'scraper', limit: 50, offset: 7), 1) as $item) {
+            $ids[] = $item->getId();
+        }
+        self::assertSame(['a1', 'a2'], $ids);
+        self::assertSame(1, $transport->callCount());
+        $uri = (string) $transport->received[0]->getUri();
+        self::assertStringContainsString('search=scraper', $uri);
+        self::assertStringContainsString('limit=50', $uri);
+        self::assertStringNotContainsString('offset=', $uri);
+    }
+
     public function testLimitCapStopsBeforeExhaustingPages(): void
     {
         // limit=2 with a big first page: only 2 items are yielded and no second request is made.
@@ -208,6 +225,7 @@ final class IterationTest extends TestCase
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(null, 2) as $item) {
+            /** @var array<string,mixed> $item */
             $values[] = $item['n'];
         }
         self::assertSame([1, 2, 3], $values);
@@ -244,6 +262,7 @@ final class IterationTest extends TestCase
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(skipEmpty: true), 3) as $item) {
+            /** @var array<string,mixed> $item */
             $values[] = $item['n'];
         }
         self::assertSame([0, 1, 3, 4, 5], $values);
@@ -279,6 +298,7 @@ final class IterationTest extends TestCase
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(unwind: ['parts']), 2) as $item) {
+            /** @var array<string,mixed> $item */
             $values[] = $item['n'];
         }
         self::assertSame(range(0, 11), $values);

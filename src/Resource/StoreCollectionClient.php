@@ -40,16 +40,32 @@ final class StoreCollectionClient
      * Lazily yields Store Actors matching the options. The {@code limit} option caps the total ({@code null} for all) and
      * {@code $chunkSize} sets the page size ({@code null} for the API's default).
      *
+     * With {@code search}, the API ignores {@code offset} and returns one page of at most 100 Actors, so this makes
+     * one request with the {@code limit} option and ignores {@code $chunkSize}.
+     *
      * @return Generator<int,ActorStoreListItem>
      */
     public function iterate(?StoreListOptions $options = null, ?int $chunkSize = null, int|float|string|null $timeoutSecs = null): Generator
     {
         $options ??= new StoreListOptions();
+        if ($options->search !== null && $options->search !== '') {
+            return $this->iterateSearchPage($options, $timeoutSecs);
+        }
         return ResourceContext::paginateOffset(
             $options->offset ?? 0,
             $options->limit,
             $chunkSize,
             fn (int $offset, ?int $pageLimit) => $this->list($options->withPagination($offset, $pageLimit), $timeoutSecs),
         );
+    }
+
+    /**
+     * Yields the single page of a search, which the API cannot continue with an offset.
+     *
+     * @return Generator<int,ActorStoreListItem>
+     */
+    private function iterateSearchPage(StoreListOptions $options, int|float|string|null $timeoutSecs): Generator
+    {
+        yield from $this->list($options->withPagination(null, $options->limit), $timeoutSecs)->getItems();
     }
 }

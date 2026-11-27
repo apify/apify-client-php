@@ -10,18 +10,23 @@ use Apify\Client\Internal\QueryParams;
 final class StoreListOptions
 {
     public function __construct(
-        /** Number of Actors to skip. */
+        /** Number of Actors to skip. The API ignores it with {@code search}. */
         public readonly ?int $offset = null,
         /**
          * The maximum number of Actors. When iterating, it caps the total over all pages, not the page size
-         * ({@code chunkSize}).
+         * ({@code chunkSize}). With {@code search}, the API returns at most 100.
          */
         public readonly ?int $limit = null,
-        /** Full-text search query. */
+        /** Full-text search query. The API ranks the results by relevance and returns one page of at most 100 Actors. */
         public readonly ?string $search = null,
-        /** The sort field (e.g. {@code "popularity"}, {@code "newest"}). */
+        /**
+         * The sort field.
+         *
+         * @deprecated The API ignores it. Results are ordered by relevance with {@code search} and by Store position
+         * otherwise, so sort them on the client.
+         */
         public readonly ?string $sortBy = null,
-        /** Filter Actors by category. */
+        /** Filter Actors by one or more comma-separated category IDs, such as {@code AI_AND_ML}. An Actor must match all of them. */
         public readonly ?string $category = null,
         /** Filter Actors by owner username. */
         public readonly ?string $username = null,

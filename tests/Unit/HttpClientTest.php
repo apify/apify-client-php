@@ -256,7 +256,9 @@ final class HttpClientTest extends TestCase
 
         self::assertSame(42, $page->getTotal());
         self::assertSame(3, $page->getCount());
-        self::assertSame(1, $page->getItems()[0]['n']);
+        /** @var array<string,mixed> $first */
+        $first = $page->getItems()[0];
+        self::assertSame(1, $first['n']);
         self::assertFalse($page->isDesc());
     }
 
