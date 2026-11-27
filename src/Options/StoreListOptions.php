@@ -20,10 +20,10 @@ final class StoreListOptions
         /** Full-text search query. The API ranks the results by relevance and returns one page of at most 100 Actors. */
         public readonly ?string $search = null,
         /**
-         * Deprecated: the API accepts it and ignores it. Results are ordered by relevance with {@code search} and by
-         * Store position otherwise, so sort them on the client.
+         * The sort field.
          *
-         * @deprecated
+         * @deprecated The API ignores it. Results are ordered by relevance with {@code search} and by Store position
+         * otherwise, so sort them on the client.
          */
         public readonly ?string $sortBy = null,
         /** Filter Actors by one or more comma-separated category IDs, such as {@code AI_AND_ML}. An Actor must match all of them. */

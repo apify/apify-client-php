@@ -15,6 +15,16 @@ final class UserIntegrationTest extends IntegrationTestCase
         self::assertNotSame('', $user->getId());
     }
 
+    public function testGetAccountById(): void
+    {
+        $client = $this->requireClient();
+        $id = $client->me()->get()?->getId();
+        self::assertNotNull($id);
+        $user = $client->user($id)->get();
+        self::assertNotNull($user);
+        self::assertSame($id, $user->getId());
+    }
+
     public function testGetMonthlyUsage(): void
     {
         $client = $this->requireClient();

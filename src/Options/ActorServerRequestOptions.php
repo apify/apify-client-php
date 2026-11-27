@@ -86,7 +86,10 @@ final class ActorServerRequestOptions
         }
     }
 
-    /** @param list<mixed> $values */
+    /**
+     * @param list<mixed> $values
+     * @phpstan-assert-if-true list<scalar> $values
+     */
     private static function isScalarList(array $values): bool
     {
         foreach ($values as $value) {

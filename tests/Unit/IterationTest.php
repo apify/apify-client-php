@@ -225,6 +225,7 @@ final class IterationTest extends TestCase
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(null, 2) as $item) {
+            /** @var array<string,mixed> $item */
             $values[] = $item['n'];
         }
         self::assertSame([1, 2, 3], $values);
@@ -261,6 +262,7 @@ final class IterationTest extends TestCase
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(skipEmpty: true), 3) as $item) {
+            /** @var array<string,mixed> $item */
             $values[] = $item['n'];
         }
         self::assertSame([0, 1, 3, 4, 5], $values);
@@ -296,6 +298,7 @@ final class IterationTest extends TestCase
             ]);
         $values = [];
         foreach ($this->client($transport)->dataset('ds')->iterateItems(new DatasetListItemsOptions(unwind: ['parts']), 2) as $item) {
+            /** @var array<string,mixed> $item */
             $values[] = $item['n'];
         }
         self::assertSame(range(0, 11), $values);

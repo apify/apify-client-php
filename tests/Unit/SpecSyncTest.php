@@ -157,7 +157,9 @@ final class SpecSyncTest extends TestCase
         self::assertNotNull($user);
         self::assertNull($user->getId());
         self::assertNull($user->getUsername());
-        self::assertSame(200, $user->toArray()['plan']['availableProxyGroups']['GOOGLE_SERP']);
+        /** @var array{plan: array{availableProxyGroups: array<string,int>}} $fields */
+        $fields = $user->toArray();
+        self::assertSame(200, $fields['plan']['availableProxyGroups']['GOOGLE_SERP']);
         self::assertTrue($user->get('isPaying'));
     }
 

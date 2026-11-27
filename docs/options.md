@@ -17,11 +17,11 @@ The offset-based options classes — `ListOptions`, `ActorListOptions`, `Storage
 
 It returns a copy of the options with the given `offset` and `limit`, preserving every other field.
 The `iterate()` helpers use it internally to request successive pages, but you can also call it to
-page manually through `list()` results — most useful for the Apify Store, whose collection is
-otherwise only pageable via `iterate()`:
+page manually through `list()` results, for example the Apify Store. A Store `search` is one page that ignores
+`offset`, so page by a filter such as `category`:
 
 ```php
-$options = new StoreListOptions(search: 'scraper');
+$options = new StoreListOptions(category: 'AI_AND_ML');
 for ($offset = 0; ; $offset += 100) {
     $page = $client->store()->list($options->withPagination($offset, 100));
     foreach ($page->getItems() as $item) {

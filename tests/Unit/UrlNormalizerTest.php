@@ -123,6 +123,7 @@ final class UrlNormalizerTest extends TestCase
             'notAString' => 5,
         ];
 
+        /** @var array{a: string, nested: array<string,string>, map: array<string,string>, notAString: int} $normalized */
         $normalized = UrlNormalizer::normalizeFields($data, ['a', 'nested.b', 'map.*', 'notAString', 'missing.key']);
 
         self::assertSame('https://example.com/', $normalized['a']);
@@ -141,7 +142,9 @@ final class UrlNormalizerTest extends TestCase
         ]);
         self::assertSame('https://abc.runs.apify.net/', $run->getContainerUrl());
         self::assertSame('https://abc.runs.apify.net/', $run->get('containerUrl'));
-        self::assertSame('https://api.apify.com/v2/datasets/d1/items', $run->toArray()['output']['results']);
+        /** @var array{output: array{results: string}} $runFields */
+        $runFields = $run->toArray();
+        self::assertSame('https://api.apify.com/v2/datasets/d1/items', $runFields['output']['results']);
 
         self::assertSame('https://x.example/', (new Dataset(['itemsPublicUrl' => 'https://X.example']))->get('itemsPublicUrl'));
         self::assertSame('https://x.example/', (new KeyValueStore(['keysPublicUrl' => 'https://X.example']))->get('keysPublicUrl'));
@@ -149,11 +152,12 @@ final class UrlNormalizerTest extends TestCase
         self::assertSame('https://x.example/', (new KeyValueStoreKey(['recordPublicUrl' => 'https://X.example']))->get('recordPublicUrl'));
         self::assertSame('https://x.example/', (new Task(['standbyUrl' => 'https://X.example']))->get('standbyUrl'));
         self::assertSame('https://x.example/hook', (new Webhook(['requestUrl' => 'https://X.example:443/hook']))->getRequestUrl());
-        self::assertSame(
-            'https://x.example/hook',
-            (new WebhookDispatch(['webhook' => ['requestUrl' => 'https://X.example/hook']]))->toArray()['webhook']['requestUrl'],
-        );
+        /** @var array{webhook: array{requestUrl: string}} $dispatchFields */
+        $dispatchFields = (new WebhookDispatch(['webhook' => ['requestUrl' => 'https://X.example/hook']]))->toArray();
+        self::assertSame('https://x.example/hook', $dispatchFields['webhook']['requestUrl']);
         $user = new User(['profile' => ['pictureUrl' => 'https://X.example', 'websiteUrl' => 'https://Y.example', 'name' => 'Not A URL']]);
-        self::assertSame(['https://x.example/', 'https://y.example/', 'Not A URL'], array_values($user->toArray()['profile']));
+        /** @var array{profile: array<string,string>} $userFields */
+        $userFields = $user->toArray();
+        self::assertSame(['https://x.example/', 'https://y.example/', 'Not A URL'], array_values($userFields['profile']));
     }
 }

@@ -70,6 +70,7 @@ final class DatasetIntegrationTest extends IntegrationTestCase
             $values = [];
             // chunkSize=2 across 5 items => three pages (2, 2, 1).
             foreach ($dataset->iterateItems(new DatasetListItemsOptions(), 2) as $item) {
+                /** @var array<string,mixed> $item */
                 $values[] = $item['n'];
             }
             sort($values);
@@ -140,7 +141,9 @@ final class DatasetIntegrationTest extends IntegrationTestCase
             $page = $dataset->listItems(new DatasetListItemsOptions());
             self::assertSame(3, $page->getCount());
             self::assertCount(3, $page->getItems());
-            self::assertSame(1, $page->getItems()[0]['n']);
+            /** @var array<string,mixed> $first */
+            $first = $page->getItems()[0];
+            self::assertSame(1, $first['n']);
             // isDesc() is sourced from the server's X-Apify-Pagination-Desc response header.
             self::assertFalse($page->isDesc());
 

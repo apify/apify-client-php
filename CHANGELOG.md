@@ -2,11 +2,11 @@
 
 ## 0.14.2
 
-- Synced with the Apify OpenAPI spec `v2-2026-11-18T151559Z`, as updated: Store Actors have the new `stats` and `isVerified` fields, the run origin `APIFY_AI` exists, and some response fields can be `null`. The models return them as received.
 - `StoreListOptions::$sortBy` is deprecated, as the API ignores it.
 - `store()->iterate()` with `search` makes one request, as the API returns a single page of at most 100 Actors and ignores `offset`. It used to repeat that page.
 - `versions()->create()` and `version()->update()` use the `long` timeout tier by default, since a version can carry its source files.
 - Documented the Store `category` filter and the `search` page limit.
+- Raised PHPStan to level 9 and added an integration test for `user($id)->get()`.
 
 ## 0.14.1
 
